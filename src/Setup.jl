@@ -814,7 +814,7 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
-function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}OneToCharge::Dict, AaToId::Dict,Sequences, OneToMass::Dict, OneToSigma::Dict, InputImage::Array{I}, InputMasses::Array{I}, InputCharges::Arraz{I}) where {I<:Integer, R<:Real}
+function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict,Sequences,  InputImage::Array{I}, InputMasses::Array{I}, InputCharges::Arraz{I}) where {I<:Integer, R<:Real}
     #=
     s = GSD.Frame()
     s.particles.N = 4
@@ -847,19 +847,17 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     ## Create Angles
     snapshot.angles.N = NAngles
     snapshot.angles.types = ["O-O-O"]
-    snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
+    snapshot.angles.typeid = zeros(Int32, NAngles)
     snapshot.angles.group = getBonds(Sequences, M=3)
 
     # Create Dihedrals
     snapshot.dihedrals.N =  NDihedrals 
-    snapshot.dihedrals.types = list(dihedral_list)
-    snapshot.dihedrals.typeid =  dihedral_AllIDs
+    snapshot.dihedrals.types = list(dihedral_list) ### TODO
+    snapshot.dihedrals.typeid =  dihedral_AllIDs ### TODO
     snapshot.dihedrals.group = getBonds(Sequences, M=4)
 
-    with gsd.hoomd.open(name=Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
-        f.append(snapshot)
-
-
-
+    file = GSD.open(name=fileName, mode='w')
+    append(file, snapshot)
 end
+
 end
