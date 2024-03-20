@@ -641,7 +641,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
         WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, 100_000, 0.01, BoxLength/10.0, now().instant.periods.value%65535, UseAngles=AlphaAddition) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
-        writeGSDStartFile("./StartTraj.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, Positions, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_map, dihedral_list)
+        writeGSDStartFile(StartFileName, NAtoms, NBonds, NAngles, NDihedrals,BoxLength, Positions, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_map, dihedral_list)
     else
         writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
         writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
