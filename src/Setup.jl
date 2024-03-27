@@ -727,7 +727,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
 end
 
 function getBonds(Sequences::Vector{String}; M=2)
-    N = sum(length.(Sequences))
+    N = sum(length.(Sequences).-(M-1))
     bonds = zeros(N, M)
     bondid = 0
     for (SeqId, Sequence) in enumerate(Sequences)
