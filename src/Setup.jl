@@ -1,8 +1,11 @@
 export createDenseStartingPosition, writeCollectedSlurmScript
 
 
-
 module Setup
+
+### preliminary GSD_wrapper include
+include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
+include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
 
 #include("ProteinSequences.jl")
 #using .ProteinSequences
@@ -14,17 +17,20 @@ using .BioData
 
 
 function determineDihedrals(Sequences, Types, TypeToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule="1-1001-1")
-    dihedral_map = Dict()
+    dihedral_short_map = Dict()
+    dihedral_long_map = Dict()
+
     dihedral_eps = zeros(400)
     dihedral_cnt=0
     eps=0.
     AA_ind = 1
     AA2_ind = 1
 
+    ReverseDihedralMap = Dict()
     key=()
     M = MixingRule=="1-1001-1" ? 4 : 2
-    dihedral_list = zeros( sum(length.(Sequences).-3), M)
-    ind = 1
+    dihedral_list = zeros(Int32, sum(length.(Sequences).-3), M)
+    index = 1
     for Sequence in Sequences
         SeqLength = length(Sequence)
         for (ind, AA) in enumerate(Sequence)
@@ -71,22 +77,28 @@ function determineDihedrals(Sequences, Types, TypeToId, OneToHPSDihedral0110, On
                     eps = (OneToHPSDihedral0110[AA1]+OneToHPSDihedral0110[AA2])/2.
                     key = (min(AA_ind,AA2_ind), max(AA_ind,AA2_ind))
                 end
-                dihedral_list[ind, :] .= key 
-                if ! haskey(dihedral_map, key)
-                    same_eps_ind = findfirst(x->x==round(eps;digits=4), dihedral_eps)
+                if ! haskey(dihedral_short_map, key)
+                    eps_short = round(eps;digits=4)
+                    same_eps_ind = findfirst(x->x==eps_short, dihedral_eps)
                     if same_eps_ind===nothing
                         dihedral_cnt+=1
-                        dihedral_map[key]=dihedral_cnt
-                        dihedral_eps[dihedral_cnt] = round(eps;digits=4)
+                        dihedral_short_map[key]=dihedral_cnt
+                        dihedral_long_map[key]=dihedral_cnt
+
+                        ReverseDihedralMap[eps_short] = key
+                        dihedral_eps[dihedral_cnt] = eps_short
                     else
-                        dihedral_map[key]=same_eps_ind
+                        dihedral_long_map[key]=same_eps_ind
+                        key = ReverseDihedralMap[eps_short]
                     end
                 end
+                dihedral_list[index, :] .= key 
+                index += 1
             end
         end
     end
     dihedral_eps = dihedral_eps[1:dihedral_cnt]
-    return (dihedral_map, dihedral_eps, dihedral_list)
+    return (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list)
 end
 
 BondStrength = Dict("Calvados2"=>19.19,"ArashModell"=>20.0 )
@@ -194,7 +206,6 @@ function writeHPSLammpsScript(fileName, StartFileName, AtomTypes, LongAtomTypes,
             if id2<id
                 continue
             end
-           # println(" $id $id2 $ResType $ResType2")
             charge = OneToCharge[ResType]*OneToCharge[ResType2]
             lambda = (OneToLambda[ResType]+OneToLambda[ResType2])/2.
             sigma = (OneToSigma[ResType]+OneToSigma[ResType2])/2.
@@ -428,7 +439,7 @@ end
 function correctPositionInBounds(pos, boxSize, Sequences)
     box = boxSize/2.0
     box_neg = -1.0.*box
-    println(boxSize)
+
     for (SeqID, Seq) in enumerate(Sequences)
         for (atom,_) in enumerate(Seq)
             for i in 1:3
@@ -476,7 +487,7 @@ end
 function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
 
     AtomTypes= Set(join(Sequences))
-    AaToId = Dict()
+    AaToId = Dict{Char,Int32}()
     for (index, value) in enumerate(AtomTypes)
         AaToId[value]=index
     end
@@ -544,7 +555,6 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
     end
     IdToAa=Dict( (v => k) for (k, v) in AaToId)
 
-    AaToId
     return (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
 
@@ -560,7 +570,6 @@ function getImageCopyNumber(pos, boxSize, Sequences)
                 diff[i] = tmp_pos[SeqID, atom, i]-tmp_pos[SeqID, atom-1, i]
 
                 if abs(diff[i]-boxSize[i])<abs(diff[i]) # || abs(diff[i]+boxSize[i])<abs(diff[i])
-                    #println("diff $(diff[i]), boxSize $(boxSize[i]), $(round(diff[i]/(boxSize[i]/2.))) ")
                     image[SeqID, atom,i] =  image[SeqID, atom-1,i]-1 #-1*convert(Int32,(round((diff[i]/(boxSize[i]/2.)/2.0))))  + image[SeqID, atom-1,i]
                     #tmp_pos[SeqID, atom, i] +=
                 elseif abs(diff[i]+boxSize[i])<abs(diff[i])
@@ -602,7 +611,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     NAtomTypes = length(LongAtomTypes)
 
  #   if AlphaAddition
-    (dihedral_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
+    (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
     NDihedralsTypes = length(dihedral_eps)
   #  end
 
@@ -636,12 +645,14 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         mkpath("./HOOMD_Setup")
         WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)
         WriteHOOMDParticlesInput("./HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
-        WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_map, dihedral_eps)
+        WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
         WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, 100_000, 0.01, BoxLength/10.0, now().instant.periods.value%65535, UseAngles=AlphaAddition) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
-        writeGSDStartFile(StartFileName, NAtoms, NBonds, NAngles, NDihedrals,BoxLength, Positions, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_map, dihedral_list)
+        InputMasses = [OneToMass[res] for res in join(Sequences)]
+        InputCharges = [OneToCharge[res] for res in join(Sequences)]
+        writeGSDStartFile(StartFileName[1:end-3]*"gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list)
     else
         writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
         writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
@@ -717,7 +728,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
                     elseif MixingRule=="0110"
                         key = (sort([AaToId[Seq[ResId+1]], AaToId[Seq[ResId+2]]]))
                     end
-                    write(file, "\t $dihedralid \t $(dihedral_map[key]) \t  $atomid \t  $(atomid+1) \t $(atomid+2) \t $(atomid+3)\n")
+                    write(file, "\t $dihedralid \t $(dihedral_long_map[key]) \t  $atomid \t  $(atomid+1) \t $(atomid+2) \t $(atomid+3)\n")
                 end
             end
         end 
@@ -728,17 +739,20 @@ end
 
 function getBonds(Sequences::Vector{String}; M=2)
     N = sum(length.(Sequences).-(M-1))
-    bonds = zeros(N, M)
+    bonds = zeros(Int32, (N, M))
     bondid = 0
+    atomid = 0
     for (SeqId, Sequence) in enumerate(Sequences)
         for (ResId,Res) in enumerate(Sequence)
             if ResId>(length(Sequence)-M+1)
+                atomid += 1
                 continue
             else
                 bondid += 1
                 for (id, i) in enumerate(0:M-1)
-                    bonds[bondid,id] = i 
+                    bonds[bondid,id] = atomid + i 
                 end
+                atomid += 1
             end
         end
     end 
@@ -771,9 +785,7 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     StartFile = open(Path*"test.sh", "w")
     RestartFile = open(Path*"test.sh", "w")
     for (RunNum, Protein) in enumerate(Proteins)
-        #println(RunNum," ", Protein)
         if(mod(RunNum,ProteinsPerSlurmFile)==1  || ProteinsPerSlurmFile==1)
-           # println("true")
             if(RunNum÷ProteinsPerSlurmFile>0)
                 write(StartFile, "\n\nwait ")
                 write(RestartFile, "\n\nwait ")
@@ -818,28 +830,29 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
-function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict,Sequences,  InputImage::Array{I}, InputMasses::Array{I}, InputCharges::Array{I}, DihedralMap::Dict, DihedralList::Vector{Tuple{Int32}}) where {I<:Integer, R<:Real}
+function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSD.Frame()    
+    snapshot.configuration.step = 1 
+    snapshot.configuration.dimensions = 3 
     snapshot.configuration.box = [Box[1],Box[2], Box[3], 0, 0, 0] #4:6 are tilt
 
-    # Type information
     snapshot.particles.N = NAtoms
-    snapshot.particles.position = reshape(Postions, (size(Positions, 1)*size(Positions, 2), 3)) ### reshape to match gsd formart
-    snapshot.particles.types =  values(AaToId)
-    snapshot.particles.typeid = [Int32(AaToId[AA]) for AA in Seq for Seq in Sequences]
-    snapshot.particles.image = InputImage
+    snapshot.particles.position = reshape(permutedims(Positions, (2,1,3)), (size(Positions, 1)*size(Positions, 2), 3)) ### permute to get alignment in memory, reshape to match gsd formart
+    snapshot.particles.types =  string.(collect(keys(AaToId)))
+    snapshot.particles.typeid = [Int32(AaToId[AA])-1 for AA in join(Sequences)] ### convert to python numbering
+    snapshot.particles.image = reshape(permutedims(InputImage, (2,1,3)), (size(InputImage, 1)*size(InputImage, 2), 3)) ### permute to get alignment in memory, reshape to match gsd formart
     snapshot.particles.mass = InputMasses
     snapshot.particles.charge = InputCharges
 
     ### Bond_data.group = (self.N, getM(data)
-    # Connect particles with bonds.
+    # Create Bonds
     snapshot.bonds.N = NBonds
     snapshot.bonds.types = ["O-O"]
     snapshot.bonds.typeid = zeros(Int32, NBonds)
     snapshot.bonds.group = getBonds(Sequences, M=2)
 
-    ## Create Angles
+    # Create Angles
     snapshot.angles.N = NAngles
     snapshot.angles.types = ["O-O-O"]
     snapshot.angles.typeid = zeros(Int32, NAngles)
@@ -847,12 +860,14 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
 
     # Create Dihedrals
     snapshot.dihedrals.N =  NDihedrals 
-    snapshot.dihedrals.types = values(DihedralMap)
-    snapshot.dihedrals.typeid =  DihedralList
+    snapshot.dihedrals.types = ["$(ids[1])-$(ids[2])-$(ids[3])-$(ids[4])" for ids in collect(keys(DihedralMap))]#string.(collect(values(DihedralMap)))
+    snapshot.dihedrals.typeid = [DihedralMap[DihedralList[key,:]]-1 for key in axes(DihedralList,1)] ### convert to python numbering
     snapshot.dihedrals.group = getBonds(Sequences, M=4)
 
-    file = GSD.open(name=fileName, mode='w')
-    append(file, snapshot)
+    file = GSD.open(FileName, 'w')
+    GSD.append(file, snapshot)
+    GSD.close(file)
+
 end
 
 end
