@@ -1,5 +1,6 @@
 import time
 
+import os
 
 import numpy as np
 
@@ -14,16 +15,21 @@ from hoomd import ashbaugh_plugin
 from hoomd import plugin_HPS_SS
 #import ashbaugh_plugin as aplugin
 
-def run(FolderPath):
+PWD = os.getcwd()
+
+def run(FolderPath):#, GPUNUM):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
+    Params = readParam(f"{FolderPath}Params.txt")
+
+
     Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}Sequences.txt")
 
     InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}Particles.txt", NBeads, Seqs)
 
-    dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}DihedralMap.txt", Seqs, InputTypes)
+    if Params["UseAngles"]:
+        dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}DihedralMap.txt", Seqs, InputTypes)
 
-    Params = readParam(f"{FolderPath}Params.txt")
 
     IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}Dictionaries.txt")
 
@@ -44,7 +50,7 @@ def run(FolderPath):
     Types = np.array(tmp)
 
 
-    gpu = hoomd.device.GPU()
+    gpu = hoomd.device.GPU()#gpu_ids=[GPUNUM])
     sim = hoomd.Simulation(device=gpu, seed=Params["Seed"])
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
 
@@ -81,10 +87,14 @@ def run(FolderPath):
         snapshot.dihedrals.typeid =  dihedral_AllIDs
         snapshot.dihedrals.group = InputDihedrals
 
-        with gsd.hoomd.open(name=Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
+        with gsd.hoomd.open(name=PWD+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
             f.append(snapshot)
 
-        sim.create_state_from_gsd(filename=Params["Simname"]+"_StartConfiguration.gsd")
+        sim.create_state_from_gsd(filename=PWD+Params['Simname']+"_StartConfiguration.gsd")
+    else:
+
+        print(f"Creat start from: {PWD+Params['Simname']}gsd")
+        sim.create_state_from_gsd(filename=PWD+Params["Simname"]+".gsd")
 
 
     forces = []
@@ -94,10 +104,17 @@ def run(FolderPath):
     harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
     forces.append(harmonic)
 
-    cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=2.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
-    cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
+    if Params["UseAngles"]:
+        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=2.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
+        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
+    else:
+        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=2.0, exclusions=['bond'])
+        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
+        #cell  = hoomd.md.nlist.Cell(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
+
 
     if Params["UseCharge"]:
+        print("Using electrostatics")
         # # electrostatics forces
         yukawa = hoomd.md.pair.Yukawa(nlist=cell)
         for i in IDToResName.keys():
@@ -120,7 +137,6 @@ def run(FolderPath):
             ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":round((IDToSigma[i]+IDToSigma[j])/20.0,5), "lam":(IDToLambda[i]+IDToLambda[j])/2.0}#, "lam":(IDToLambda[i]+IDToLambda[j])/2.0} ### convert to nm as well
             ash.r_cut[(res_i,res_j)] = 2.0
 
-
     if Params["UseAngles"]:
         # ANGLE POTENTIAL 
         anglePotential = getAnglePotential()
@@ -131,27 +147,53 @@ def run(FolderPath):
         forces.append(dihedralPotential)
 
 
-
     if Params["Minimise"]:
+        print("minimising energy")
         ### Minimise energy
-        sim = minimiseSystem(sim, cell, forcesWithoutLJ=forces, IDToResName=IDToResName, IDToLambda=IDToLambda, IDToSigma=IDToSigma, kT=kT)
+        sim = minimiseSystem(sim, cell, forcesWithoutLJ=forces, IDToResName=IDToResName, IDToLambda=IDToLambda, IDToSigma=IDToSigma, kT=kT, Params=Params)
        
         sn2= sim.state.get_snapshot()
+        snapshot = gsd.hoomd.Frame()  
+        snapshot.configuration.step = 1
+        snapshot.configuration.dimensions = sn2.configuration.dimensions
+        snapshot.configuration.box = sn2.configuration.box
 
+        snapshot.particles.N = sn2.particles.N
         snapshot.particles.position = sn2.particles.position
+        snapshot.particles.types =  sn2.particles.types
+        snapshot.particles.typeid = sn2.particles.typeid
+        snapshot.particles.image = sn2.particles.image
+        snapshot.particles.mass = sn2.particles.mass
+        snapshot.particles.charge = sn2.particles.charge
 
-        with gsd.hoomd.open(name=Params["Simname"] + "_minimised.gsd", mode='w') as f:
+        snapshot.bonds.N = sn2.bonds.N
+        snapshot.bonds.types = sn2.bonds.types
+        snapshot.bonds.typeid = sn2.bonds.typeid
+        snapshot.bonds.group = sn2.bonds.group
+        if Params["UseAngles"]:
+            snapshot.angles.N = sn2.angles.N
+            snapshot.angles.types = sn2.angles.types
+            snapshot.angles.typeid = sn2.angles.typeid
+            snapshot.angles.group = sn2.angles.group
+
+            snapshot.dihedrals.N =  sn2.dihedrals.N 
+            snapshot.dihedrals.types = sn2.dihedrals.types
+            snapshot.dihedrals.typeid = sn2.dihedrals.typeid
+            snapshot.dihedrals.group = sn2.dihedrals.group
+
+        with gsd.hoomd.open(name=PWD+Params["Simname"] + "_minimised.gsd", mode='w') as f:
             f.append(snapshot)
 
 
-    if Params["Use_Minimised_GSD"] or Params["Alt_GSD_Start"]!="-":
-        gpu = hoomd.device.GPU()
+    if Params["Alt_GSD_Start"]!="-": # Params["Use_Minimised_GSD"] or 
+        gpu = hoomd.device.GPU()#gpu_ids=[GPUNUM])
         sim = hoomd.Simulation(device=gpu, seed=Params["Seed"])
-        if Params["Use_Minimised_GSD"]:
-            sim.create_state_from_gsd(filename=Params["Simname"]+"_minimised.gsd")
-        else:
-            sim.create_state_from_gsd(filename=Params["Alt_GSD_Start"])
-
+        #if Params["Use_Minimised_GSD"]:
+        #    print("A")
+        #    sim.create_state_from_gsd(PWD+Params["Simname"] + "_minimised.gsd")
+       # else:
+        print("B")
+        sim.create_state_from_gsd(filename=PWD+Params["Alt_GSD_Start"])
 
 
     ### logging quantitites
@@ -169,12 +211,14 @@ def run(FolderPath):
     logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
     table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
     sim.operations.writers.append(table)
+        
 
 
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
     sim.operations.integrator = integrator
     nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
+    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
     integrator.methods = [nvt]
     integrator.dt = Params["dt"]
 
@@ -183,7 +227,11 @@ def run(FolderPath):
         nvt.gamma[name] = IDToMass[i]/100.0
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
     sim.operations.integrator=integrator
+
     forces.append(ash)
+
+
+
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
@@ -194,7 +242,6 @@ def run(FolderPath):
         now = 0
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
-
 
     ### start simulation
     sim.run(Params["NSteps"])
@@ -207,8 +254,10 @@ def run(FolderPath):
 if __name__ == '__main__':
     if len(sys.argv)<2:
         print("Need folder of input parameters as second argument.")
+        #print("Expect GPU number as third argument.")
+
     else:
-        print(sys.argv[1])
-        run(sys.argv[1])
+        print(sys.argv[1])#, sys.argv[2])
+        run(sys.argv[1])#, int(sys.argv[2]))
 
  

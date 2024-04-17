@@ -599,7 +599,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         NAngles += length(Seq)-2
         NDihedrals += length(Seq)-3
     end
-    AlphaAddition=true
+    AlphaAddition=false
     if SimulationType=="Calvados2+Alpha"
         AlphaAddition = true
         SimulationType="Calvados2"
@@ -610,10 +610,12 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
     NAtomTypes = length(LongAtomTypes)
 
- #   if AlphaAddition
-    (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
-    NDihedralsTypes = length(dihedral_eps)
-  #  end
+    dihedral_short_map=Dict()
+    dihedral_list = zeros(Int32, (0,0))
+    if AlphaAddition
+        (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
+        NDihedralsTypes = length(dihedral_eps)
+    end
 
     if InitStyle=="Slab"
         pos = createStartingPosition(Sequences, BoxSize)
@@ -645,14 +647,16 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         mkpath("./HOOMD_Setup")
         WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)
         WriteHOOMDParticlesInput("./HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
-        WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
+        if AlphaAddition
+            WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
+        end
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
         WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, 100_000, 0.01, BoxLength/10.0, now().instant.periods.value%65535, UseAngles=AlphaAddition) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
-        writeGSDStartFile(StartFileName[1:end-3]*"gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list)
+        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition) #StartFileName[1:end-3]*"gsd"
     else
         writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
         writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
@@ -731,7 +735,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
                     write(file, "\t $dihedralid \t $(dihedral_long_map[key]) \t  $atomid \t  $(atomid+1) \t $(atomid+2) \t $(atomid+3)\n")
                 end
             end
-        end 
+        end
 
         close(file)
     end
@@ -830,20 +834,23 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
-function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}) where {I<:Integer, R<:Real, I2<:Integer}
+function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSD.Frame()    
     snapshot.configuration.step = 1 
     snapshot.configuration.dimensions = 3 
-    snapshot.configuration.box = [Box[1],Box[2], Box[3], 0, 0, 0] #4:6 are tilt
-
+    println("I am here\n$([Box[1],Box[2], Box[3], 0, 0, 0]./10.0 )")
+    snapshot.configuration.box = [Box[1],Box[2], Box[3], 0, 0, 0]./10.0 #4:6 are tilt
+    println(snapshot.configuration.box)
     snapshot.particles.N = NAtoms
-    snapshot.particles.position = reshape(permutedims(Positions, (2,1,3)), (size(Positions, 1)*size(Positions, 2), 3)) ### permute to get alignment in memory, reshape to match gsd formart
+    snapshot.particles.position = reshape(permutedims(Positions, (2,1,3)), (size(Positions, 1)*size(Positions, 2), 3))./10.0 ### permute to get alignment in memory, reshape to match gsd formart
     snapshot.particles.types =  string.(collect(keys(AaToId)))
     snapshot.particles.typeid = [Int32(AaToId[AA])-1 for AA in join(Sequences)] ### convert to python numbering
     snapshot.particles.image = reshape(permutedims(InputImage, (2,1,3)), (size(InputImage, 1)*size(InputImage, 2), 3)) ### permute to get alignment in memory, reshape to match gsd formart
     snapshot.particles.mass = InputMasses
     snapshot.particles.charge = InputCharges
+    snapshot.particles.diameter =  [Float32(AaToSigma[AA]) for AA in join(Sequences)]
+
 
     ### Bond_data.group = (self.N, getM(data)
     # Create Bonds
@@ -852,17 +859,19 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     snapshot.bonds.typeid = zeros(Int32, NBonds)
     snapshot.bonds.group = getBonds(Sequences, M=2)
 
-    # Create Angles
-    snapshot.angles.N = NAngles
-    snapshot.angles.types = ["O-O-O"]
-    snapshot.angles.typeid = zeros(Int32, NAngles)
-    snapshot.angles.group = getBonds(Sequences, M=3)
+    if UseAngles
+        # Create Angles
+        snapshot.angles.N = NAngles
+        snapshot.angles.types = ["O-O-O"]
+        snapshot.angles.typeid = zeros(Int32, NAngles)
+        snapshot.angles.group = getBonds(Sequences, M=3)
 
-    # Create Dihedrals
-    snapshot.dihedrals.N =  NDihedrals 
-    snapshot.dihedrals.types = ["$(ids[1])-$(ids[2])-$(ids[3])-$(ids[4])" for ids in collect(keys(DihedralMap))]#string.(collect(values(DihedralMap)))
-    snapshot.dihedrals.typeid = [DihedralMap[DihedralList[key,:]]-1 for key in axes(DihedralList,1)] ### convert to python numbering
-    snapshot.dihedrals.group = getBonds(Sequences, M=4)
+        # Create Dihedrals
+        snapshot.dihedrals.N =  NDihedrals 
+        snapshot.dihedrals.types = ["$(ids[1])-$(ids[2])-$(ids[3])-$(ids[4])" for ids in collect(keys(DihedralMap))]#string.(collect(values(DihedralMap)))
+        snapshot.dihedrals.typeid = [DihedralMap[DihedralList[key,:]]-1 for key in axes(DihedralList,1)] ### convert to python numbering
+        snapshot.dihedrals.group = getBonds(Sequences, M=4)
+    end
 
     file = GSD.open(FileName, 'w')
     GSD.append(file, snapshot)

@@ -1,6 +1,7 @@
 
 import numpy as np
 import hoomd
+import hoomd.md
 from hoomd import plugin_HPS_SS
 import copy
 
@@ -97,6 +98,7 @@ def readParticleData(fileName, Nparticles, Sequences):
 def readDictionaries(filename):
     ID,resname, q, mass, sigma, lamda_val = np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)#int, converters={0: lambda x: int(x), 1: lambda x: str(x).strip(), 2: lambda x: float(x), 3: lambda x: float(x), 4: lambda x: float(x), 5: lambda x: float(x) })
     ID=ID.astype(int)-1
+    resname = np.array([f" {aa}" if len(aa)==1 else aa for aa in resname])
     IDToResName = dict(zip(ID, resname.astype(str)))
     IDToCharge  = dict(zip(ID, q.astype(float)))
     IDToMass    = dict(zip(ID, mass.astype(float)))
@@ -220,64 +222,67 @@ def getDihedralPotential(dihedral_list, dihedral_IDs, dihedral_eps):
 
     return dihedralPotential
 
-def minimiseSystem(sim,cell, forcesWithoutLJ, IDToResName, IDToLambda, IDToSigma, kT):
+def minimiseSystem(sim,cell, forcesWithoutLJ, IDToResName, IDToLambda, IDToSigma, kT, Params):
     forces = copy.deepcopy(forcesWithoutLJ)
     # # nonbonded: ashbaugh-hatch potential
-
-    ash =hoomd.md.pair.LJ(nlist=cell, default_r_on=0.0, mode="shift", tail_correction=False)
-    for i in IDToResName.keys():
-        res_i = IDToResName[i]
-        for j in IDToResName.keys():
-            res_j = IDToResName[j]
-            ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":0.1}
-            ash.r_cut[(res_i,res_j)] = 2.0
-
     sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
-
-    
-    print("first minimisation")
-    #dt = 0.005
-    fire = hoomd.md.minimize.FIRE(dt=0.0001, force_tol=1e-2,angmom_tol=1e-2,energy_tol=1e-6)
+    fire = hoomd.md.minimize.FIRE(dt=0.001, force_tol=1e-3,angmom_tol=1e-3,energy_tol=1e-3)
     fire.methods.append(hoomd.md.methods.ConstantVolume(hoomd.filter.All()))
     sim.operations.integrator = fire
-    f_tmp = copy.deepcopy(forcesWithoutLJ)
-    f_tmp.append(ash)
-    sim.operations.integrator.forces= f_tmp
-    cnt=0
-    while not(fire.converged):
-        if (cnt%10)==0: print(cnt)
-        sim.run(100)
-        cnt+=1
-    print("done")
+
+    if True:
+        ash =hoomd.md.pair.LJ(nlist=cell, default_r_on=0.0, mode="shift", tail_correction=False)
+        for i in IDToResName.keys():
+            res_i = IDToResName[i]
+            for j in IDToResName.keys():
+                res_j = IDToResName[j]
+                ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":0.1}
+                ash.r_cut[(res_i,res_j)] = 2.0
+
+        sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+
+        
+        print("first minimisation")
+        #dt = 0.005
+
+        f_tmp = copy.deepcopy(forcesWithoutLJ)
+        f_tmp.append(ash)
+        sim.operations.integrator.forces= f_tmp
+        cnt=0
+        while not(fire.converged)and cnt<100:
+            if (cnt%10)==0: print(cnt)
+            sim.run(100)
+            cnt+=1
+        print("done")
 
 
 
 
-    ash =hoomd.md.pair.LJ(nlist=cell, default_r_on=0.0, mode="shift", tail_correction=False)
-    for i in IDToResName.keys():
-        res_i = IDToResName[i]
-        for j in IDToResName.keys():
-            res_j = IDToResName[j]
-            ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":0.2}
-            ash.r_cut[(res_i,res_j)] = 2.0
+        ash =hoomd.md.pair.LJ(nlist=cell, default_r_on=0.0, mode="shift", tail_correction=False)
+        for i in IDToResName.keys():
+            res_i = IDToResName[i]
+            for j in IDToResName.keys():
+                res_j = IDToResName[j]
+                ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":0.2}
+                ash.r_cut[(res_i,res_j)] = 2.0
 
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+        sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
 
-    
-    print("first minimisation")
-    #dt = 0.005
-    fire = hoomd.md.minimize.FIRE(dt=0.001, force_tol=1e-2,angmom_tol=1e-2,energy_tol=1e-6)
-    fire.methods.append(hoomd.md.methods.ConstantVolume(hoomd.filter.All()))
-    sim.operations.integrator = fire
-    f_tmp = copy.deepcopy(forcesWithoutLJ)
-    f_tmp.append(ash)
-    sim.operations.integrator.forces= f_tmp
-    cnt=0
-    while not(fire.converged):
-        if (cnt%10)==0: print(cnt)
-        sim.run(100)
-        cnt+=1
-    print("done")
+        
+        print("first minimisation")
+        #dt = 0.005
+        fire = hoomd.md.minimize.FIRE(dt=0.001, force_tol=1e-2,angmom_tol=1e-2,energy_tol=1e-4)
+        fire.methods.append(hoomd.md.methods.ConstantVolume(hoomd.filter.All()))
+        sim.operations.integrator = fire
+        f_tmp = copy.deepcopy(forcesWithoutLJ)
+        f_tmp.append(ash)
+        sim.operations.integrator.forces= f_tmp
+        cnt=0
+        while not(fire.converged) and cnt<100:
+            if (cnt%10)==0: print(cnt)
+            sim.run(100)
+            cnt+=1
+        print("done")
 
 
     sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
@@ -296,14 +301,14 @@ def minimiseSystem(sim,cell, forcesWithoutLJ, IDToResName, IDToLambda, IDToSigma
     f_tmp.append(ash)
     sim.operations.integrator.forces = f_tmp
     cnt=0
-    fire.reset()
-    while not(fire.converged):
+    #fire.reset()
+    while not(fire.converged) and cnt<100:
         if (cnt%10)==0: print(cnt)
         sim.run(100)
         cnt+=1
     print("done")
 
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
+    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/1.0)
 
     ash = ashbaugh_plugin.pair.AshbaughPair(nlist=cell, default_r_cut=2.0, default_r_on=0.0)
     for i in IDToResName.keys():
@@ -320,12 +325,48 @@ def minimiseSystem(sim,cell, forcesWithoutLJ, IDToResName, IDToLambda, IDToSigma
     sim.operations.integrator.forces = f_tmp
     cnt=0
     fire.reset()
-    while not(fire.converged):
+    while not(fire.converged) and cnt<100:
         if (cnt%10==0):
             print(cnt)
         sim.run(100)
         cnt+=1
     print("done")
+
+    if False:
+        print("md with low time step")
+
+        integrator = hoomd.md.Integrator(dt=Params["dt"]) 
+        sim.operations.integrator = integrator
+        nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT/100) ### ps^-1
+        integrator.methods = [nvt]
+        sim.operations.integrator.forces = f_tmp
+
+        
+        integrator.dt = Params["dt"]/10.0
+        sim.run(100000)
+        print("md: 1/5 done")
+
+        integrator.dt = Params["dt"]/5.0
+        sim.run(200000)
+        print("md: 2/5 done")
+
+
+        integrator.dt = Params["dt"]/2.0
+        sim.run(300000)
+        print("md: 3/5 done")
+
+
+        integrator.dt = Params["dt"]/1.5
+        sim.run(400000)
+        print("md: 4/5 done")
+
+        integrator.dt = Params["dt"]/1.2
+        sim.run(500000)
+        print("md: fully done")
+
+        integrator.dt = Params["dt"]/1.0
+        sim.run(1000000)
+        print("md: fully done2")
 
     return sim
 

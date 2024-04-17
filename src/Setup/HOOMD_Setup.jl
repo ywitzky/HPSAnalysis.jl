@@ -57,8 +57,8 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     write(io, "Trajectory: $(TrajectoryName)\n")
     write(io, "UseAngles: $(UseAngles)\n")
     write(io, "UseCharge: $(UseCharge)\n")
-    write(io, "Alt_GSD_Start: $(Alt_GSD_Start)")
-    write(io, "Create_Start_Config: $(Create_Start_Config)")
+    write(io, "Alt_GSD_Start: $(Alt_GSD_Start)\n")
+    write(io, "Create_Start_Config: $(Create_Start_Config)\n")
 
     close(io);
 end
