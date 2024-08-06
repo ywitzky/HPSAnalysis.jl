@@ -1,11 +1,12 @@
 
-using JLD2, Mmap, LoopVectorization ,  Printf, HDF5#, gsd # ProfileView,
+using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat#, gsd # ProfileView,
 
 ### preliminary GSD_wrapper include
-include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
-include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
+#include("/uni-mainz.de/homes/ywitzky/Code_Projects/GSD/src/gsd.jl")
+#include("/uni-mainz.de/homes/ywitzky/Code_Projects/GSD/src/HOOMDTrajectory.jl")
 
 include("./IO/IO_HOOMD.jl")
+include("./IO/Sequence_IO.jl")
 
 function parseXYZ!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     traj=open(Sim.TrajectoryFile, "r")
@@ -228,8 +229,8 @@ function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String,
             end
         end
     elseif Sim.TrajectoryFile[end-2:end] =="gsd"
-        gsdfileobj= GSD.open_gsd(Sim.TrajectoryFile, "r";application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
-        N = convert(I, GSD.get_nframes(gsdfileobj))
+        gsdfileobj= GSDFormat.open_gsd(Sim.TrajectoryFile, "r";application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
+        N = convert(I, GSDFormat.get_nframes(gsdfileobj))
         Sim.NSteps= N
     else
         error("Can find TrajectoryFile:\"$TrajectoryFile\".")
@@ -667,8 +668,12 @@ function SaveAllData(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         Dictionary[String(fieldname)]= getfield(Sim,fieldname)
     end
     SaveFields(Sim,"All",Dictionary)
+    println("ASDFG $(Sim.BigDataList)")
+    println("Asphericity, size $(sizeof(getfield(Sim,:Asphericity)))")
+
     for fields in Sim.BigDataList
-        save(Sim.DataPath*String(fields)*".jld2",Dict(String(fields)=> getfield(Sim,fields)))
+        println("$fields, size $(sizeof(getfield(Sim,fields)))")
+        JLD2.save(Sim.DataPath*String(fields)*".jld2",Dict(String(fields)=> getfield(Sim,fields)))
     end
 end
 

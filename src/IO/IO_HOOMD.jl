@@ -1,26 +1,34 @@
 function read_HOOMD_GSD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-    gsdfileobj = GSD.open_gsd(Sim.TrajectoryFile, "r"; application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
+    gsdfileobj = GSDFormat.open_gsd(Sim.TrajectoryFile, "r"; application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
     N = Sim.NAtoms
-    images_not_saved = false
+    image_old = zeros(R, (N, 3))
+
+    images_not_saved = zeros(Bool, Sim.NSteps)# false
     for step in 1:Sim.NSteps
-        xyz   = GSD.read_chunk(gsdfileobj; frame=step-1, name="particles/position") * 10 ### convert from nm to Angstroem
+        xyz   = GSDFormat.read_chunk(gsdfileobj; frame=step-1, name="particles/position") * 10 ### convert from nm to Angstroem
 
         Sim.x[1:N,step] .=  xyz[1:N,1]
         Sim.y[1:N,step] .=  xyz[1:N,2]
         Sim.z[1:N,step] .=  xyz[1:N,3]
 
-        if GSD.chunk_exists(gsdfileobj;frame=step-1, name="particles/image")
-            image = GSD.read_chunk(gsdfileobj; frame=step-1, name="particles/image") 
+        if GSDFormat.chunk_exists(gsdfileobj;frame=step-1, name="particles/image")
+            image = GSDFormat.read_chunk(gsdfileobj; frame=step-1, name="particles/image") 
 
             Sim.x_uw[1:N,step] .= Sim.x[1:N,step] .+ Sim.BoxLength[1].*image[1:N,1]
             Sim.y_uw[1:N,step] .= Sim.y[1:N,step] .+ Sim.BoxLength[2].*image[1:N,2]
             Sim.z_uw[1:N,step] .= Sim.z[1:N,step] .+ Sim.BoxLength[3].*image[1:N,3]
+            image_old .= image
         else
-            images_not_saved = true
+            ### may cause issues for a few particles
+            Sim.x_uw[1:N,step] .= Sim.x[1:N,step] .+ Sim.BoxLength[1].*image_old[1:N,1]
+            Sim.y_uw[1:N,step] .= Sim.y[1:N,step] .+ Sim.BoxLength[2].*image_old[1:N,2]
+            Sim.z_uw[1:N,step] .= Sim.z[1:N,step] .+ Sim.BoxLength[3].*image_old[1:N,3]
+            println("Step: $step")
+            images_not_saved[step] = true
         end
     end
 
-    if images_not_saved
+    if all(images_not_saved)
         unfoldPositions(Sim)
     end
 
