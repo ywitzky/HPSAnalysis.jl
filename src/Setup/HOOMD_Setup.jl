@@ -24,7 +24,7 @@ function WriteHOOMDParticlesInput(filename::String, pos::Array{R}, ToCharge, ToI
     cnt=1
     for (SeqID, Seq) in enumerate(Sequences)
         for (atom,res) in enumerate(Seq)
-            write(io, "$(cnt), $(ToID[res]) , $(@sprintf("%.3f",pos[SeqID,atom, 1])), $(@sprintf("%.3f",pos[SeqID,atom, 2])), $(@sprintf("%.3f",pos[SeqID,atom, 3])), $(ToCharge[res]), $(ToMass[res]), $(ToDiameter[res]) , $(image[SeqID, atom,1]) , $(image[SeqID, atom,2]) , $(image[SeqID, atom,3]) \n");
+            write(io, "$(cnt), $(ToID[res] -1) , $(@sprintf("%.3f",pos[SeqID,atom, 1])), $(@sprintf("%.3f",pos[SeqID,atom, 2])), $(@sprintf("%.3f",pos[SeqID,atom, 3])), $(ToCharge[res]), $(ToMass[res]), $(ToDiameter[res]) , $(image[SeqID, atom,1]) , $(image[SeqID, atom,2]) , $(image[SeqID, atom,3]) \n");
             cnt += 1
         end
     end
@@ -42,7 +42,7 @@ function WriteDihedrals(filename, dihedral_map, dihedral_eps)
     close(io)
 end
 
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false)
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU")
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
     write(io, "Seed: $Seed\n")
@@ -59,6 +59,9 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     write(io, "UseCharge: $(UseCharge)\n")
     write(io, "Alt_GSD_Start: $(Alt_GSD_Start)\n")
     write(io, "Create_Start_Config: $(Create_Start_Config)\n")
+    write(io, "epsilon_r: $(ϵ_r)\n")
+    write(io, "kappa: $(κ)\n")
+    write(io, "Device: $(Device)\n")
 
     close(io);
 end

@@ -125,11 +125,11 @@ def readDihedrals(fileName, Sequences, IDs):
     return dihedrals, dihedral_dict, dihedral_list, dihedral_IDs, id_list
 
 def parseKeywords(keyword, value):
-    if keyword in ["Simname", "Trajectory","Alt_GSD_Start"]:
+    if keyword in ["Simname", "Trajectory","Alt_GSD_Start", "Device"]:
         return value
     if keyword in ["Seed", "NSteps", "NOut"]:
         return int(value)
-    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp"]:
+    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa"]:
         return float(value)
     if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config"]:
         return value=="True" or value=="true"

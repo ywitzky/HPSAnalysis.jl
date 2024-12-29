@@ -36,10 +36,14 @@ function computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     conversion = 1.66053906660/volume/Sim.Resolution
     lowestind = Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1
     highestind = Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) 
+    Ninds = abs(lowestind)+1+highestind
     #printstyled("Subtract COM and add wrap afterwards\n"; color=:red)
 
     Pseudohelical = zeros(Bool,Sim.NAtoms)
     AlphaHelixProb = zeros(eltype(Sim.x), Sim.NAtoms)
+
+    println(Sim.BoxSize)
+    println("low: $(lowestind), high: $(highestind)")
     for (j,step) in enumerate(Sim.ClusterRange)### 1:NSteps
         if step %200 == 0 println("step $step") end
 
@@ -52,12 +56,27 @@ function computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
             ### so far dont use particles that arent in the box
             ind = Int32(ceil((SlabCoord[atom,step]-AxisCOM[j])/Sim.Resolution))
 
+
             #ind = ind >= lowestind && ind<= highestind ?  ind : continue
             if ind < lowestind 
-                ind = highestind - (lowestind-ind)
+                ind = highestind - (lowestind-ind)%Ninds
             elseif  ind> highestind
-                ind =lowestind + (ind-highestind)
+                ind =lowestind + (ind-highestind)%Ninds
             end
+
+            #= 
+            if ind < lowestind || ind> highestind
+                println("atom $(atom)")
+                println("COM: $(AxisCOM[j])")
+                println("y: $(SlabCoord[atom,step])")
+                println("ind pre: $(Int32(ceil((SlabCoord[atom,step]-AxisCOM[j])/Sim.Resolution)))")
+                println("ind: $(ind)")
+                println("bla: $(ind%Ninds)")
+                println("fix: $( highestind - (lowestind-(ind%Ninds)))")
+                println("fix2: $( highestind - (lowestind-ind)%Ninds)")
+            end=#
+
+
 
             Sim.SlabHistogramSeries[ind , step,1]+= Sim.Masses[atom]
             if Sim.Charges[atom] > 0

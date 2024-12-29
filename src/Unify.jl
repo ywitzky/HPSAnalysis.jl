@@ -22,18 +22,17 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
         Weights = fill(FakeArray(1,1), length(Paths))
     end
     if length(BasePathAdd)==0
-        BasePathAdd = fill("", length(Paths))
+        BasePathAdd = [fill("", length(file)) for file in LmpFiles]
     end
 
-    Results = Dict{String, Vector{Any}}()
+    Results = Dict{String,  Tuple{Any, Vector{Any}}}()
     KeyNames = Vector{Tuple{eltype(Fields), String}}()
     Tmp = Dict{Tuple{Int, String}, Any}()#Dict{Tuple{Tuple{Int32,String}, Any}}#Vector{Array{eltype(Any)}}}}
     Axes = Dict("RGSeries" =>2 , "AlphaHelixProb"=>0, "VarLocalPersistenceLength"=>0, "Asphericity"=>2,"Acylindricity"=>2, "ShapeAsymmetry"=> 2,"REEHists"=>0 )
 
-
     ### Initialise Data Structure
     for (ProtID, PathVec) in enumerate(Paths)
-        Data = initData(PathVec[1], LmpFiles[ProtID][1]; Reparse=false, LoadAll=false, BasePathAdd=BasePathAdd[1][1])
+        Data = initData(PathVec[1]; LmpName=LmpFiles[ProtID][1], Reparse=false, LoadAll=false,BasePathAdd=BasePathAdd[ProtID][1])
         (RGMeasureStep, End) = GetFieldsFromData(Data, ["RGMeasureStep", "NSteps"])
         LocStep = RGMeasureStep < StepWidth ? RGMeasureStep : StepWidth
         for (ID, field) in enumerate(Fields)
@@ -42,10 +41,13 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
             (field_data,) = GetFieldsFromData(Data, [String(field)])
             NDims = ndims(field_data)
             if Axes[field]>NDims || Axes[field]<0
-                printstyled("Axes indices for $field is too low/high for ndims=$(NDims). Stop working!\n"; color=:red)
+                printstyled("Axes indices for field: \"$field \" is too low/high for ndims=$(NDims). Stop working!\n"; color=:red)
                 return Results
             end
             
+            #start_val = Start > size(Data)[Axes[field]] ?  1 : Start
+            #end_val = Start > size(Data)[Axes[field]] ?  size(Data)[Axes[field]] : End
+
             if Axes[field]==0 ### already averages, take number of measurements as weight
                 Tmp[(ProtID,Key)]=CMA_Init(field_data,weight=length(Start:LocStep:End))
             else
@@ -61,7 +63,7 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
     for (ProtID, PathVec) in enumerate(Paths)
          ### Add other simulation runs
         for (SimRun,Path) in enumerate(PathVec[2:end])
-            Data = initData(Path, LmpFiles[ProtID][SimRun]; Reparse=false, LoadAll=true,BasePathAdd=BasePathAdd[ProtID][SimRun])
+            Data = initData(Path; LmpName=LmpFiles[ProtID][SimRun], Reparse=false, LoadAll=false,BasePathAdd=BasePathAdd[ProtID][SimRun])
             (RGMeasureStep, End) = GetFieldsFromData(Data, ["RGMeasureStep", "NSteps"])
             LocStep = RGMeasureStep < StepWidth ? RGMeasureStep : StepWidth
             for (ID, field) in enumerate(Fields)
@@ -77,16 +79,19 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
                 end
             end
         end
+
         ### compute final result
         for (ID, field) in enumerate(Fields)
             (field,Key)=KeyNames[ID]
-            (mean, error) = CMA_Finalize(Tmp[(ProtID,Key)])
+            (mean,std, error) = CMA_Finalize(Tmp[(ProtID,Key)])
             if ProtID==1
-                Results[Key] = Vector{eltype(mean)}(undef, length(Paths))
-                Results["$(Key)_Error"] = Vector{eltype(error)}(undef, length(Paths))
+                Results[Key] = (Vector{typeof(mean)}, Vector{eltype(mean)}(undef, length(Paths)))
+                Results["$(Key)_σ"] =  (Vector{typeof(std)},  Vector{eltype(std)}(undef, length(Paths)))
+                Results["$(Key)_Error"] = (Vector{typeof(error)},  Vector{eltype(error)}(undef, length(Paths)))
             end
-            Results[Key][ProtID] = mean
-            Results["$(Key)_Error"][ProtID] = error
+            Results[Key][2][ProtID] = mean
+            Results["$(Key)_σ"][2][ProtID] =std
+            Results["$(Key)_Error"][2][ProtID] = error
         end
     end
 
@@ -129,6 +134,7 @@ function CMA_Update(data, Obj; weight=BigFloat(1.0))
     if data isa Array{<:Number}
         data = BigFloat.(data) 
     end   
+
     if weight isa Array{<:Number}
         weight= BigFloat.(weight)
         weighted_data = data.*weight
@@ -144,15 +150,20 @@ end
 function CMA_Finalize(Obj)
     CMA = Obj.SUM ./Obj.Weight
     if Obj.N==1
-        return Float64.(CMA), zeros(Float64, size(CMA))
+        #println(Obj.SQR," ",Obj.SUM," ",CMA," ",Obj.Weight )
+        #println()
+        CMA_σ = @. sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight)))
+        return Float64.(CMA), Float64.(CMA_σ), zeros(Float64, size(CMA))
     end
 
     if all(isapprox.(Obj.Weight,1 , atol=10^-5))
-        CMA_err= @. sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight))/(Obj.N-1))
+        CMA_σ = @. sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight)))
+        CMA_err= @. CMA_σ/sqrt((Obj.N-1))
     else
-        println(Obj.SQR," ",Obj.SUM," ",CMA," ",Obj.Weight)
-        CMA_err= @. sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight-1))/(Obj.N))
+        #println(Obj.SQR," ",Obj.SUM," ",CMA," ",Obj.Weight)
+        CMA_σ = @.  sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight-1)))
+        CMA_err= @. CMA_σ/sqrt( (Obj.N))
     end
 
-    return Float64.(CMA), Float64.(CMA_err)
+    return Float64.(CMA), Float64.(CMA_σ), Float64.(CMA_err)
 end

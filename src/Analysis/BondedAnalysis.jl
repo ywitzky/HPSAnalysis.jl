@@ -44,7 +44,9 @@ function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I
         for chain in 1:Sim.NChains
             for atom in Sim.ChainStart[chain]:Sim.ChainStop[chain]-2
                 index = ceil(I, Sim.BondAngles[atom]*InvAngleResolution)
-                Sim.BondAngleHist[index]+= 1.0
+                if index != 0 
+                    Sim.BondAngleHist[index]+= 1.0
+                end
             end
         end
     end
@@ -154,6 +156,7 @@ function computeDihedralAngles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         for i in 1:Sim.NAtoms-3 
             arg1 = length_vec[i+1]*(vec[1,i]*cross[1,i+1]+vec[2,i]*cross[2,i+1]+vec[3,i]*cross[3,i+1])
             arg2 = cross[1,i]*cross[1,i+1]+cross[2,i]*cross[2,i+1]+cross[3,i]*cross[3,i+1]
+
             Sim.TorsionAngles[i, step] = atan(arg1,arg2 )
         end
     end

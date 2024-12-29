@@ -13,8 +13,6 @@ function computeRGComponentSeries!(Sim::SimData{R,I}) where{R<:Real, I<:Integer}
             x[chain] =sum((Sim.x_uw[start:stop, step] .- Sim.COM_uw[chain,1,step]).^2 .*Sim.Masses[start:stop])
             y[chain] =sum((Sim.y_uw[start:stop, step] .- Sim.COM_uw[chain,2,step]).^2 .*Sim.Masses[start:stop])
             z[chain] =sum((Sim.z_uw[start:stop, step] .- Sim.COM_uw[chain,3,step]).^2 .*Sim.Masses[start:stop])
-
-
         end
         x ./= Sim.ChainMasses
         y ./= Sim.ChainMasses
@@ -138,7 +136,6 @@ function computeREEAutocorr(Sim::SimData{R,I},  NLags=5000)  where{R<:Real, I<:I
     end
     autozero ./= length(Sim.EquilibrationTime:Sim.NSteps)
     =#
-    #println(mean2)
     #AutoCorr2[:, :, :] .-=mean2
     for i in 1:NLags_
         AutoCorr2[i, :, :] ./= (Sim.NSteps-Sim.EquilibrationTime-i)
@@ -230,36 +227,36 @@ function computeRGCorrelationTime(Sim::SimData{R,I}, NLags=5000) where{R<:Real, 
             end
         end
     end
-    Sim.RGMeasureStep = max(1,ceil(eltype(Sim.NChains),Statistics.mean(half_time)))
+    Sim.RGMeasureStep = max(1,ceil(I,Statistics.mean(half_time)))
 end
 
 function computeInertiaTensor(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.InertiaTensorEigVals = zeros(eltype(Sim.x), (3,Sim.NChains, Sim.NSteps))
 
-    xtmp = zeros(eltype(Sim.x), Sim.NAtoms)
-    ytmp = zeros(eltype(Sim.y), Sim.NAtoms)
-    ztmp = zeros(eltype(Sim.z), Sim.NAtoms)
+    xtmp = zeros(R, Sim.NAtoms)
+    ytmp = zeros(R, Sim.NAtoms)
+    ztmp = zeros(R, Sim.NAtoms)
 
     Matrix = zeros(eltype(Sim.x), 3,3)
     for step in 1:Sim.NSteps
         for chain in 1:Sim.NChains
             Matrix .= 0
             for atom in Sim.ChainStart[chain]:Sim.ChainStop[chain]
-                xtmp[atom] = (Sim.x_uw[atom, step]-Sim.COM_uw[chain, 1, step])
-                ytmp[atom] = (Sim.y_uw[atom, step]-Sim.COM_uw[chain, 2, step])
-                ztmp[atom] = (Sim.z_uw[atom, step]-Sim.COM_uw[chain, 3, step])
-                Matrix[1,1]+= xtmp[atom]*xtmp[atom]*Sim.Masses[atom]
-                Matrix[1,2]+= xtmp[atom]*ytmp[atom]*Sim.Masses[atom]
-                Matrix[1,3]+= xtmp[atom]*ztmp[atom]*Sim.Masses[atom]
-                Matrix[2,2]+= ytmp[atom]*ytmp[atom]*Sim.Masses[atom]
-                Matrix[2,3]+= ytmp[atom]*ztmp[atom]*Sim.Masses[atom]
-                Matrix[3,3]+= ztmp[atom]*ztmp[atom]*Sim.Masses[atom]
+                @inbounds xtmp[atom] = (Sim.x_uw[atom, step]-Sim.COM_uw[chain, 1, step])
+                @inbounds ytmp[atom] = (Sim.y_uw[atom, step]-Sim.COM_uw[chain, 2, step])
+                @inbounds ztmp[atom] = (Sim.z_uw[atom, step]-Sim.COM_uw[chain, 3, step])
+                @inbounds Matrix[1,1]+= xtmp[atom]*xtmp[atom]*Sim.Masses[atom]
+                @inbounds Matrix[1,2]+= xtmp[atom]*ytmp[atom]*Sim.Masses[atom]
+                @inbounds Matrix[1,3]+= xtmp[atom]*ztmp[atom]*Sim.Masses[atom]
+                @inbounds Matrix[2,2]+= ytmp[atom]*ytmp[atom]*Sim.Masses[atom]
+                @inbounds Matrix[2,3]+= ytmp[atom]*ztmp[atom]*Sim.Masses[atom]
+                @inbounds Matrix[3,3]+= ztmp[atom]*ztmp[atom]*Sim.Masses[atom]
             end
-            Matrix[2,1]=Matrix[1,2]
-            Matrix[3,1]=Matrix[1,3]
-            Matrix[3,2]=Matrix[2,3]
-            Matrix ./= Sim.ChainMasses[chain] #(Sim.ChainStop[chain]-Sim.ChainStart[chain])
-            Sim.InertiaTensorEigVals[:, chain,step] .= eigvals(Matrix)
+            @inbounds Matrix[2,1]=Matrix[1,2]
+            @inbounds Matrix[3,1]=Matrix[1,3]
+            @inbounds Matrix[3,2]=Matrix[2,3]
+            @inbounds Matrix ./= Sim.ChainMasses[chain] 
+            @inbounds Sim.InertiaTensorEigVals[:, chain,step] .= eigvals(Matrix)
         end
     end
 end
@@ -268,7 +265,7 @@ function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100) where {R<:R
     λ = Sim.InertiaTensorEigVals
     Sim.ShapeAsymmetry =  1.0 .-3.0.*(λ[1,:,:].*λ[2,:,:].+λ[1,:,:].*λ[3,:,:].+λ[2,:,:].*λ[3,:,:])./(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]).^2 ### arash + janka
     Sim.ParallelInertiaTensor = @. (λ[1,:,:]+λ[2,:,:])/2.0
-    Sim.AspectRatio = @. Sim.ParallelInertiaTensor[1,:,:]/λ[3,:,:] ### Arash tanja paper
+    Sim.AspectRatio = @. Sim.ParallelInertiaTensor[:,:]/λ[3,:,:] ### Arash tanja paper
     Sim.Asphericity = @. (λ[3,:,:]-0.5*(λ[1,:,:]+λ[2,:,:]))/(λ[1,:,:]+λ[2,:,:]+λ[3,:,:]) ### wikipedia + own norm
     Sim.Acylindricity = @. (λ[2,:,:] - λ[1,:,:])/(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]) ### https://journals.aps.org/pre/pdf/10.1103/PhysRevE.106.064606
 

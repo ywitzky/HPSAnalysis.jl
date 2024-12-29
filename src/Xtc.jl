@@ -23,7 +23,7 @@ libxdrffile= Libdl.find_library("libxdrfile.so", vcat(Base.DL_LOAD_PATH, ["/usr/
 
 export xtc_init, read_xtc, close_xtc
 
-mutable  struct xtcType
+mutable struct xtcType
     natoms::Int32
     step::Vector{Int32}
     time::Vector{Float32}

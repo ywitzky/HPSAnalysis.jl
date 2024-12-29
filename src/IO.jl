@@ -579,7 +579,7 @@ function initReducedData_NoConfStorage(Path::String, NumSteps::Int,NChains::Int,
 
 end
 
-function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAll=true, Reduce=1, EquilibrationTime=1, LammpsVariables= Dict{String,Any}(), BasePathAdd="", HOOMD=false) #where {R<:Real,I<:Integer}
+function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAll=true, Reduce=1, EquilibrationTime=1, LammpsVariables= Dict{String,Any}(), BasePathAdd="", HOOMD=false, ReadBig=false) #where {R<:Real,I<:Integer}
     
 
     Data = SimData()#::SimData{R,I}
@@ -614,7 +614,7 @@ function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAl
             readXYZ!(Data; TrajectoryFile=Data.TrajectoryFile, EnergyFile=Data.EnergyFile)
             #unfoldPositions(Data)
         else
-            ReadAllData!(Data)
+            ReadAllData!(Data;ReadBig=ReadBig)
         end
     end
     if Data.NSteps<EquilibrationTime
@@ -638,7 +638,7 @@ function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAl
     Data.y =  Mmap.mmap(Data.yio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.z =  Mmap.mmap(Data.zio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     
-    if Reparse
+    if Reparse && Data.TrajectoryFile[end-2:end] !="gsd"
         unfoldPositions(Data)
     end
 
@@ -668,11 +668,8 @@ function SaveAllData(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         Dictionary[String(fieldname)]= getfield(Sim,fieldname)
     end
     SaveFields(Sim,"All",Dictionary)
-    println("ASDFG $(Sim.BigDataList)")
-    println("Asphericity, size $(sizeof(getfield(Sim,:Asphericity)))")
 
     for fields in Sim.BigDataList
-        println("$fields, size $(sizeof(getfield(Sim,fields)))")
         JLD2.save(Sim.DataPath*String(fields)*".jld2",Dict(String(fields)=> getfield(Sim,fields)))
     end
 end

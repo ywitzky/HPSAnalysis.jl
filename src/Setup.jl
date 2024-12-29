@@ -4,12 +4,12 @@ export createDenseStartingPosition, writeCollectedSlurmScript
 module Setup
 
 ### preliminary GSD_wrapper include
-include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
-include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
+#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
+#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
+using GSDFormat
 
 #include("ProteinSequences.jl")
 #using .ProteinSequences
-using Dates
 using Printf
 include("BioData.jl")
 include("Setup/HOOMD_Setup.jl")
@@ -273,7 +273,7 @@ function writeHPSLammpsScript(fileName, StartFileName, AtomTypes, LongAtomTypes,
     
     write(file,"
     fix 1 all nve 
-    fix 2 all langevin $(Temperature) $(Temperature) $(SimulationType=="Calvados2" || SimulationType=="ArashModell" ? 100 : 1000) $(now().instant.periods.value%100_000) ### Tstart, Tstop, Dampening in fs  (1ps dampening in paper), seed\n")
+    fix 2 all langevin $(Temperature) $(Temperature) $(SimulationType=="Calvados2" || SimulationType=="ArashModell" ? 100 : 1000) $(rand(1:100_000)) ### Tstart, Tstop, Dampening in fs  (1ps dampening in paper), seed\n")
     if (Restart)
     write(file,"
     fix 3 all print $WriteOutFreq  \"\$(step) \$(time) \$(temp) \$(press) \$(etotal) \$(pe) \$(ke) \$(evdwl) \$(ecoul) \$(epair) \$(ebond) \$(eangle) \$(edihed)\" append \${energyfile} screen no\n")
@@ -289,7 +289,7 @@ function writeHPSLammpsScript(fileName, StartFileName, AtomTypes, LongAtomTypes,
 
     if ChargeTemperSim
         write(file,"   
-    chargetemper $NTimeSteps $ChargeTemperSwapSteps \$q 2 $(now().instant.periods.value%100_000) $(now().instant.periods.value%100_000) ### timesteps swapfreq chargeinit temp_fix_id seed1 seed2 ")
+    chargetemper $NTimeSteps $ChargeTemperSwapSteps \$q 2 $(rand(1:100_000)) $(rand(1:100_000)) ### timesteps swapfreq chargeinit temp_fix_id seed1 seed2 ")
     else
     write(file,"   
     run $(NTimeSteps) upto")
@@ -359,7 +359,7 @@ function writeLammpsScript(fileName, AtomTypes; WriteOutFreq=100000)
 
     minimize 1.0e-4 1.0e-6 500 1000
     fix 1 all nve # temp 300.0 300.0 1000  ### 
-    fix 2 all langevin 285 285 1000 $(now().instant.periods.value%100000)) ### Tstart, Tstop, Dampening in fs  (1ps dampening in paper), seed
+    fix 2 all langevin 285 285 1000 $(rand(1:100_000))) ### Tstart, Tstop, Dampening in fs  (1ps dampening in paper), seed
     fix 3 all print $(WriteOutFreq)  \"\$(step) \$(time) \$(temp) \$(press) \$(etotal) \$(pe) \$(ke) \$(evdwl) \$(ecoul) \$(epair) \$(ebond) \$(eangle) \$(edihed)\" file ./energy.dat screen no
 
     restart $(WriteOutFreq) ./sim.restart
@@ -585,7 +585,7 @@ function getImageCopyNumber(pos, boxSize, Sequences)
     return image
 end
 
-function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100000000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=-1, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000)
+function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100000000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=-1, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU")
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
@@ -608,6 +608,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     end
   
     (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
+
     NAtomTypes = length(LongAtomTypes)
 
     dihedral_short_map=Dict()
@@ -650,13 +651,14 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         if AlphaAddition
             WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
         end
+        (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, 100_000, 0.01, BoxLength/10.0, now().instant.periods.value%65535, UseAngles=AlphaAddition) ### BoxLength has to be convert to nm
+        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
-        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition) #StartFileName[1:end-3]*"gsd"
+        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition)
     else
         writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
         writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
@@ -836,21 +838,19 @@ end
 
 function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
  
-    snapshot = GSD.Frame()    
+    snapshot = GSDFormat.Frame()    
     snapshot.configuration.step = 1 
     snapshot.configuration.dimensions = 3 
-    println("I am here\n$([Box[1],Box[2], Box[3], 0, 0, 0]./10.0 )")
     snapshot.configuration.box = [Box[1],Box[2], Box[3], 0, 0, 0]./10.0 #4:6 are tilt
-    println(snapshot.configuration.box)
     snapshot.particles.N = NAtoms
     snapshot.particles.position = reshape(permutedims(Positions, (2,1,3)), (size(Positions, 1)*size(Positions, 2), 3))./10.0 ### permute to get alignment in memory, reshape to match gsd formart
-    snapshot.particles.types =  string.(collect(keys(AaToId)))
+    IdToAa = Dict(value => key for (key, value) in AaToId)
+    snapshot.particles.types =  [string(IdToAa[Id]) for Id in  sort(collect(values(AaToId))) ] #string.(collect(keys(AaToId)))
     snapshot.particles.typeid = [Int32(AaToId[AA])-1 for AA in join(Sequences)] ### convert to python numbering
     snapshot.particles.image = reshape(permutedims(InputImage, (2,1,3)), (size(InputImage, 1)*size(InputImage, 2), 3)) ### permute to get alignment in memory, reshape to match gsd formart
     snapshot.particles.mass = InputMasses
     snapshot.particles.charge = InputCharges
-    snapshot.particles.diameter =  [Float32(AaToSigma[AA]) for AA in join(Sequences)]
-
+    snapshot.particles.diameter =  [Float32(AaToSigma[AA])/10.0  for AA in join(Sequences)]
 
     ### Bond_data.group = (self.N, getM(data)
     # Create Bonds
@@ -873,9 +873,9 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
         snapshot.dihedrals.group = getBonds(Sequences, M=4)
     end
 
-    file = GSD.open(FileName, 'w')
-    GSD.append(file, snapshot)
-    GSD.close(file)
+    file = GSDFormat.open(FileName, 'w')
+    GSDFormat.append(file, snapshot)
+    GSDFormat.close(file)
 
 end
 

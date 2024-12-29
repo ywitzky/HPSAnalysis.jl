@@ -6,6 +6,7 @@ include("./ProteinSequences.jl")
 #import .BioData
 #import .ProteinSequences
 include("./Xtc.jl") 
+include("./Setup.jl")
 
  
 #include("./StructDispatch.jl") ###TODO: Do proper typing and get rid of this at some point

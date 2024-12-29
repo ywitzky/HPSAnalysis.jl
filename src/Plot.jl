@@ -352,7 +352,7 @@ function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real,
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_LastFrames.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_LastFrames.pdf")
-
+    return fig
 end
 
 function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
@@ -378,11 +378,11 @@ function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where 
     NMeasurements= sum(Sim.SlabHistogramSeries[0,start:stop,1].!=0.0)
     AvgHist[:,:,end] .= OffsetArrays.no_offset_view((reduce(+, Sim.SlabHistogramSeries[xaxis,start:stop,:], dims=2)./(NMeasurements))[:,1,:])
 
-
-    fig = Plots.plot(dpi=300,  ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ,  title="slab density of $(Sim.SimulationName)" ,palette=:darktest, seriescolor=:darktest, color=:darktest, markercolor=:darktest, linecolor=:darktest, zcolor=:darktest, xticks=xticks, colorbar_title="window No.", levels=tmp) #,size=(600,300), figsize=(12cm, 4.5cm) Plots.palette(:darktest, 10)
+    # ,  title="slab density of $(Sim.SimulationName)"
+    fig = Plots.plot(dpi=300,  ylabel= "avg. density\n"* "  [kg/L]" , xlabel= "z-Axis [Å]"  ,  title="$(Sim.SimulationName)",palette=:darktest, seriescolor=:darktest, color=:darktest, markercolor=:darktest, linecolor=:darktest, zcolor=:darktest, xticks=xticks, colorbar_title="window No.", levels=tmp) #,size=(600,300), figsize=(12cm, 4.5cm) Plots.palette(:darktest, 10)
     for i in 1:tmp
         if (i)*Windowlength < Sim.EquilibrationTime continue end
-        Plots.plot!(axes(AvgHist)[1], AvgHist[:,1,i],  label="",  line_z=i, marker_z=i, levels=tmp, c=:darktest)
+        Plots.plot!(axes(AvgHist)[1][2:end-1], AvgHist[:,1,i][2:end-1],  label="",  line_z=i, marker_z=i, levels=tmp, c=:darktest)
     end
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.png")

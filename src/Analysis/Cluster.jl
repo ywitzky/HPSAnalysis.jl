@@ -12,9 +12,9 @@ function computeCOMClusters(Sim::LammpsAnalysis.SimData{T,Int}; Cutoff=50.0) whe
         add_vertices!(G, Sim.NChains)
 
         for C in 1:Sim.NChains
-            dx = Sim.COM[C+1:Sim.NChains,1, step] .- Sim.COM[C+1:Sim.NChains,1, step]
-            dy = Sim.COM[C+1:Sim.NChains,2, step] .- Sim.COM[C+1:Sim.NChains,2, step]
-            dz = Sim.COM[C+1:Sim.NChains,3, step] .- Sim.COM[C+1:Sim.NChains,3, step]
+            dx = Sim.COM[C+1:Sim.NChains,1, step] .- Sim.COM[C,1, step]
+            dy = Sim.COM[C+1:Sim.NChains,2, step] .- Sim.COM[C,2, step]
+            dz = Sim.COM[C+1:Sim.NChains,3, step] .- Sim.COM[C,3, step]
 
             dist_sqr = dx.^2 .+dy.^2 .+dz.^2
             for (k,K) in enumerate(C+1:Sim.NChains)

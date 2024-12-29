@@ -41,9 +41,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     xio::Union{IOStream, Nothing}
     yio::Union{IOStream, Nothing}
     zio::Union{IOStream, Nothing}
-    x::Array{FloatType} ### Atom, Step
-    y::Array{FloatType} ### Atom, Step
-    z::Array{FloatType} ### Atom, Step
+    x::Matrix{FloatType} ### Atom, Step
+    y::Matrix{FloatType} ### Atom, Step
+    z::Matrix{FloatType} ### Atom, Step
     #xyz::Array{FloatType}
     StepFrequency::IntType
     Reduce::Rational
@@ -54,9 +54,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     x_uw_io::Union{IOStream, Nothing}
     y_uw_io::Union{IOStream, Nothing}
     z_uw_io::Union{IOStream, Nothing}
-    x_uw::Array{FloatType} ### Atom, Step
-    y_uw::Array{FloatType} ### Atom, Step
-    z_uw::Array{FloatType} ### Atom, Step
+    x_uw::Matrix{FloatType} ### Atom, Step
+    y_uw::Matrix{FloatType} ### Atom, Step
+    z_uw::Matrix{FloatType} ### Atom, Step
 
     BasePath::String
     PlotPath::String
@@ -178,9 +178,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
         
         Dict{String,Any}(),0, Dict{String,ChoosenIntType}(),zeros((0,0)),0,0,
         
-        "","","",nothing,nothing,nothing,zeros(0), zeros(0),zeros(0),1,1, 
+        "","","",nothing,nothing,nothing,zeros( (0,0)), zeros((0,0)),zeros((0,0)),1,1, 
 
-        "","","",nothing,nothing,nothing,zeros(0), zeros(0),zeros(0),
+        "","","",nothing,nothing,nothing,zeros((0,0)), zeros((0,0)),zeros((0,0)),
 
         "","","","","","",[],
 

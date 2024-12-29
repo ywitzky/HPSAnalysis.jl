@@ -273,6 +273,8 @@ function computeMSDofChains!(Sim::LammpsAnalysis.SimData{R,I}; MaxDelta=100_000)
 end
 
 function unfoldPositions(Sim::SimData{R,I}; CheckFiles=true) where {R<:Real, I<:Integer}
+    println("I am unfolding Positions again!")
+
     if CheckFiles && length(Sim.TrajectoryFile)>=3 
         if Sim.TrajectoryFile[end-2:end] ==".h5" || Sim.TrajectoryFile[end-2:end] =="gsd"
             return nothing 
@@ -513,6 +515,8 @@ function computeBondsHists(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
+
+#### probably deprecated check sequence analysis and the sequence monte carlo
 function computeSequenceHydropathyDecoration(Sim::SimData{R,I}; SimType="Calvados2", β=-1.0) where {R<:Real, I<:Integer}
     Sim.HydropathyDecoration = zeros(R, Sim.NChains)
     Sim.MeanHydropathy = zeros(R, Sim.NChains)
