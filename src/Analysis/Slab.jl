@@ -129,7 +129,7 @@ function centerSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
-function computeDensityHistogram(Sim::LammpsAnalysis.SimData{R,I}, DivLength=I(10))  where {R<:Real, I<:Integer}
+function computeDensityHistogram(Sim::HPSAnalysis.SimData{R,I}, DivLength=I(10))  where {R<:Real, I<:Integer}
     if !(Sim.SlabAxis in [1,2,3])
         ArgumentError("SlabAxis is not properly specified.")
     end

@@ -1,4 +1,4 @@
-function computeChargeBondTimesForCell(Sim::LammpsAnalysis.SimData{T,I2}, xind::I, yind::I, zind::I, border::Bool) where {I<:Integer, T<:Real, I2<:Integer}
+function computeChargeBondTimesForCell(Sim::HPSAnalysis.SimData{T,I2}, xind::I, yind::I, zind::I, border::Bool) where {I<:Integer, T<:Real, I2<:Integer}
     IMax = length(Sim.PositiveCellList[xind, yind, zind]) 
     if IMax ==0
         return
@@ -59,7 +59,7 @@ function computeChargeBondTimesForCell(Sim::LammpsAnalysis.SimData{T,I2}, xind::
     return nothing
 end
 
-function computeChargeBonds(Sim::LammpsAnalysis.SimData{T,I2}, xind::I, yind::I, zind::I, border::Bool) where {I<:Integer, T<:Real, I2<:Integer}
+function computeChargeBonds(Sim::HPSAnalysis.SimData{T,I2}, xind::I, yind::I, zind::I, border::Bool) where {I<:Integer, T<:Real, I2<:Integer}
     IMax = length(Sim.PositiveCellList[xind, yind, zind]) 
     if IMax ==0
         return

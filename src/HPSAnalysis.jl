@@ -1,4 +1,4 @@
-module LammpsAnalysis
+module HPSAnalysis
 
 ### helping stuff which probably should be seperate
 include("./BioData.jl")
@@ -17,4 +17,4 @@ include("./Analysis.jl")
 include("./Unify.jl")
 include("./Plot.jl")
 include("./HREMD.jl")
-end # module LammpsAnalysis
+end # module HPSAnalysis

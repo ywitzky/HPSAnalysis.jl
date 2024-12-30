@@ -1,4 +1,4 @@
-function plotBondAngleHistComp(Sims::Vector{LammpsAnalysis.SimData{R,I}}, Path::String) where {R <: Real , I<: Integer}
+function plotBondAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R <: Real , I<: Integer}
     BondAnglePlot = Plots.plot(xlabel="Bond Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Bond angle histogram")
     for Sim in Sims
         Plots.plot!(axes(Sim.BondAngleHist,1)*180.0/size(Sim.BondAngleHist,1), Sim.BondAngleHist[:]*100, label=Sim.SimulationName)
@@ -8,7 +8,7 @@ function plotBondAngleHistComp(Sims::Vector{LammpsAnalysis.SimData{R,I}}, Path::
     return BondAnglePlot
 end
 
-function plotRGAutocorrComp(Sims::Vector{LammpsAnalysis.SimData{R,I}},  Path::String) where {R<:Real, I<:Integer}
+function plotRGAutocorrComp(Sims::Vector{HPSAnalysis.SimData{R,I}},  Path::String) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
     for Sim in Sims
         axis = axes(Sim.RGAutocorr[1,:])
@@ -27,7 +27,7 @@ function plotRGAutocorrComp(Sims::Vector{LammpsAnalysis.SimData{R,I}},  Path::St
     return RG_Auto
 end
 
-function plotDihedralAngleHistComp(Sims::Vector{LammpsAnalysis.SimData{R,I}}, Path::String) where {R<:Real, I<:Integer}
+function plotDihedralAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R<:Real, I<:Integer}
     DihedralAnglePlot= Plots.plot(xlabel="Diehedral Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Dihedral angle histogram", label="",legend_position=:topleft)
     for Sim in Sims
         DihedralAnglePlot= Plots.plot!(axes(Sim.TorsionHist,2), Sim.TorsionHist[end,:]*100,  label=Sim.SimulationName)

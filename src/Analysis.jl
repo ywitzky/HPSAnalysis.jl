@@ -91,7 +91,7 @@ end
     Sim.REEHists /= length(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)
 end =#
 
-function computeCOP!(Sim::LammpsAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
+function computeCOP!(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.COP    =  zeros(Sim.NChains,3  , Sim.NSteps)
     Sim.COP_uw =  zeros(Sim.NChains,3  , Sim.NSteps)
     
@@ -114,7 +114,7 @@ function computeCOP!(Sim::LammpsAnalysis.SimData{R,I}) where {R<:Real, I<:Intege
     end
 end
 
-function computeCOM!(Sim::LammpsAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
+function computeCOM!(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.COM    =  zeros(R, Sim.NChains,3  , Sim.NSteps)
     Sim.COM_uw =  zeros(R, Sim.NChains,3  , Sim.NSteps)
     
@@ -210,7 +210,7 @@ function computeRGComponentSlabHist(Sim::SimData{R,I}) where {R<:Real, I<:Intege
     return RGCompHist
 end 
 
-function computeMSDofChains!(Sim::LammpsAnalysis.SimData{R,I}; MaxDelta=100_000) where {R<:Real, I<:Integer}
+function computeMSDofChains!(Sim::HPSAnalysis.SimData{R,I}; MaxDelta=100_000) where {R<:Real, I<:Integer}
     N = min(Sim.NSteps-Sim.EquilibrationTime, MaxDelta)
     Sim.MSD = zeros(R, Sim.NChains, N,3 )
     if length(Sim.COM)==0

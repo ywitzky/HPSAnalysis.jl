@@ -26,7 +26,7 @@ function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 end
 =#
 
-function plotREEVecAutocorr(Sim::LammpsAnalysis.SimData{R,I}, conf=0.1) where {R<:Real, I<:Integer}
+function plotREEVecAutocorr(Sim::HPSAnalysis.SimData{R,I}, conf=0.1) where {R<:Real, I<:Integer}
     x = (collect(R, axes(Sim.REEVecSeries,1)).-convert(R,1.0)) * convert(R,conf)
 
     Plots.plot(xlabel="Lag time [ns]", ylabel="AutoCorr [steps]")

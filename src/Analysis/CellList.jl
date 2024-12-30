@@ -1,4 +1,4 @@
-function initCellLists(Sim::LammpsAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
+function initCellLists(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.CellStep = zeros(I, 1)
     Sim.CellDimensions= zeros(3,2)
     for i in 1:3

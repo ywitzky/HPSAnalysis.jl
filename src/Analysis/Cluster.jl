@@ -1,6 +1,6 @@
 export computeClusterCOMs
 
-function computeCOMClusters(Sim::LammpsAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+function computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
     ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
     Clusters = Vector{Vector{Vector{Int}}}()
 
@@ -36,7 +36,7 @@ function computeCOMClusters(Sim::LammpsAnalysis.SimData{T,Int}; Cutoff=50.0) whe
     return Clusters
 end
 
-function computeChargeClusters(Sim::LammpsAnalysis.SimData{T,Int}; Cutoff=5.0) where{T<:Real, Int<:Integer}
+function computeChargeClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=5.0) where{T<:Real, Int<:Integer}
     printstyled("Function computeClusters does only detect charge contacts for clusters.\n"; color=:yellow)
     ### abuse cellList mechanism developed for Charge contacts
     Sim.ChargeResidueContactMatrix = zeros(eltype(Sim.x), Sim.MaxChainLength,Sim.MaxChainLength)
@@ -53,11 +53,11 @@ function computeChargeClusters(Sim::LammpsAnalysis.SimData{T,Int}; Cutoff=5.0) w
         add_vertices!(G, Sim.NChains)
         
         Sim.CellStep[1] = step
-        LammpsAnalysis.resetCellLists(Sim) ### empty all cells
+        HPSAnalysis.resetCellLists(Sim) ### empty all cells
         if i%100==0
             println("Step: $(Sim.CellStep) of $(Sim.NSteps)")
         end
-        LammpsAnalysis.computeCellLists(Sim) ### compute CellLists  for step
+        HPSAnalysis.computeCellLists(Sim) ### compute CellLists  for step
 
         iterateThroughCellList(Sim, computeChargeBondTimesForCell )
 
