@@ -1,7 +1,6 @@
-export createDenseStartingPosition, writeCollectedSlurmScript
-
-
 module Setup
+
+export createDenseStartingPosition, writeCollectedSlurmScript
 
 ### preliminary GSD_wrapper include
 #include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
