@@ -1,7 +1,6 @@
-export createDenseStartingPosition, writeCollectedSlurmScript
-
-
 module Setup
+
+export createDenseStartingPosition, writeCollectedSlurmScript
 
 ### preliminary GSD_wrapper include
 #include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
@@ -531,11 +530,11 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
     if SimulationType=="HPS-Alpha"
         OneToCharge = deepcopy(BioData.OneToHPSCharge)
         OneToLambda = deepcopy(BioData.OneToHPSUrryLambda)
-        OneToSigma  = deepcopy(BioData.OneToHPSUrryLambda)
+        OneToSigma  = deepcopy(OneToSigmaDef)
     elseif SimulationType=="Calvados2"
         OneToCharge = deepcopy(BioData.OneToHPSCharge)
-        OneToLambda = deepcopy(BioData.OneToCalvados2Lambda)
-        OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
+        OneToLambda = deepcopy(OneToLambdaDef)
+        OneToSigma  = deepcopy(OneToSigmaDef)
         OneToCharge['H'] = 1. / ( 1 + 10^(pH-6) )                 ### HIS is pH-Dependent for calvados2
         for e in LongAtomTypes ### added the charge modifications for the first/last amino acids
             if ~(e in keys(OneToCharge))

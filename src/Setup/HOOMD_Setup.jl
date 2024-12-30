@@ -9,7 +9,7 @@ end
 
 function WriteDictionaries(filename::String, ToCharge, ToID, ToMass, ToDiameter, ToLambda)
     io = open(filename, "w")
-    write(io, "// ID,resname, Charge, Mass, σ\n")
+    write(io, "// ID,resname, Charge, Mass, λ   \n")
 
     for key in sort(collect(keys(ToID)), by=x->ToID[x])
         write(io, " $(ToID[key]), $key, $(ToCharge[key]), $(ToMass[key]), $(ToDiameter[key]), $(ToLambda[key])\n")
