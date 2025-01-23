@@ -188,7 +188,7 @@ def run(FolderPath):#, GPUNUM):
     integrator.dt = Params["dt"]
 
 
-  	for i in IDToResName.keys():
+    for i in IDToResName.keys():
         name = IDToResName[i]
         nvt.gamma[name] = IDToMass[i]*10.0
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)

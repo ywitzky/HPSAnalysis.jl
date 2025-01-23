@@ -1,10 +1,8 @@
-
 import numpy as np
 import hoomd
 import hoomd.md
-from hoomd import plugin_HPS_SS
 import copy
-
+import gsd.hoomd
 from hoomd import ashbaugh_plugin
 
 def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
@@ -79,10 +77,11 @@ def readParticleData(fileName, Nparticles, Sequences):
     InputPositions[:,1] = y/10.0
     InputPositions[:,2] = z/10.0
     InputTypes -= 1 #convert from array start 1 to 0
+    Diameter /= 10.0
 
-    InputImage[:,0]=ix
-    InputImage[:,1]=iy
-    InputImage[:,2]=iz
+    InputImage[:,0] = ix
+    InputImage[:,1] = iy
+    InputImage[:,2] = iz
 
     TypeToID=dict()
     cnt=0
@@ -98,7 +97,7 @@ def readParticleData(fileName, Nparticles, Sequences):
 def readDictionaries(filename):
     ID,resname, q, mass, sigma, lamda_val = np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)#int, converters={0: lambda x: int(x), 1: lambda x: str(x).strip(), 2: lambda x: float(x), 3: lambda x: float(x), 4: lambda x: float(x), 5: lambda x: float(x) })
     ID=ID.astype(int)-1
-    resname = np.array([f" {aa}" if len(aa)==1 else aa for aa in resname])
+    resname = np.array(resname)
     IDToResName = dict(zip(ID, resname.astype(str)))
     IDToCharge  = dict(zip(ID, q.astype(float)))
     IDToMass    = dict(zip(ID, mass.astype(float)))
@@ -129,7 +128,7 @@ def parseKeywords(keyword, value):
         return value
     if keyword in ["Seed", "NSteps", "NOut"]:
         return int(value)
-    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa"]:
+    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor"]:
         return float(value)
     if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config"]:
         return value=="True" or value=="true"
@@ -332,45 +331,45 @@ def minimiseSystem(sim,cell, forcesWithoutLJ, IDToResName, IDToLambda, IDToSigma
         cnt+=1
     print("done")
 
-    if False:
-        print("md with low time step")
 
-        integrator = hoomd.md.Integrator(dt=Params["dt"]) 
-        sim.operations.integrator = integrator
-        nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT/100) ### ps^-1
-        integrator.methods = [nvt]
-        sim.operations.integrator.forces = f_tmp
+def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
+    with gsd.hoomd.open(TrajectoryPath) as f:
+        frame = f[-1] ### take last frame for restart
 
-        
-        integrator.dt = Params["dt"]/10.0
-        sim.run(100000)
-        print("md: 1/5 done")
+        snapshot = gsd.hoomd.Frame()  
 
-        integrator.dt = Params["dt"]/5.0
-        sim.run(200000)
-        print("md: 2/5 done")
+        ### Specify particles
+        snapshot.particles.N        = frame.particles.N
+        snapshot.particles.position = frame.particles.position
+        snapshot.particles.types    = frame.particles.types
+        snapshot.particles.typeid   = frame.particles.typeid
+        snapshot.particles.image    = frame.particles.image
+        snapshot.particles.mass     = frame.particles.mass
+        snapshot.particles.charge   = frame.particles.charge 
 
+        ### Configure box
+        snapshot.configuration.box  = frame.configuration.box
 
-        integrator.dt = Params["dt"]/2.0
-        sim.run(300000)
-        print("md: 3/5 done")
+        # Connect particles with bonds.
+        snapshot.bonds.N            = frame.bonds.N 
+        snapshot.bonds.types        = frame.bonds.types 
+        snapshot.bonds.typeid       = frame.bonds.typeid
+        snapshot.bonds.group        = frame.bonds.group
 
+        ## Create Angles
+        snapshot.angles.N           = frame.angles.N
+        snapshot.angles.types       = frame.angles.types
+        snapshot.angles.typeid      = frame.angles.typeid
+        snapshot.angles.group       = frame.angles.group
 
-        integrator.dt = Params["dt"]/1.5
-        sim.run(400000)
-        print("md: 4/5 done")
+        # Create Angles
+        snapshot.dihedrals.N        = frame.dihedrals.N
+        snapshot.dihedrals.types    = frame.dihedrals.types
+        snapshot.dihedrals.typeid   = frame.dihedrals.typeid 
+        snapshot.dihedrals.group    = frame.dihedrals.group
 
-        integrator.dt = Params["dt"]/1.2
-        sim.run(500000)
-        print("md: fully done")
-
-        integrator.dt = Params["dt"]/1.0
-        sim.run(1000000)
-        print("md: fully done2")
-
-    return sim
-
-
+        with gsd.hoomd.open(RestartPath, mode='w') as f2:
+            f2.append(snapshot)
 
 
 
