@@ -466,7 +466,7 @@ end
 function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltConcentration=-1)
     ### constants
 	e = 1.602*10.0^-(19) ### Charge of electron
-	e_0 = 8.854*10.0^-(12) ### vacuum permitivity
+	e_0 = 8.854188*10.0^-(12) ### vacuum permitivity
 	kb = 1.380*10.0^-(23) ### boltzmann constant
     NA = 6.02214086 * 10.0^23 # 1/mol Avogadro constant
 
@@ -476,9 +476,13 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
         ϵ_r = 80.0 # what ever? I think unitless, relative permitivity
     else
         ### taken from RESEARCH ARTICLE Improved predictions of phase behaviour of intrinsically disordered proteins by tuning the interaction range; Giulio Tesei , Kresten Lindorff-Larsen; 2022
+        RT =  8.3145*Temperature*1e-3
 	    ϵ_r= 5321.0/Temperature+233.76-0.9297*Temperature+1.417*10.0^-3*Temperature^2-8.292*10.0^-7*Temperature^3 ### relative permitivity
-        λ = e^2 /(4.0*pi*e_0*ϵ_r*kb*Temperature) ### m, Bjerrum length
-        κ = sqrt(1.0/(8.0*pi*λ*NA*SaltConcentration*1000.0))*10.0^10 ### Å Screening length
+        #λ = e^2 /(4.0*pi*e_0*ϵ_r*kb*Temperature) ### m, Bjerrum length
+        λ = 1.6021766^2/(4*pi*8.854188*ϵ_r)*6.022*1000/RT ### ?, Bjerrum length
+
+        κ = sqrt(8.0*pi*λ*SaltConcentration*6.022/10)
+        #κ = sqrt(1.0/(8.0*pi*λ*NA*SaltConcentration*1000.0))*10.0^10 ### Å Screening length, named D in the paper
     end
     return (ϵ_r, κ)
 end
@@ -530,11 +534,11 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
     if SimulationType=="HPS-Alpha"
         OneToCharge = deepcopy(BioData.OneToHPSCharge)
         OneToLambda = deepcopy(BioData.OneToHPSUrryLambda)
-        OneToSigma  = deepcopy(BioData.OneToHPSUrryLambda)
+        OneToSigma  = deepcopy(OneToSigmaDef)
     elseif SimulationType=="Calvados2"
         OneToCharge = deepcopy(BioData.OneToHPSCharge)
-        OneToLambda = deepcopy(BioData.OneToCalvados2Lambda)
-        OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
+        OneToLambda = deepcopy(OneToLambdaDef)
+        OneToSigma  = deepcopy(OneToSigmaDef)
         OneToCharge['H'] = 1. / ( 1 + 10^(pH-6) )                 ### HIS is pH-Dependent for calvados2
         for e in LongAtomTypes ### added the charge modifications for the first/last amino acids
             if ~(e in keys(OneToCharge))
@@ -584,7 +588,7 @@ function getImageCopyNumber(pos, boxSize, Sequences)
     return image
 end
 
-function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100000000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=-1, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU")
+function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=-1, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=35.0, ah_cut=20.0)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
@@ -653,7 +657,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device) ### BoxLength has to be convert to nm
+        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]

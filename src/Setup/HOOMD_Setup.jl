@@ -9,7 +9,7 @@ end
 
 function WriteDictionaries(filename::String, ToCharge, ToID, ToMass, ToDiameter, ToLambda)
     io = open(filename, "w")
-    write(io, "// ID,resname, Charge, Mass, σ\n")
+    write(io, "// ID,resname, Charge, Mass, λ   \n")
 
     for key in sort(collect(keys(ToID)), by=x->ToID[x])
         write(io, " $(ToID[key]), $key, $(ToCharge[key]), $(ToMass[key]), $(ToDiameter[key]), $(ToLambda[key])\n")
@@ -42,11 +42,13 @@ function WriteDihedrals(filename, dihedral_map, dihedral_eps)
     close(io)
 end
 
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU")
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=3.5, ah_cut=2.0, ionic=0.1, pH=7.0)
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
     write(io, "Seed: $Seed\n")
     write(io, "Temp: $Temp\n")
+    write(io, "ionic: $ionic\n")
+    write(io, "pH: $pH\n")
     write(io, "NSteps: $NSteps\n")
     write(io, "NOut: $NOut\n")
     write(io, "dt: $Timestep\n")
@@ -60,8 +62,12 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     write(io, "Alt_GSD_Start: $(Alt_GSD_Start)\n")
     write(io, "Create_Start_Config: $(Create_Start_Config)\n")
     write(io, "epsilon_r: $(ϵ_r)\n")
+    write(io, "yk_prefactor: $(138.9315360433804/ϵ_r)\n") ### e^2/(4*pi*epsilon_r) in units of KJ/mol
+    #write(io, "yk_D: $(D)\n")
     write(io, "kappa: $(κ)\n")
     write(io, "Device: $(Device)\n")
-
+    write(io, "YukawaCutoff: $(yk_cut)\n")
+    write(io, "AHCutoff: $(ah_cut)\n")
     close(io);
 end
+
