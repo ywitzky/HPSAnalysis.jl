@@ -12,7 +12,7 @@ import h5py
 import sys
 from PythonFuncs import *
 from hoomd import ashbaugh_plugin
-from hoomd import plugin_HPS_SS
+#from hoomd import plugin_HPS_SS
 #import ashbaugh_plugin as aplugin
 
 PWD = os.getcwd()
@@ -20,17 +20,17 @@ PWD = os.getcwd()
 def run(FolderPath):#, GPUNUM):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
-    Params = readParam(f"{FolderPath}Params.txt")
+    Params = readParam(f"{FolderPath}/HOOMD_Setup/Params.txt")
 
-    Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}Sequences.txt")
+    Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}/HOOMD_Setup/Sequences.txt")
 
-    InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}Particles.txt", NBeads, Seqs)
+    InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}/HOOMD_Setup/Particles.txt", NBeads, Seqs)
 
     if Params["UseAngles"]:
-        dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}DihedralMap.txt", Seqs, InputTypes)
+        dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}/HOOMD_Setup/DihedralMap.txt", Seqs, InputTypes)
 
 
-    IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}Dictionaries.txt")
+    IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}/HOOMD_Setup/Dictionaries.txt")
 
 
     ### constants 
@@ -88,14 +88,13 @@ def run(FolderPath):#, GPUNUM):
         snapshot.dihedrals.typeid =  dihedral_AllIDs
         snapshot.dihedrals.group = InputDihedrals
 
-        with gsd.hoomd.open(name=PWD+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
+        with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
             f.append(snapshot)
 
-        sim.create_state_from_gsd(filename=PWD+Params['Simname']+"_StartConfiguration.gsd")
+        sim.create_state_from_gsd(filename=FolderPath+Params['Simname']+"_StartConfiguration.gsd")
     else:
-
-        print(f"Creat start from: {PWD+Params['Simname']}gsd")
-        sim.create_state_from_gsd(filename=PWD+Params["Simname"]+".gsd")
+        print(f"Creat start from: {FolderPath+Params['Simname']}gsd")
+        sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
 
 
     forces = []
@@ -122,8 +121,9 @@ def run(FolderPath):#, GPUNUM):
             for j in IDToResName.keys():
                 res_j = IDToResName[j]
                 yukawa.params[(res_i,res_j)] = dict(epsilon=IDToCharge[i]*IDToCharge[j]*Params["epsilon_r"], kappa=Params["kappa"]) ### (KJ , 1/nm)d
+
                 if ((IDToCharge[i]==0) or (IDToCharge[j]==0)):
-                    yukawa.r_cut[(res_i, res_j)] = 0.0
+                    yukawa.r_cut[(res_i,res_j)] = 0.0
                 else:
                     yukawa.r_cut[(res_i,res_j)] = 3.5
         forces.append(yukawa)
@@ -151,7 +151,7 @@ def run(FolderPath):#, GPUNUM):
 
     if Params["Alt_GSD_Start"]!="-":  ### not needed?
         sim = hoomd.Simulation(device=device, seed=Params["Seed"])
-        sim.create_state_from_gsd(filename=PWD+Params["Alt_GSD_Start"])
+        sim.create_state_from_gsd(filename=FolderPath+Params["Alt_GSD_Start"])
 
 
     ### logging quantitites
@@ -161,7 +161,7 @@ def run(FolderPath):#, GPUNUM):
     logger = hoomd.logging.Logger(categories=['scalar', 'string'])
     #logger.add(thermodynamic_properties)
 
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=Params["Trajectory"] ,filter=hoomd.filter.All(),mode='wb',dynamic=['particles/position', 'particles/image'])
+    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode='wb',dynamic=['particles/position', 'particles/image'])
     sim.operations.writers.append(gsd_writer)
     gsd_writer.log = logger
 
@@ -175,7 +175,7 @@ def run(FolderPath):#, GPUNUM):
     logger_pres.add(sim, quantities=["timestep"])
     logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
     hdf5_writer = hoomd.write.HDF5Log(
-        trigger=hoomd.trigger.Periodic(100), filename='pressure.h5', mode='x', logger=logger_pres
+        trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
     )
     sim.operations.writers.append(hdf5_writer)
 
@@ -188,9 +188,9 @@ def run(FolderPath):#, GPUNUM):
     integrator.dt = Params["dt"]
 
 
-  	for i in IDToResName.keys():
+    for i in IDToResName.keys():
         name = IDToResName[i]
-        nvt.gamma[name] = IDToMass[i]*10.0
+        nvt.gamma[name] = IDToMass[i]*10.0**-5
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
     sim.operations.integrator=integrator
 

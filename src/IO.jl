@@ -824,7 +824,7 @@ function WriteAsPDB_Help(Sim::SimData{T,I}, x::Matrix{T}, y::Matrix{T}, z::Matri
     write(file, "END")
 end
 
-function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y")
+function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true)
 
     Data = SimData()
     Data.BasePath= Path
@@ -905,20 +905,21 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     InitFiles= "$(Data.BasePath)/InitFiles/"
     mkpath(InitFiles)
 
-    ### generate Martini ITP Files
-    mkpath("$(InitFiles)ITPS_Files/")
-    Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
+    if Regenerate
+        ### generate Martini ITP Files
+        mkpath("$(InitFiles)ITPS_Files/")
+        Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
 
-    ### Generate Topology files
-    TopologyFile = "$(InitFiles)TestTopology.top"
-    Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
+        ### Generate Topology files
+        TopologyFile = "$(InitFiles)TestTopology.top"
+        Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
 
-    ### generate coordinates
-    Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+        ### generate coordinates
+        Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
 
-    ### convert to PDB
-    Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
-
+        ### convert to PDB
+        Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
+    end
     ### read positons from pdb
     Polyply.readPDB("$(InitFiles)$SimulationName.pdb", Data.x,Data.y,Data.z)
 

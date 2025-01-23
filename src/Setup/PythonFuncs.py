@@ -2,7 +2,6 @@
 import numpy as np
 import hoomd
 import hoomd.md
-from hoomd import plugin_HPS_SS
 import copy
 
 from hoomd import ashbaugh_plugin
@@ -98,7 +97,7 @@ def readParticleData(fileName, Nparticles, Sequences):
 def readDictionaries(filename):
     ID,resname, q, mass, sigma, lamda_val = np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)#int, converters={0: lambda x: int(x), 1: lambda x: str(x).strip(), 2: lambda x: float(x), 3: lambda x: float(x), 4: lambda x: float(x), 5: lambda x: float(x) })
     ID=ID.astype(int)-1
-    resname = np.array([f" {aa}" if len(aa)==1 else aa for aa in resname])
+    resname = np.array(resname)
     IDToResName = dict(zip(ID, resname.astype(str)))
     IDToCharge  = dict(zip(ID, q.astype(float)))
     IDToMass    = dict(zip(ID, mass.astype(float)))
