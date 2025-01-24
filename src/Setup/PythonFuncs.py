@@ -128,7 +128,7 @@ def parseKeywords(keyword, value):
         return value
     if keyword in ["Seed", "NSteps", "NOut"]:
         return int(value)
-    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor"]:
+    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor", "AHCutoff", "YukawaCutoff"]:
         return float(value)
     if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config"]:
         return value=="True" or value=="true"
@@ -330,7 +330,6 @@ def minimiseSystem(sim,cell, forcesWithoutLJ, IDToResName, IDToLambda, IDToSigma
         sim.run(100)
         cnt+=1
     print("done")
-
 
 def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
     with gsd.hoomd.open(TrajectoryPath) as f:

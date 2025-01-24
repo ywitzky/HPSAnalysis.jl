@@ -17,7 +17,7 @@ from hoomd import ashbaugh_plugin
 
 PWD = os.getcwd()
 
-def run(FolderPath):#, GPUNUM):
+def run(FolderPath, Restart=False):#, GPUNUM):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
     Params = readParam(f"{FolderPath}/HOOMD_Setup/Params.txt")
@@ -55,46 +55,51 @@ def run(FolderPath):#, GPUNUM):
 
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
-    if Params["Create_Start_Config"]:
-        snapshot = gsd.hoomd.Frame()  
-        #if Params["Use_Minimised_GSD"]:
-            ### Specify particles
-        snapshot.particles.N = NBeads
-        snapshot.particles.position = InputPositions.astype(np.float32) ### convert to nm
-        snapshot.particles.types = tuple(Types)
-        snapshot.particles.typeid = InputTypes.astype(np.int32)
-        snapshot.particles.image = InputImage
-
-        snapshot.configuration.box = [Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0] #4:6 are tilt
-
-        snapshot.particles.mass = InputMasses.astype(np.float32)
-        snapshot.particles.charge = InputCharges.astype(np.float32)
-
-        # Connect particles with bonds.
-        snapshot.bonds.N = NBeads-NChains
-        snapshot.bonds.types = ['O-O']
-        snapshot.bonds.typeid = np.zeros(snapshot.bonds.N, dtype=np.uint32)
-        snapshot.bonds.group = InputBonds#.astype(np.uint32)
-
-        ## Create Angles
-        snapshot.angles.N = NBeads-2*NChains
-        snapshot.angles.types = ['O-O-O']
-        snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
-        snapshot.angles.group = InputAngles
-
-        # Create Angles
-        snapshot.dihedrals.N =  NBeads-3*NChains 
-        snapshot.dihedrals.types = list(dihedral_list)
-        snapshot.dihedrals.typeid =  dihedral_AllIDs
-        snapshot.dihedrals.group = InputDihedrals
-
-        with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
-            f.append(snapshot)
-
-        sim.create_state_from_gsd(filename=FolderPath+Params['Simname']+"_StartConfiguration.gsd")
+    if Restart:
+        RestartPath=FolderPath+Params["Simname"] +"_Restart.gsd"
+        CopyLastFrameToRestartFile(FolderPath+Params["Trajectory"], RestartPath)
+        sim.create_state_from_gsd(filename=RestartPath)
     else:
-        print(f"Creat start from: {FolderPath+Params['Simname']}gsd")
-        sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
+        if Params["Create_Start_Config"]:
+            snapshot = gsd.hoomd.Frame()  
+            #if Params["Use_Minimised_GSD"]:
+                ### Specify particles
+            snapshot.particles.N = NBeads
+            snapshot.particles.position = InputPositions.astype(np.float32) ### convert to nm
+            snapshot.particles.types = tuple(Types)
+            snapshot.particles.typeid = InputTypes.astype(np.int32)
+            snapshot.particles.image = InputImage
+
+            snapshot.configuration.box = [Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0] #4:6 are tilt
+
+            snapshot.particles.mass = InputMasses.astype(np.float32)
+            snapshot.particles.charge = InputCharges.astype(np.float32)
+
+            # Connect particles with bonds.
+            snapshot.bonds.N = NBeads-NChains
+            snapshot.bonds.types = ['O-O']
+            snapshot.bonds.typeid = np.zeros(snapshot.bonds.N, dtype=np.uint32)
+            snapshot.bonds.group = InputBonds#.astype(np.uint32)
+
+            ## Create Angles
+            snapshot.angles.N = NBeads-2*NChains
+            snapshot.angles.types = ['O-O-O']
+            snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
+            snapshot.angles.group = InputAngles
+
+            # Create Angles
+            snapshot.dihedrals.N =  NBeads-3*NChains 
+            snapshot.dihedrals.types = list(dihedral_list)
+            snapshot.dihedrals.typeid =  dihedral_AllIDs
+            snapshot.dihedrals.group = InputDihedrals
+
+            with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
+                f.append(snapshot)
+
+            sim.create_state_from_gsd(filename=FolderPath+Params['Simname']+"_StartConfiguration.gsd")
+        else:
+            print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
+            sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
 
 
     forces = []
@@ -105,12 +110,11 @@ def run(FolderPath):#, GPUNUM):
     forces.append(harmonic)
 
     if Params["UseAngles"]:
-        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=2.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
-        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
+        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
+        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'] )
     else:
-        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=2.0, exclusions=['bond'])
-        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
-        #cell  = hoomd.md.nlist.Cell(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )#, mesh=hoomd.mesh.Mesh(), default_r_cut=3.5)
+        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond'])
+        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )
 
 
     if Params["UseCharge"]:
@@ -120,12 +124,12 @@ def run(FolderPath):#, GPUNUM):
             res_i = IDToResName[i]
             for j in IDToResName.keys():
                 res_j = IDToResName[j]
-                yukawa.params[(res_i,res_j)] = dict(epsilon=IDToCharge[i]*IDToCharge[j]*Params["epsilon_r"], kappa=Params["kappa"]) ### (KJ , 1/nm)d
+                yukawa.params[(res_i,res_j)] = dict(epsilon=IDToCharge[i]*IDToCharge[j]*Params["yk_prefactor"], kappa=Params["kappa"]) ### (KJ , 1/nm)d
 
                 if ((IDToCharge[i]==0) or (IDToCharge[j]==0)):
                     yukawa.r_cut[(res_i,res_j)] = 0.0
                 else:
-                    yukawa.r_cut[(res_i,res_j)] = 3.5
+                    yukawa.r_cut[(res_i,res_j)] = Params["YukawaCutoff"]
         forces.append(yukawa)
     
     # # nonbonded: ashbaugh-hatch potential
@@ -134,8 +138,8 @@ def run(FolderPath):#, GPUNUM):
         res_i = IDToResName[i]
         for j in IDToResName.keys():
             res_j = IDToResName[j]
-            ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":round((IDToSigma[i]+IDToSigma[j])/20.0,5), "lam":(IDToLambda[i]+IDToLambda[j])/2.0}#, "lam":(IDToLambda[i]+IDToLambda[j])/2.0} ### convert to nm as well
-            ash.r_cut[(res_i,res_j)] = 2.0
+            ash.params[(res_i, res_j)] = {"epsilon":0.8368, "sigma":round((IDToSigma[i]+IDToSigma[j])/20.0,5), "lam":(IDToLambda[i]+IDToLambda[j])/2.0} ### convert to nm as well
+            ash.r_cut[(res_i,res_j)] = Params["AHCutoff"] 
     forces.append(ash)
 
 
@@ -161,7 +165,8 @@ def run(FolderPath):#, GPUNUM):
     logger = hoomd.logging.Logger(categories=['scalar', 'string'])
     #logger.add(thermodynamic_properties)
 
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode='wb',dynamic=['particles/position', 'particles/image'])
+    write_mode = 'ab' if Restart else 'wb'
+    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image'])
     sim.operations.writers.append(gsd_writer)
     gsd_writer.log = logger
 
@@ -170,14 +175,18 @@ def run(FolderPath):#, GPUNUM):
     table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
     sim.operations.writers.append(table)
         
+
+    if True:
     ### track presure
-    logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
-    logger_pres.add(sim, quantities=["timestep"])
-    logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
-    hdf5_writer = hoomd.write.HDF5Log(
-        trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
-    )
-    sim.operations.writers.append(hdf5_writer)
+        logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
+        logger_pres.add(sim, quantities=["timestep"])
+        logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
+        hdf5_writer = hoomd.write.HDF5Log(
+            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
+        )
+        sim.operations.writers.append(hdf5_writer)
+    else:
+        print("Thermodynamic Quantities are not tracked!")
 
 
     ### apply langevin
@@ -207,12 +216,20 @@ def run(FolderPath):#, GPUNUM):
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
+    ### pre equilibrate bonds
+    integrator.dt = Params["dt"]/10.0
+    sim.run(10000)
+
     ### start simulation
+    integrator.dt = Params["dt"]
     sim.run(Params["NSteps"])
     
     print(f"TPS: {sim.tps:0.5g}")
+    print(f"WallTime: {sim.walltime:0.5g}")
 
 
+def restart(FolderPath):
+    run(FolderPath, Restart=True)
 
 
 if __name__ == '__main__':
