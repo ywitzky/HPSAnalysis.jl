@@ -167,7 +167,7 @@ def run(FolderPath, Restart=False):#, GPUNUM):
 
     write_mode = 'ab' if Restart else 'wb'
     gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image'])
-    sim.operations.writers.append(gsd_writer)
+    #sim.operations.writers.append(gsd_writer)
     gsd_writer.log = logger
 
     #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
@@ -216,11 +216,18 @@ def run(FolderPath, Restart=False):#, GPUNUM):
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
-    ### pre equilibrate bonds
-    integrator.dt = Params["dt"]/10.0
-    sim.run(10000)
+
+    ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
+    for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
+        print(f"fac {fac}")
+        for i in range(10):
+            integrator.dt = Params["dt"]/fac
+            sim.run(100)#Params["NSteps"])
+            sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
 
     ### start simulation
+    sim.operations.writers.append(gsd_writer)
+
     integrator.dt = Params["dt"]
     sim.run(Params["NSteps"])
     
