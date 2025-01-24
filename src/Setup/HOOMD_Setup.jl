@@ -42,7 +42,7 @@ function WriteDihedrals(filename, dihedral_map, dihedral_eps)
     close(io)
 end
 
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=3.5, ah_cut=2.0, ionic=0.1, pH=7.0)
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0)
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
     write(io, "Seed: $Seed\n")
