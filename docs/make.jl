@@ -17,6 +17,7 @@ makedocs(
 	remotes=nothing,
     pages = [
         "Home" => "index.md",
+        "Setup" => "setup.md",
         #"Installation" => "man/installation.md",
         #"List of functions" => "man/listfunctions.md",
     ],
