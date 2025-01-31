@@ -11,15 +11,13 @@ using HPSAnalysis
 makedocs(
     sitename = "HPSAnalysis",
     authors = "Yannick Witzky",
-    format = Documenter.HTML(;
-    size_threshold_ignore = ["man/listfunctions.md"]), # easier local build
+    format = Documenter.HTML(;edit_link=:commit,
+    prettyurls = get(ENV, "CI", nothing) == "true"), # easier local build
     modules = [HPSAnalysis],
-	remotes=nothing,
+    repo = "https://gitlab.rlp.net/ywitzky/HPSAnalysis.jl",
     pages = [
         "Home" => "index.md",
         "Setup" => "setup.md",
-        #"Installation" => "man/installation.md",
-        #"List of functions" => "man/listfunctions.md",
     ],
 )
 
@@ -27,5 +25,7 @@ makedocs(
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
 #=deploydocs(
-    repo = "<repository url>"
+    devbranch="LF_Docs",
+    repo = "https://gitlab.rlp.net/ywitzky/HPSAnalysis.jl",
+    push_preview=true,
 )=#
