@@ -295,13 +295,15 @@ end
 
 function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
-    axis = axes(Sim.RGAutocorr[1,:])
+    axis = 0:length(Sim.RGAutocorr[1,:])-1
+    println(axis)
+    println(maximum(axes(Sim.RGAutocorr[1,:])))
     avg = sum(Sim.RGAutocorr, dims=1)[1,:]./Sim.NChains
 
     for chain in 1:Sim.NChains
         RG_Auto = Plots.plot!(axis, Sim.RGAutocorr[chain,:], label="")
     end
-    Plots.plot!(axis, avg,  label="avg. over chains", c=:black)
+    Plots.plot!(axis, avg,  label="avg. over chains", c=:black, xlim=(0,length(Sim.RGAutocorr[1,:])))
 
     #Plots.vline!([Sim.EquilibrationTime], label="Choosen EquilibrationTime")
     Plots.savefig(RG_Auto, Sim.PlotPath*Sim.SimulationName*"_RGAutocorr.png")

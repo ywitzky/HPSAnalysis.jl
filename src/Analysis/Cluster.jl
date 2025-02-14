@@ -1,7 +1,7 @@
 export computeClusterCOMs
 
 function computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
-    ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
+    ### cutoff from dignon et al. "Sequence determinants of protein phase behavior from a coarse-grained model"
     Clusters = Vector{Vector{Vector{Int}}}()
 
     pre = Sim.ChargeAnalysisCutoff 
