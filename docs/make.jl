@@ -3,8 +3,6 @@ using Documenter
 push!(LOAD_PATH,"../src/")
 using HPSAnalysis
 
-
-
 @info "Making documentation..."
 
 
@@ -12,13 +10,15 @@ makedocs(
     sitename = "HPSAnalysis",
     authors = "Yannick Witzky",
     format = Documenter.HTML(;
-    size_threshold_ignore = ["man/listfunctions.md"]), # easier local build
+    size_threshold_ignore = ["listfunctions.md"]
+    ), # easier local build
     modules = [HPSAnalysis],
 	remotes=nothing,
     pages = [
         "Home" => "index.md",
-        #"Installation" => "man/installation.md",
-        #"List of functions" => "man/listfunctions.md",
+        "Slab Analysis" => "SlabAnalysis.md",
+        "List of functions" => "listfunctions.md",
+        # "Installation" => "man/installation.md",
     ],
 )
 
