@@ -295,13 +295,15 @@ end
 
 function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
-    axis = axes(Sim.RGAutocorr[1,:])
+    axis = 0:length(Sim.RGAutocorr[1,:])-1
+    println(axis)
+    println(maximum(axes(Sim.RGAutocorr[1,:])))
     avg = sum(Sim.RGAutocorr, dims=1)[1,:]./Sim.NChains
 
     for chain in 1:Sim.NChains
         RG_Auto = Plots.plot!(axis, Sim.RGAutocorr[chain,:], label="")
     end
-    Plots.plot!(axis, avg,  label="avg. over chains", c=:black)
+    Plots.plot!(axis, avg,  label="avg. over chains", c=:black, xlim=(0,length(Sim.RGAutocorr[1,:])))
 
     #Plots.vline!([Sim.EquilibrationTime], label="Choosen EquilibrationTime")
     Plots.savefig(RG_Auto, Sim.PlotPath*Sim.SimulationName*"_RGAutocorr.png")
@@ -332,29 +334,35 @@ function animateDensityGif(Sim::SimData{R,I}, NBins=100) where {R<:Real, I<:Inte
     gif(anim, "/localscratch/HPS_DATA/HPS-Alpha/SLAB/DensityGifs/$(Sim.SimulationName)_$(Sim.TargetTemp).gif", fps = 30)
 end
 
+
+@doc raw"""
+    plotAvgSlabDensity(Sim::SimData; Windowlength=100)
+
+Plots the average slab histogram of the frames in range Sim.NSteps-Windowlength:Sim.NSteps. Result is empty if the Windowlength is larger then the step size at which histgrams here computed.
+"""
 function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
 
-    #local xticks=([-150,-100,-50,0,50,100,150], ["-750", "-500", "-250", "0", "250", "500","750"])
-
     xaxis = axes(Sim.SlabHistogramSeries)[1]
     ### newer iterations dont measure at every frame. Detect which frames actually contain data
     NMeasurements= sum(Sim.SlabHistogramSeries[0,Sim.NSteps-Windowlength:Sim.NSteps,1].!=0.0)
-    println("NMeas: $NMeasurements")
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
-    #layout=(length(Temperatures),length(Proteins)  )
-    # xticks=xticks,, ylim=(0,0.55)
-    fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) #,size=(600,300), figsize=(12cm, 4.5cm)
-    Plots.plot!(xaxis, AvgHist[:,1,1], color=:black, label="",  title=Sim.SimulationName)# ind ==1 ? Prot : "")#, bottom_margin= ind==3 ? 10mm : 0mm, left_margin= Num==1 ? 15mm : 0mm ) #title= Num ==1 ? Prot : "phosphorylated RS41")
+    fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 
+    Plots.plot!(xaxis, AvgHist[:,1,1], color=:black, label="",  title=Sim.SimulationName)
 
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_LastFrames.png")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_LastFrames.pdf")
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.png")
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.pdf")
     return fig
 end
 
+@doc raw"""
+    plotAvgSlabDensityEvolution(Sim::SimData; Windowlength=100)
+
+Plots the average slab histogram in range n\*Windowlength:(n+1)\*Windowlength starting at Sim.EquilibrationTime. Some slices will be empty if the Windowlength is larger then the step size at which histgrams were computed.
+"""
 function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
@@ -378,8 +386,8 @@ function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where 
     NMeasurements= sum(Sim.SlabHistogramSeries[0,start:stop,1].!=0.0)
     AvgHist[:,:,end] .= OffsetArrays.no_offset_view((reduce(+, Sim.SlabHistogramSeries[xaxis,start:stop,:], dims=2)./(NMeasurements))[:,1,:])
 
-    # ,  title="slab density of $(Sim.SimulationName)"
-    fig = Plots.plot(dpi=300,  ylabel= "avg. density\n"* "  [kg/L]" , xlabel= "z-Axis [Å]"  ,  title="$(Sim.SimulationName)",palette=:darktest, seriescolor=:darktest, color=:darktest, markercolor=:darktest, linecolor=:darktest, zcolor=:darktest, xticks=xticks, colorbar_title="window No.", levels=tmp) #,size=(600,300), figsize=(12cm, 4.5cm) Plots.palette(:darktest, 10)
+    fig = Plots.plot(dpi=300,  ylabel= "avg. density\n"* "  [kg/L]" , xlabel= "z-Axis [Å]"  ,  title="$(Sim.SimulationName)",palette=:darktest, seriescolor=:darktest, color=:darktest, markercolor=:darktest, linecolor=:darktest, zcolor=:darktest, xticks=xticks, colorbar_title="window No.", levels=tmp)
+
     for i in 1:tmp
         if (i)*Windowlength < Sim.EquilibrationTime continue end
         Plots.plot!(axes(AvgHist)[1][2:end-1], AvgHist[:,1,i][2:end-1],  label="",  line_z=i, marker_z=i, levels=tmp, c=:darktest)
