@@ -6,3 +6,6 @@ using HPSAnalysis, Aqua, Test
     ### ignore standard libraries, not sure how to deal with them im PackageCompatUI/add compats manually
     ### Test fails in project extras since they dont get excluded their normaly
 end
+
+
+include("./Analysis/Analysis_test.jl")
