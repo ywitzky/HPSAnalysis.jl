@@ -670,8 +670,6 @@ function SaveAllData(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     SaveFields(Sim,"All",Dictionary)
 
     for fields in Sim.BigDataList
-        println(Sim.DataPath*String(fields)*".jld2")
-        #println(Dict(String(fields)=> getfield(Sim,fields)))
         JLD2.save(Sim.DataPath*String(fields)*".jld2",Dict(String(fields)=> getfield(Sim,fields)))
     end
 end

@@ -18,7 +18,6 @@ makedocs(
         "Home" => "index.md",
         "Slab Analysis" => "SlabAnalysis.md",
         "List of functions" => "listfunctions.md",
-        # "Installation" => "man/installation.md",
     ],
 )
 

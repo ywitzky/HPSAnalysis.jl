@@ -25,7 +25,7 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
     end
 
     Len = deepcopy(Sim.BoxLength[Sim.SlabAxis])
-    Len_inv = 1/Len
+    Len_inv = 1.0/Len
 
     NHists = 1 + 2 +1 + Sim.NAtomTypes*Use_Types # one normal, one for positive charge, one for negative charge, one for alpha helices and one for each type
 
@@ -45,6 +45,9 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
         AlphaHelixProb = zeros(eltype(Sim.x), Sim.NAtoms)
     end
 
+    lowestind = Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1
+    highestind =Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution))
+
     for (j,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
         if j %200 == 0 println("step $j/$(length(Sim.ClusterRange))") end
 
@@ -55,9 +58,12 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
         end
 
         for atom in 1:Sim.NAtoms 
-            pos = (SlabCoord[atom,step]-AxisCOM[j]-0.5) ### center slab at 0
+            pos = (SlabCoord[atom,step]-AxisCOM[j])-0.5 ### center slab at 0
             pos -= Len*round(I, pos*Len_inv)            ### wrap back to central images
             ind = ceil(Int32,((pos)/Sim.Resolution))    ### get index according to resolution
+            if ind == lowestind-1
+                ind = highestind
+            end
 
             Sim.SlabHistogramSeries[ind , step,1]+= Sim.Masses[atom]
             if Sim.Charges[atom] > 0
