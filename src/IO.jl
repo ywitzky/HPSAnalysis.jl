@@ -579,9 +579,10 @@ function initReducedData_NoConfStorage(Path::String, NumSteps::Int,NChains::Int,
 
 end
 
+#read the defines Parameters and coordinates
 function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAll=true, Reduce=1, EquilibrationTime=1, LammpsVariables= Dict{String,Any}(), BasePathAdd="", HOOMD=false, ReadBig=false) #where {R<:Real,I<:Integer}
     
-
+    #Define path where the Data should be
     Data = SimData()#::SimData{R,I}
     Data.HOOMD=HOOMD
     Data.BasePath= Path
@@ -600,7 +601,7 @@ function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAl
 
 
     Data.StepFrequency=StepFrequency
-
+    #Read HoomdSetup Datas
     if Data.HOOMD
         read_HOOMD_Folder(Data,Data.BasePath*"/HOOMD_Setup/")
     else
@@ -824,8 +825,36 @@ function WriteAsPDB_Help(Sim::SimData{T,I}, x::Matrix{T}, y::Matrix{T}, z::Matri
     write(file, "END")
 end
 
-function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true)
 
+#=
+        **CreateStartConfiguration**(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true)
+
+        Creates the file structure and initialises particle positions for given the given parameters.
+        
+        **Arguments**
+         *SimulationName::String: The name of the simulation.
+         * Path::String: The base directory where simulation data will be stored.
+         * BoxSize::Vector{R}: A vector defining the box dimensions (x, y, z).
+         * Proteins::Vector{String}: List of protein names used in the simulation.
+         * Sequences::Vector{String}: List of amino acid sequences corresponding to the proteins.
+        **Optional Arguments**
+         * Axis::String: The axis along which the system is unfolded.
+         * Regenerate::Bool=true: If true, regenerates initial positions using the Polyply package.
+
+        **Returns**
+         * A tuple (pos, Data) containing the initial positions and the simulation data structure.
+    """=#
+@doc raw"""
+    CreateStartConfiguration()
+
+    NICHT BondPlot
+
+    **BOLD**
+
+    *kursiv*
+"""
+function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true)
+    #Definition of Paths for the parameters
     Data = SimData()
     Data.BasePath= Path
     Data.PlotPath=Data.BasePath*"/Plots/"
@@ -840,8 +869,9 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     mkpath(Data.PlotPath)
     mkpath(Data.DataPath)
 
+    #Definition of the Box
     Data.BoxLength = [Float32(BoxSize[1]),Float32(BoxSize[2]),Float32(BoxSize[3])]
-    Data.BoxSize = zeros(eltype(Data.x), 3,2 )
+    Data.BoxSize = zeros(eltype(Data.x), 3,2 )#Matrix of FloatType
     Data.BoxSize[1,1] = -Data.BoxLength[1]/2.
     Data.BoxSize[1,2] =  Data.BoxLength[1]/2.
     Data.BoxSize[2,1] = -Data.BoxLength[2]/2.
@@ -849,19 +879,21 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     Data.BoxSize[3,1] = -Data.BoxLength[3]/2.
     Data.BoxSize[3,2] =  Data.BoxLength[3]/2.
 
-
+    #Definition: Number of Steps,Chains
     Data.NSteps = 1 ### only for the creation creation, will be changed later.
     Data.NChains = length(Sequences)
     Data.StepFrequency=1
-    Data.SimulationName=SimulationName #
+    Data.SimulationName=SimulationName
 
     Data.Sequences = Sequences
 
+    #Definition of the length of all chains
     Data.NAtoms = 0
     for Prot in Proteins
         Data.NAtoms += length(ProteinSequences.NameToSeq[Prot]) 
     end
 
+    #All Residues get an ID, same Residue -> same ID, and definition for other way around
     Data.IDs = zeros(eltype(Data.NAtoms), Data.NAtoms)
     cnt = Int32(1)
     ind = 1
@@ -878,6 +910,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     end
     Data.IDToResName = Dict( (v => string(k)) for (k, v) in ResNameToID)
 
+    #Matrix of the start and end values of each chain
     Data.ChainStart = zeros(eltype(Data.NSteps), Data.NChains)
     Data.ChainStop  = zeros(eltype(Data.NSteps), Data.NChains)
     Data.ChainStart[1] = 1
@@ -893,10 +926,12 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
 
     ### allocate disk space for X
+    #creat path for the coordinates
     Data.xio= open(Data.xFilePath,"w+")
     Data.yio= open(Data.yFilePath,"w+")
     Data.zio= open(Data.zFilePath,"w+")
-    
+    #mmap creat 2D-Matrix for the coordinates (Lenght, Steps(=1))
+    #Matrices of start coordinates (for each x,y,z-value)
     Data.x =  Mmap.mmap(Data.xio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.y =  Mmap.mmap(Data.yio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.z =  Mmap.mmap(Data.zio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
