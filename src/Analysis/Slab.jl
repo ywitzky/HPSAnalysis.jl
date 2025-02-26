@@ -1,16 +1,29 @@
+@doc raw"""
+    computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+Computes the slab density histogram along a specified axis.???
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Creat**:
+* `Sim.SlabHistogramSeries`: Stores mass densities across slabs for different atom types.
+"""
 function computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     ### ensure that TorsionAngles have been computed
     if sum(Sim.TorsionAngles[:,1])==0
+        #updates Sim.TorsionAngles
         computeDihedralAngles(Sim)
     end
-
+    #Cluster COM -> update Sim.Cluster
     Clust_Coms = computeClusterCOMs(Sim)
+    #Lagest Cluster
     LClustID = argmax.([length.(C) for C in Sim.Clusters]) ### returns index for clusters with most proteins inside
 
     AxisCOM = [Clust_Coms[i][id, Sim.SlabAxis] for (i,id) in enumerate(LClustID)]
 
 
     #println(length(AxisCOM))
+    #coordinates based on slab axis
     if Sim.SlabAxis==1
         SlabCoord = Sim.x
     elseif Sim.SlabAxis==2
@@ -25,7 +38,7 @@ function computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     NHists = 1 + 2 +1 + Sim.NAtomTypes # one normal, one for positive chage, one for negative charge, one for alpha helices and one for each type
 
     ### array with 1:N steps for -boxwidth:boxwitdh in the direction of the slab
-    Sim.SlabHistogramSeries = OffsetArray(zeros(eltype(Sim.x), Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
+    Sim.SlabHistogramSeries = OffsetArray(zeros(R, Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
 
     AllAxis = [1,2,3]
     deleteat!(AllAxis, Sim.SlabAxis)

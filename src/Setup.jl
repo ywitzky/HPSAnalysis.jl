@@ -591,9 +591,35 @@ function getImageCopyNumber(pos, boxSize, Sequences)
     return image
 end
 
-#Get: All Start Parameters
-#Do:  Write all start Parametres and the Hoomd-Start-File
-#
+@doc raw"""
+    writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
+Writes the start configuration for a molecular dynamics simulation.
+    
+**Arguments**
+- `fileName::String`: Name of the output file.
+- `StartFileName::String`: Name of the initial configuration file.
+- `Info::String`: Additional information about the simulation.
+- `Sequences::Vector{String}`: List of amino acid sequences corresponding to the proteins.
+- `BoxSize::Vector{ChoosenFloatType}`: A vector defining the box dimensions (x, y, z).
+- `NSteps::Int`: Number of simulation steps (default: 100,000,000).
+- `SimulationType::String`: Type of simulation (default: "Calvados2").
+- `Temperature::Int`: Temperature in Kelvin (default: 300).
+- `MixingRule::String`: Mixing rule for ??? .
+- `Pos::Vector{Float}`: Initial positions (default: empty array).
+- `InitStyle::String`: Initialization style, e.g., "Slab" or "Pos".
+- `SaltConcentration::Float`: Salt concentration in M (default: 0.15).
+- `pH::Int`: pH level (default: 6).
+- `ChargeTemperSteps`: List of charge tempering steps.
+- `ChargeTemperSwapSteps::Int`: Swap steps for charge tempering.
+- `HOOMD::Boolean`: Boolean to enable HOOMD compatibility.
+- `OneToChargeDef::Dict, OneToLambdaDef::Dict, OneToSigmaDef::Dict`: Dictionaries for parameter definitions.
+- `WriteOutFreq::Int`: Frequency of writing output (default: 100,000).
+- `Device::String`: Computational device, e.g., "GPU" (default: "GPU").
+- `yk_cut::Float, ah_cut::Float`: Cutoff distances for interactions.
+
+**Returns**:
+* Write Data Files with the start configuration.
+"""
 function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0

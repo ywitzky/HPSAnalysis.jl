@@ -654,6 +654,17 @@ function initData(Path::String;LmpName="", StepFrequency=1, Reparse=true, LoadAl
     return Data
 end
 
+@doc raw"""
+    SaveAllData(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+
+Save of the Field information as a jld2 file.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Creat**:
+* Save File.
+"""
 function SaveAllData(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Dictionary= Dict()
     Sim.BigDataList = [] #Array{Symbol}()
@@ -826,33 +837,24 @@ function WriteAsPDB_Help(Sim::SimData{T,I}, x::Matrix{T}, y::Matrix{T}, z::Matri
 end
 
 
-#=
-        **CreateStartConfiguration**(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true)
-
-        Creates the file structure and initialises particle positions for given the given parameters.
-        
-        **Arguments**
-         *SimulationName::String: The name of the simulation.
-         * Path::String: The base directory where simulation data will be stored.
-         * BoxSize::Vector{R}: A vector defining the box dimensions (x, y, z).
-         * Proteins::Vector{String}: List of protein names used in the simulation.
-         * Sequences::Vector{String}: List of amino acid sequences corresponding to the proteins.
-        **Optional Arguments**
-         * Axis::String: The axis along which the system is unfolded.
-         * Regenerate::Bool=true: If true, regenerates initial positions using the Polyply package.
-
-        **Returns**
-         * A tuple (pos, Data) containing the initial positions and the simulation data structure.
-    """=#
 @doc raw"""
-    CreateStartConfiguration()
+    CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{R}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true)
 
-    NICHT BondPlot
+Creates the file structure and initialises particle positions for the given parameters.
 
-    **BOLD**
+**Arguments**:
+- `SimulationName::String`: The name of the simulation.
+- `Path::String`: The base directory where simulation data will be stored.
+- `BoxSize::Vector{R}`: A vector defining the box dimensions (x, y, z).
+- `Proteins::Vector{String}`: List of protein names used in the simulation.
+- `Sequences::Vector{String}`: List of amino acid sequences corresponding to the proteins.
+**Optional Arguments**:
+- `Axis::String`: The axis along which the system is unfolded.
+- `Regenerate::Bool`: If true, regenerates initial positions using the Polyply package.
 
-    *kursiv*
-"""
+**Returns**:
+* A tuple (pos, Data) containing the initial positions and the simulation data structure.
+    """
 function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true)
     #Definition of Paths for the parameters
     Data = SimData()

@@ -1,5 +1,17 @@
 export computeClusterCOMs
 
+@doc raw"""
+    computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+
+Computes a List of Cluster based on the vicinity of the COMs.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `Cutoff::Float`: How close the chains have to be for a Cluster.
+
+**Returns**:
+- `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains.
+"""
 function computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
     ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
     Clusters = Vector{Vector{Vector{Int}}}()

@@ -222,6 +222,16 @@ function plotBondHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return BondPlot
 end
 
+@doc raw"""
+    plotDihedralAngleHist(Sim::SimData{R,I})
+Plot of the befor computed histogram of dihedral angles.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Create**:
+* A histogram of dihedral angles.
+"""
 function plotDihedralAngleHist(Sim)
     kα1 = 11.4
     kα2 = 0.15
@@ -265,6 +275,17 @@ function plotDihedralAngleHist(Sim)
     return DihedralAnglePlot
 end
 
+@doc raw"""
+    plotBondAngleHist(Sim::SimData{R,I})
+
+Plot of the histogram of bond angles.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Create**:
+* A histogram of bond angles.
+"""
 function plotBondAngleHist(Sim)
     BondAnglePlot= Plots.plot(axes(Sim.BondAngleHist,1)*180.0/size(Sim.BondAngleHist,1), Sim.BondAngleHist[:]*100, xlabel="Bond Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Bond angle histogram", label="")
 
@@ -355,6 +376,18 @@ function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real,
     return fig
 end
 
+@doc raw"""
+    plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
+
+Plot of the average density in the simulation box.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `Windowlength::Int`: How much steps are processed.
+
+**Create**:
+* A histogram of the average density.
+"""
 function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
