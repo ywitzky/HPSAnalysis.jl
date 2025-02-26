@@ -682,6 +682,8 @@ function SaveAllData(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     SaveFields(Sim,"All",Dictionary)
 
     for fields in Sim.BigDataList
+        println(Sim.DataPath*String(fields)*".jld2")
+        #println(Dict(String(fields)=> getfield(Sim,fields)))
         JLD2.save(Sim.DataPath*String(fields)*".jld2",Dict(String(fields)=> getfield(Sim,fields)))
     end
 end
@@ -716,11 +718,13 @@ function ReadAllData!(Sim::SimData{R,I}; ReadBig=false) where {R<:Real, I<:Integ
         end
     end
     olddata = load(Sim.DataPath*"$("All").jld2")
-    #ReadFields!(Sim, "All", Dictionary)
+
+    BigDataFiles = GetBigDataRecords(Sim)
     if ~ReadBig 
-        #printstyled("Reading of big data components has to be activated by ReadBig.\n";color=:yellow)
+        if length(BigDataFiles)>0
+            printstyled("Reading of big data components has to be activated by ReadBig.\n";color=:yellow)
+        end
     else
-        BigDataFiles  = GetBigDataRecords(Sim)
         for to_get in BigDataFiles
             setfield!(Sim, Symbol(to_get) ,load(Sim.DataPath*to_get*".jld2")[to_get])
         end
@@ -728,10 +732,11 @@ function ReadAllData!(Sim::SimData{R,I}; ReadBig=false) where {R<:Real, I<:Integ
 
     for (key, field) in Dictionary
         try
-            #tmp =load(Sim.DataPath*"$(FileName).jld2", String(key) )
-            setfield!(Sim, key, olddata[String(key)])
+            if !(String(key) in BigDataFiles)
+                setfield!(Sim, key, olddata[String(key)])
+            end
         catch
-            printstyled("Cannot find field: $(field) with key $(key).\n"; color=:yellow)
+           printstyled("Cannot find field: $(field) with key $(key).\n"; color=:yellow)
             continue
         end
     end

@@ -210,9 +210,10 @@ function computeREEHist(Sim::SimData{R,I}, StartStops=[[]]; ScalFac=5.0, Decorre
 end 
 
 function computeRGCorrelationTime(Sim::SimData{R,I}, NLags=5000) where{R<:Real, I<:Integer}
-    NLags = min(NLags, length(Sim.EquilibrationTime:Sim.NSteps)-1)
+    NLags = min(NLags, length(Sim.EquilibrationTime:Sim.NSteps))
     Sim.RGAutocorr = zeros(Sim.NChains, NLags)
-    lags = Vector(range(1,NLags))
+    lags = Vector(range(0,NLags-1))
+
 
     for chain in 1:Sim.NChains
         Sim.RGAutocorr[chain,:] .= StatsBase.autocor(Sim.RGSeries[chain,Sim.EquilibrationTime:Sim.NSteps], lags;demean=true)
@@ -227,6 +228,7 @@ function computeRGCorrelationTime(Sim::SimData{R,I}, NLags=5000) where{R<:Real, 
             end
         end
     end
+    println(half_time)
     Sim.RGMeasureStep = max(1,ceil(I,Statistics.mean(half_time)))
 end
 
