@@ -648,7 +648,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     #Define lenght of all chains
     NAtomTypes = length(LongAtomTypes)
 
-    #if AlphaAddition then determine the Dihedral ?? 
+    #if AlphaAddition then determine the Dihedral
     dihedral_short_map=Dict()
     dihedral_list = zeros(Int32, (0,0))
     if AlphaAddition

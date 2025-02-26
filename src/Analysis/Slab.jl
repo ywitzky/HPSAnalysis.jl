@@ -1,6 +1,6 @@
 @doc raw"""
     computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-Computes the slab density histogram along a specified axis.???
+Computes the slab density histogram along a specified axis.
 
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.

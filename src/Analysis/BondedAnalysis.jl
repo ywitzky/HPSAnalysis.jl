@@ -200,7 +200,7 @@ Computes a histogram of dihedral angles.
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
 
 **Updates**:
-* Sim.TorsionHist with the frequency of ??.
+* Sim.TorsionHist with the invert of NDihedrals.
 """
 function computeDihedralHist(Sim::SimData{R,I}; N = 500) where {R<:Real, I<:Integer}
     #Sim.TorsionHist=OffsetArray(zeros(R , 1+Sim.NAtomTypes, 360),1:1+Sim.NAtomTypes, -179:180 ) 

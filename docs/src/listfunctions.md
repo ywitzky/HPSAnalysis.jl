@@ -2,5 +2,5 @@
  
 Here an overview of all functions:
 ```@autodocs
-Modules = [HPSAnalysis]
+Modules = [HPSAnalysis, HPSAnalysis.Setup]
 ```
