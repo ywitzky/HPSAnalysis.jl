@@ -3,11 +3,11 @@
 
 Computes clusters based on distances between protein COMs and cutoff.
 
-Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps by naivly computing minimal distances between all proteins based on the given cutoff. Returns the concatenation of groups of IDs belonging to weekly connected graph components of all frames.
+Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps by naivly computing minimal distances between all proteins center of masses based on the given cutoff. Returns the concatenation of groups of IDs belonging to weekly connected graph components of all frames.
 
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
-- `Cutoff::Float`: How close the chains have to be for a Cluster.
+- `Cutoff::Float`: Distance criterion for a Cluster.
 
 **Returns**:
 - `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains.
