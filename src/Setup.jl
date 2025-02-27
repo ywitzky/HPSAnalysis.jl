@@ -592,7 +592,7 @@ function getImageCopyNumber(pos, boxSize, Sequences)
 end
 
 @doc raw"""
-    writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
+    writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6.0, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
 Writes the start configuration for a molecular dynamics simulation.
     
 **Arguments**
@@ -600,25 +600,28 @@ Writes the start configuration for a molecular dynamics simulation.
 - `StartFileName::String`: Name of the initial configuration file.
 - `Info::String`: Additional information about the simulation.
 - `Sequences::Vector{String}`: List of amino acid sequences corresponding to the proteins.
-- `BoxSize::Vector{ChoosenFloatType}`: A vector defining the box dimensions (x, y, z).
+- `BoxSize::Vector{Float}`: A vector of minmal/maximal box dimensions in each axis. ([x_min, x_max, y_min, y_max, z_min, z_max]).
 - `NSteps::Int`: Number of simulation steps (default: 100,000,000).
-- `SimulationType::String`: Type of simulation (default: "Calvados2").
-- `Temperature::Int`: Temperature in Kelvin (default: 300).
-- `MixingRule::String`: Mixing rule for ??? .
-- `Pos::Vector{Float}`: Initial positions (default: empty array).
+- `SimulationType::String`: IDP model used for simulations.(default: "Calvados2").
+- `Temperature::Float`: Temperature in Kelvin (default: 300).
+- `MixingRule::String`: Mixing rule for optional dihedral potential for Calvados models.
+- `Pos::Vector{Float}`: Initial positions. (default: empty array).
 - `InitStyle::String`: Initialization style, e.g., "Slab" or "Pos".
 - `SaltConcentration::Float`: Salt concentration in M (default: 0.15).
-- `pH::Int`: pH level (default: 6).
+- `pH::Float`: pH level (default: 6).
 - `ChargeTemperSteps`: List of charge tempering steps.
 - `ChargeTemperSwapSteps::Int`: Swap steps for charge tempering.
 - `HOOMD::Boolean`: Boolean to enable HOOMD compatibility.
-- `OneToChargeDef::Dict, OneToLambdaDef::Dict, OneToSigmaDef::Dict`: Dictionaries for parameter definitions.
+- `OneToChargeDef::Dict`: Dictionary defining the amount of charge for each one letter atom type.
+- `OneToSigmaDef::Dict`: Dictionary defining the sigma parameter in LJ potentials for each one letter atom type.
+- `OneToLambdaDef::Dict`: Dictionary defining the lambda paramter in Ashbaugh-Hatch potentials for each one letter atom type.
 - `WriteOutFreq::Int`: Frequency of writing output (default: 100,000).
-- `Device::String`: Computational device, e.g., "GPU" (default: "GPU").
-- `yk_cut::Float, ah_cut::Float`: Cutoff distances for interactions.
+- `Device::String`: Computational device, "CPU"/"GPU" (default: "GPU").
+- `yk_cut::Float`: Cutoff distances for yukawa potential.
+- `ah_cut::Float`: Cutoff distances for ashbaugh hatch potential.
 
-**Returns**:
-* Write Data Files with the start configuration.
+**Creates**:
+* Writes data files with the start configuration.
 """
 function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
 
