@@ -1,9 +1,9 @@
 # Setup for a Simulation
-First, the setup begins by creating a data structur that organizes the information and Simulation datas, for each protein and temperture. For the proteins there corresponding sequence is taken from a dictionary.\
-Based on the protein sequence, the number of chains (NChains) required to achieve the target density in the simulation box is calculated. Once NChains is determined, a list is generated containing NChains repetitions of the protein sequences. \
+First, the setup begins by creating a data structur that organizes the information and Simulation datas, for each protein and temperture. Here the proteins sequences are taken from a dictionary of predefined sequences.\
+Based on the protein sequence, the number of chains (NChains) required to achieve the target density in the simulation box is calculated. Once NChains is determined, a list is generated containing NChains repetitions of the protein sequences. Alternatively one could add a mixture of different proteins/sequences here.\
 Next, the parameters of the simulation box, such as its size and boundary conditions, are defined. \
-Using the previously defined data, the initial coordinates of the proteins are calculated, ensuring a proper starting configuration for the simulation. \
-Finally, all necessary inputs are written, including the simulation parameters, the interaction model (Yukawa potential with Debye-Hückel screening), relevant dictionaries, and the start file. These files will be used to initialize the simulation.
+Using the previously defined data, the initial coordinates of the proteins are generated using the python package named **Polyply**, ensuring a unordered preminimized starting configuration for the simulation. \
+Finally, all necessary documentation and inputs are written, including the simulation parameters, the interaction models, relevant dictionaries, and the start file. These files will be used to initialize the simulation externally.
 
 
 ```julia
