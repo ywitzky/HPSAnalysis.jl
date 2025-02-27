@@ -367,7 +367,7 @@ function writeLammpsScript(fileName, AtomTypes; WriteOutFreq=100000)
     run 1000000000")
     close(file)
 end
-
+#Set start coordinates for the AA, by adding offset for x,y-position and offset in z-position if Seqindex%ProteinsPerLayer==0
 function createStartingPosition(Sequences, BoxSize, LatticeSpacing=8.0, BondSpacing=3.8)
     NSeq = length(Sequences)
     MaxSeqLength =0 
@@ -487,14 +487,16 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
     return (ϵ_r, κ)
 end
 
+#Creat the Dictionaries for AA to Charge, Mass, Sigma, Lambda and Dihedral
 function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
-
+    #Define Aminoacids to ID Dict
     AtomTypes= Set(join(Sequences))
     AaToId = Dict{Char,Int32}()
     for (index, value) in enumerate(AtomTypes)
         AaToId[value]=index
     end
 
+    #Change the Sequenz for fist and last AA in each chain 
     index_cnt = length(AtomTypes)
     LongAtomTypes=deepcopy(AtomTypes)
     ResToLongAtomType = Dict()
@@ -524,7 +526,8 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
     Sequences.=NewSequences
     LongAtomTypes = union(LongAtomTypes, AtomTypes)
     LongAtomTypesToRes=Dict( (v => k) for (k, v) in ResToLongAtomType)
- 
+    
+    #creat the Dictionaties of AA to Charge, Mass, Sigma, Lambda and Dihedral
     OneToCharge = Dict()
     OneToMass = deepcopy(BioData.AaToWeight)
     OneToSigma = Dict()
@@ -588,10 +591,43 @@ function getImageCopyNumber(pos, boxSize, Sequences)
     return image
 end
 
+@doc raw"""
+    writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6.0, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
+Writes the start configuration for a molecular dynamics simulation.
+    
+**Arguments**
+- `fileName::String`: Name of the output file.
+- `StartFileName::String`: Name of the initial configuration file.
+- `Info::String`: Additional information about the simulation.
+- `Sequences::Vector{String}`: List of amino acid sequences corresponding to the proteins.
+- `BoxSize::Vector{Float}`: A vector of minmal/maximal box dimensions in each axis. ([x_min, x_max, y_min, y_max, z_min, z_max]).
+- `NSteps::Int`: Number of simulation steps (default: 100,000,000).
+- `SimulationType::String`: IDP model used for simulations.(default: "Calvados2").
+- `Temperature::Float`: Temperature in Kelvin (default: 300).
+- `MixingRule::String`: Mixing rule for optional dihedral potential for Calvados models.
+- `Pos::Vector{Float}`: Initial positions. (default: empty array).
+- `InitStyle::String`: Initialization style, e.g., "Slab" or "Pos".
+- `SaltConcentration::Float`: Salt concentration in M (default: 0.15).
+- `pH::Float`: pH level (default: 6).
+- `ChargeTemperSteps`: List of charge tempering steps.
+- `ChargeTemperSwapSteps::Int`: Swap steps for charge tempering.
+- `HOOMD::Boolean`: Boolean to enable HOOMD compatibility.
+- `OneToChargeDef::Dict`: Dictionary defining the amount of charge for each one letter atom type.
+- `OneToSigmaDef::Dict`: Dictionary defining the sigma parameter in LJ potentials for each one letter atom type.
+- `OneToLambdaDef::Dict`: Dictionary defining the lambda paramter in Ashbaugh-Hatch potentials for each one letter atom type.
+- `WriteOutFreq::Int`: Frequency of writing output (default: 100,000).
+- `Device::String`: Computational device, "CPU"/"GPU" (default: "GPU").
+- `yk_cut::Float`: Cutoff distances for yukawa potential.
+- `ah_cut::Float`: Cutoff distances for ashbaugh hatch potential.
+
+**Creates**:
+* Writes data files with the start configuration.
+"""
 function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
+    #Define Number of all Aminoacids, Bonds, Angles and Dihedrals, set AlphaAddition
     NAtoms= 0
     NBonds=0
     NAngles=0
@@ -609,11 +645,13 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     else
         AlphaAddition=false
     end
-  
+    
+    #Creat the Dictionaries for AA to Charge, Mass, Sigma, Lambda and Dihedral
     (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
-
+    #Define lenght of all chains
     NAtomTypes = length(LongAtomTypes)
 
+    #if AlphaAddition then determine the Dihedral
     dihedral_short_map=Dict()
     dihedral_list = zeros(Int32, (0,0))
     if AlphaAddition
@@ -621,9 +659,12 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         NDihedralsTypes = length(dihedral_eps)
     end
 
+    #Set start coordinates for the AA, with different variations
     if InitStyle=="Slab"
+        #By adding offset for x,y-position and offset in z-position if Seqindex%ProteinsPerLayer==0
         pos = createStartingPosition(Sequences, BoxSize)
     elseif (InitStyle=="Pos")
+        #By getting Initial Positions
         cnt = 1
         pos_init = Pos
 
@@ -637,16 +678,20 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
             end
         end
     else
+        #By getting Initial Positions
         pos = createDenseStartingPosition(Sequences, BoxSize)
     end
 
+    #AltBox=[BoxLengthShort,BoxLengthLong,BoxLengthShort]
     AltBox = [BoxSize[2]-BoxSize[1], BoxSize[4]-BoxSize[3], BoxSize[6]-BoxSize[5]]
+    #Periodic Boundery, if outside -> define coordinates inside and set image
     pos = Setup.correctPositionInBounds(pos, AltBox, Sequences) ### poly coordinates are not in box sometimes
     pos = Setup.correctPositionInBounds(pos, AltBox, Sequences) ### 2 times is the charm....
     pos = Setup.correctPositionInBounds(pos, AltBox, Sequences) ### 3 times is the charm....
 
     image = Setup.getImageCopyNumber(pos, AltBox, Sequences)
 
+    #Write all Inputs, Parameters (Yukawa Interaction with Debye-Hückle), Dictionaries and the Start-File
     if HOOMD
         mkpath("./HOOMD_Setup")
         WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)

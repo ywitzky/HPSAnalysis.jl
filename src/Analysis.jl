@@ -114,6 +114,18 @@ function computeCOP!(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
+@doc raw"""
+    computeCOM!(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
+
+Computes the center of mass (COM) for each polymer chain.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Updates**:
+- `Sim.COM`: COM of each chain.
+- `Sim.COM_uw`: Unwrapped COM.
+"""
 function computeCOM!(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.COM    =  zeros(R, Sim.NChains,3  , Sim.NSteps)
     Sim.COM_uw =  zeros(R, Sim.NChains,3  , Sim.NSteps)

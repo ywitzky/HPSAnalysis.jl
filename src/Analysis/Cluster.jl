@@ -1,14 +1,19 @@
 @doc raw"""
-    computeClustersByChainCOM(Sim::SimData; Cutoff=50)
+    computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
 
 Computes clusters based on distances between protein COMs and cutoff.
 
-Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps by naivly computing minimal distances between all proteins based on the given cutoff. Returns the concatenation of groups of IDs belonging to weekly connected graph components of all frames.
+Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps by naivly computing minimal distances between all proteins center of masses based on the given cutoff. Returns the concatenation of groups of IDs belonging to weekly connected graph components of all frames.
 
-Default cutoff of ``50~\AA`` is taken from dignon et al. "Sequence determinants of protein phase behavior from a coarse-grained model" but might need to be modified based on the protein size.
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `Cutoff::Float`: Distance criterion for a Cluster.
+
+**Returns**:
+- `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains.
 """
-function computeClustersByChainCOM(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
-    ### cutoff from dignon et al. "Sequence determinants of protein phase behavior from a coarse-grained model"
+function computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+    ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
     Clusters = Vector{Vector{Vector{Int}}}()
 
     for (i,step) in enumerate(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)
@@ -108,11 +113,17 @@ end
 
 
 @doc raw"""
-    getLargestClusterIDs(Sim::SimData)
+    getLargestClusterIDs(Sim::SimData{T,I}) where {I<:Integer, T<:Real}
 
-Computes IDs for the largest clusters. 
+Computes IDs for the largest clusters.
 
 Warning is emitted if less than 80% of the proteins are within the largest cluster. The cluster definition might not be reasonable when being used to center slab simulations or other tasks.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Returns**:
+- `LClustID::Vector{Int}`: List of IDs for largest clusters.
 """
 function getLargestClusterIDs(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
     LClustID = argmax.([length.(C) for C in Sim.Clusters]) ### returns index for clusters with most proteins inside
@@ -127,14 +138,20 @@ function getLargestClusterIDs(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
 end
 
 @doc raw"""
-    computeCOMOfLargestCluster(Sim::SimData)
+    computeCOMOfLargestCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
 
 Computes COM of the largest cluster along the axis Sim.SlabAxis in the unwrapped positions.
 
 For the algorithm to work, it is important that the dense phase of the first frame is not crossing the periodic boundaries. The algorithm take dense phase center of the previous step to pre center the data to about issues  at the boundaries. Therefore it works only when the displacement along Sim.SlabAxis between consecutive frames is smaller than half of the box length.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Returns**:
+- `Coms::Vector{Float}`: COM of largest cluster along the Sim.SlabAxis for each step.
 """
 function computeCOMOfLargestCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
-    Coms= zeros(T, length(Sim.Clusters))
+    Coms= zeros(T, length(Sim.Clusters))#Vector{Int}
     LClustID = getLargestClusterIDs(Sim)
 
     Len = Sim.BoxLength[Sim.SlabAxis]
@@ -169,6 +186,17 @@ function computeCOMOfLargestCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Re
     return Coms
 end
 
+@doc raw"""
+    computeCOMsOfCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
+
+Computes COM for each cluster in each frame.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Returns**:
+- `Coms::Matrix{Float}`: Matrix of COM for each cluster and time step.
+"""
 function computeCOMsOfCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
     Coms= Vector{Matrix{T}}()
     for (Cstep,C) in enumerate(Sim.Clusters)
