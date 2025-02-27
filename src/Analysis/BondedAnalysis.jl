@@ -26,6 +26,8 @@ end
 
 Computes the average bond angles.
 
+Computes the bond angles, the cosine thereof for each triplet of beads i, i+1, i+2 along the backbone of the proteins for each frame. The average bond angle and the average cosine of the bond angle are computed over all steps for each triplet independly. The histogram averages also over all triplets. The persistence length is computed if the average of the cosine of the bond angle is large than zero and otherwise set to 0. 
+
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
 - `NBins`::Int: Number of bins for the angle histogram (default: 180).
@@ -78,7 +80,7 @@ function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I
     for chain in 1:Sim.NChains
         NAngles +=Sim.ChainStop[chain]-Sim.ChainStart[chain]-2
     end
-    #convertirung into Real -> invers
+    #conversion into Real -> invers
     inv = 1.0/convert(T, (Sim.NSteps-Sim.EquilibrationTime+1)*NAngles/InvAngleResolution)
     Sim.BondAngleHist .*= inv
 
