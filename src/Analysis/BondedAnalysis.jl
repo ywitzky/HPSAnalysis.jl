@@ -21,6 +21,23 @@ function computeBondAngles!(Sim::SimData{T, I}, Δx, Δy,Δz,length_vec ; step=1
     return nothing
 end
 
+@doc raw"""
+    computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I<:Integer}
+
+Computes the average bond angles.
+
+Computes the bond angles, the cosine thereof for each triplet of beads i, i+1, i+2 along the backbone of the proteins for each frame. The average bond angle and the average cosine of the bond angle are computed over all steps for each triplet independly. The histogram averages also over all triplets. The persistence length is computed if the average of the cosine of the bond angle is large than zero and otherwise set to 0. 
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `NBins`::Int: Number of bins for the angle histogram (default: 180).
+
+**Creates**:
+* `Sim.AvgBondAngles`: Stores the averaged bond angles.
+* `Sim.AvgCosBondAngles`: Stores the averaged cosine of bond angles.
+* `Sim.LocalPersistenceLength`: Computes the persistence length from bond angles.
+* `Sim.BondAngleHist`: Stores the histogram of bond angles.
+"""
 function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I<:Integer}
     r_0=T(-3.8)
 
@@ -35,6 +52,7 @@ function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I
 
     Δx, Δy,Δz,length_vec = allocateBondAngleVecs(Sim)
     for step in Sim.EquilibrationTime:Sim.NSteps
+        #Calculation of the Bond Angles for each Step, with error
         computeBondAngles!(Sim, Δx, Δy,Δz,length_vec; step=step)
 
         Sim.AvgBondAngles .+= Sim.BondAngles
@@ -43,6 +61,7 @@ function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I
         ### add to histogram
         for chain in 1:Sim.NChains
             for atom in Sim.ChainStart[chain]:Sim.ChainStop[chain]-2
+                #Round up to next Integer (I)
                 index = ceil(I, Sim.BondAngles[atom]*InvAngleResolution)
                 if index != 0 
                     Sim.BondAngleHist[index]+= 1.0
@@ -53,7 +72,7 @@ function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I
     ### normalize avg
     Sim.AvgBondAngles ./= T(Sim.NSteps-Sim.EquilibrationTime)
     Sim.AvgCosBondAngles ./= T(Sim.NSteps-Sim.EquilibrationTime)
-
+    #if val>T(0.0) true then r_0/log(val) if this is false then T(0.0)
     Sim.LocalPersistenceLength = [ val>T(0.0) ? r_0/log(val) : T(0.0) for val in Sim.AvgCosBondAngles ]
 
     ### normalize histogram
@@ -61,6 +80,7 @@ function computeAvgBondAngles(Sim::SimData{T, I}; NBins = 180) where {T<:Real, I
     for chain in 1:Sim.NChains
         NAngles +=Sim.ChainStop[chain]-Sim.ChainStart[chain]-2
     end
+    #conversion into Real -> invers
     inv = 1.0/convert(T, (Sim.NSteps-Sim.EquilibrationTime+1)*NAngles/InvAngleResolution)
     Sim.BondAngleHist .*= inv
 
@@ -123,6 +143,17 @@ function computeLocalPersistance(Sim::SimData{R,I}, r_0=1.0, MaxVariants = 5) wh
 
 end
 
+@doc raw"""
+    computeDihedralAngles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+
+Computes the dihedral angles (torsion angles).
+
+**Arguments**:
+ - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Creates**:
+ * Sim.TorsionAngles with computed dihedral angles.
+"""
 function computeDihedralAngles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     ### also computes the improper dihedral angles for residues between chains !!!!
     Sim.TorsionAngles=zeros(( Sim.NAtoms-3, Sim.NSteps))
@@ -162,6 +193,17 @@ function computeDihedralAngles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
+@doc raw"""
+    computeDihedralHist(Sim::SimData{R,I}; N = 500) where {R<:Real, I<:Integer}
+
+Computes a histogram of dihedral angles.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Creates**:
+* Sim.TorsionHist with the invert of NDihedrals.
+"""
 function computeDihedralHist(Sim::SimData{R,I}; N = 500) where {R<:Real, I<:Integer}
     #Sim.TorsionHist=OffsetArray(zeros(R , 1+Sim.NAtomTypes, 360),1:1+Sim.NAtomTypes, -179:180 ) 
     Sim.TorsionHist=OffsetArray(zeros(R , 1, 360),1:1, -179:180 ) 

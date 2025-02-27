@@ -1,11 +1,16 @@
 @doc raw"""
-    computeSlabHistogram(Sim::SimData; Use_Alpha=false, Use_Types=false)
-
+    computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
 Computes centered slab histograms along Sim.SlabAxis.
 
-Centered slab histograms are computed for all amino acids, only the positive and only the negatives at all times. Use\_Alpha enables the computation of alpha helices and their own slab histogram. Amino acids specific histograms are enabled through Use\_Types. 
+Centered slab histograms are computed for all amino acids, only the positive and only the negatives at all times. **Use\_Alpha** enables the computation of alpha helices and their own slab histogram. Amino acids specific histograms are enabled through **Use\_Types**. 
 
 Results are not return but stored in Sim.SlabHistogramSeries as an Offset array where the first dimension ranges from -boxwidth/Sim.Resolution:Sim.Resolution:boxwidth/Sim.Resolution. Default Sim.Resolution is set to ``1~\AA``. The second index are the steps at which clusters and slab histogram were computed according to Sim.ClusterRange. The third index are the amino acids which have been used the order in which they are mentioned above. If used, amino acid specific histograms have the index 4+Sim.IDs. 
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Creat**:
+* `Sim.SlabHistogramSeries`: Stores mass densities across slabs for different atom types.
 """
 function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
     if Use_Alpha && sum(Sim.TorsionAngles[:,1])==0 
@@ -29,8 +34,9 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
 
     NHists = 1 + 2 +1 + Sim.NAtomTypes*Use_Types # one normal, one for positive charge, one for negative charge, one for alpha helices and one for each type
 
-    ### offset array with 1:N steps for -boxwidth:boxwidth in the direction of the slab
-    Sim.SlabHistogramSeries = OffsetArray(zeros(eltype(Sim.x), Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
+    ### array with 1:N steps for -boxwidth:boxwitdh in the direction of the slab
+    Sim.SlabHistogramSeries = OffsetArray(zeros(R, Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
+
 
     AllAxis = [1,2,3]
     deleteat!(AllAxis, Sim.SlabAxis)
