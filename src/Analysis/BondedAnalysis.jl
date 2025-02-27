@@ -32,7 +32,7 @@ Computes the bond angles, the cosine thereof for each triplet of beads i, i+1, i
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
 - `NBins`::Int: Number of bins for the angle histogram (default: 180).
 
-**Updates**:
+**Creates**:
 * `Sim.AvgBondAngles`: Stores the averaged bond angles.
 * `Sim.AvgCosBondAngles`: Stores the averaged cosine of bond angles.
 * `Sim.LocalPersistenceLength`: Computes the persistence length from bond angles.
@@ -151,7 +151,7 @@ Computes the dihedral angles (torsion angles).
 **Arguments**:
  - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
 
-**Updates**:
+**Creates**:
  * Sim.TorsionAngles with computed dihedral angles.
 """
 function computeDihedralAngles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
@@ -201,7 +201,7 @@ Computes a histogram of dihedral angles.
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
 
-**Updates**:
+**Creates**:
 * Sim.TorsionHist with the invert of NDihedrals.
 """
 function computeDihedralHist(Sim::SimData{R,I}; N = 500) where {R<:Real, I<:Integer}
