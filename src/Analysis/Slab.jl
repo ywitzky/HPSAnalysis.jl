@@ -1,9 +1,8 @@
 @doc raw"""
-<<<<<<< src/Analysis/Slab.jl
-    computeSlabHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
 Computes centered slab histograms along Sim.SlabAxis.
 
-Centered slab histograms are computed for all amino acids, only the positive and only the negatives at all times. Use\_Alpha enables the computation of alpha helices and their own slab histogram. Amino acids specific histograms are enabled through Use\_Types. 
+Centered slab histograms are computed for all amino acids, only the positive and only the negatives at all times. **Use\_Alpha** enables the computation of alpha helices and their own slab histogram. Amino acids specific histograms are enabled through **Use\_Types**. 
 
 Results are not return but stored in Sim.SlabHistogramSeries as an Offset array where the first dimension ranges from -boxwidth/Sim.Resolution:Sim.Resolution:boxwidth/Sim.Resolution. Default Sim.Resolution is set to ``1~\AA``. The second index are the steps at which clusters and slab histogram were computed according to Sim.ClusterRange. The third index are the amino acids which have been used the order in which they are mentioned above. If used, amino acid specific histograms have the index 4+Sim.IDs. 
 
