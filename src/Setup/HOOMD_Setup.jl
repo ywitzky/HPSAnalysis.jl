@@ -1,3 +1,15 @@
+@doc raw"""
+    WriteHOOMDSequences(filename::String, Sequences)
+
+Write a data file with the sequence of each protein.
+    
+**Arguments**
+- `filename::String`: Path where the data will be saved.
+- `Sequences::List{String}`: List of protein sequences.
+
+**Creat**:
+* Write a file with all Sequences.
+"""
 function WriteHOOMDSequences(filename::String, Sequences)
     io = open(filename, "w");
 
@@ -7,6 +19,22 @@ function WriteHOOMDSequences(filename::String, Sequences)
     close(io);
 end
 
+@doc raw"""
+    WriteDictionaries(filename::String, ToCharge, ToID, ToMass, ToDiameter, ToLambda)
+
+Write a data file with all Dictionaries that are used in the Simulation.
+    
+**Arguments**
+- `filename::String`: Path where the data will be saved.
+- `ToCharge::Dict()`: Dictionary defining the charge for the Aminoacids.
+- `ToID::Dict()`: Dictionary mapping each amino acid type to a unique ID number.
+- `ToMass::Dict()`: Dictionary defining the mass for the Aminoacids.
+- `ToDiameter::Dict()`: Dictionary defining the diameter for the Aminoacids.
+- `ToLambda::Dict()`: Dictionary defining the Lambda for the Aminoacids.
+
+**Creat**:
+* Write a file with all Dictionaries.
+"""
 function WriteDictionaries(filename::String, ToCharge, ToID, ToMass, ToDiameter, ToLambda)
     io = open(filename, "w")
     write(io, "// ID,resname, Charge, Mass, λ   \n")
@@ -17,6 +45,22 @@ function WriteDictionaries(filename::String, ToCharge, ToID, ToMass, ToDiameter,
     close(io);
 end
 
+@doc raw"""
+    WriteHOOMDParticlesInput(filename::String, pos::Array{R}, ToCharge, ToID, Sequences, ToMass, ToDiameter, image) where {R<:Real}
+
+Write a data file that contains position, charge, mass and diameter for the Aminoacids.
+    
+**Arguments**
+- `filename::String`: Path where the data will be saved.
+- `pos::Array`: List of positions for each Aminoacid.
+- `Sequences::List{String}`: List of protein sequences.
+- `ToMass::Dict()`: Dictionary defining the mass for the Aminoacids.
+- `ToDiameter::Dict()`: Dictionary defining the diameter for the Aminoacids.
+- `image::`: Corection of the Positions because of boundery condition.
+
+**Creat**:
+* Write a file with the escential datas of each Aminoacid.
+"""
 function WriteHOOMDParticlesInput(filename::String, pos::Array{R}, ToCharge, ToID, Sequences, ToMass, ToDiameter, image) where {R<:Real}
 
     io = open(filename, "w");
@@ -42,6 +86,37 @@ function WriteDihedrals(filename, dihedral_map, dihedral_eps)
     close(io)
 end
 
+@doc raw"""
+    WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0)
+
+Write a data file that contains all Parameters of the Simulation.
+    
+**Arguments**
+- `filename::String`: Path where the data will be saved.
+- `SimName::String`: Name of the Simulation.
+- `Temp::Float`: Temperature of the Simulation.
+- `NSteps::Float`: The Number of steps for the Simulation.
+- `NOut::Float`: The Number of steps to determine datas.
+- `Timestep::Float`: ??.
+- `Box::Array`: Size of the Simulation Box.
+- `Seed::Float`: ??.
+- `Minimise::Boolean`: Sould the energy be minimize befor the Simulation.
+- `TrajectoryName::String`: Data file for the trajectorys.
+- `UseAngles::Boolean`: .
+- `UseCharge::Boolean`: .
+- `Alt_GSD_Start::String`: .
+- `Create_Start_Config::Boolean`: .
+- `ϵ_r::Float`: Dielectric constant.
+- `κ::Float`: .
+- `Device::String`: The Simulation is running on a GPU.
+- `yk_cut::Float`: Cutoff for the Yukawa Potential.
+- `ah_cut::Float`: Cutoff for the Ashbaugh Potential.
+- `ionic::Float`: Ionicity of the Simulation.
+- `pH::Float`: PH value of the Simulation.
+
+**Creat**:
+* Write a file with all Parameters of the Simulation that are given from the Arguments.
+"""
 function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0)
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")

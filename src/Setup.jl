@@ -463,6 +463,22 @@ function rescalePositions(pos, boxSize, Sequences, image, rescale_factor=5.5/3.8
     return correctPositionInBounds(uw_pos, boxSize, Sequences)
 end
 
+@doc raw"""
+    DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltConcentration=-1)
+
+Calculates the constants for the Yukawa potencial for given temperature and salt concentration.
+    
+**Arguments**
+- `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+
+**Optional Arguments**:
+- `Temperature::Float`: Temperature of the Simulation.
+- `SaltConcentration::Float`: Salt concentration of the Simulation.
+
+**Return**:
+* `ϵ_r::Float`: Temperature-dependent dielectric constant.
+* `κ::Float`: Invers of the Debye length.
+"""
 function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltConcentration=-1)
     ### constants
 	e = 1.602*10.0^-(19) ### Charge of electron
@@ -487,7 +503,42 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
     return (ϵ_r, κ)
 end
 
-#Creat the Dictionaries for AA to Charge, Mass, Sigma, Lambda and Dihedral
+@doc raw"""
+    DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
+
+Define escential Parameters for the Simulation based on the Simulation Type.
+    
+**Arguments**
+- `Sequences::List{String}`: List of sequences of Proteins.
+- `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+- `pH::Float`: pH-value of the system.
+
+**Optional Arguments**:
+- `OneToChargeDef::Dict()`: Dictionary defining the charge for the Aminoacids.
+- `OneToLambdaDef::Dict()`: Dictionary defining the Lambda for the Aminoacids.
+- `OneToSigmaDef::Dict()`: Dictionary defining the Sigma for the Aminoacids.
+
+**Return**:
+A tuple containing:
+- `AtomTypes::Set{Char}`: Set of unique amino acid types in the provided sequences.
+- `LongAtomTypes::Set{Char}`: Set of amino acid types where the first and last amino acid in a sequence are treated as distinct types.
+- `AaToId::Dict{Char, Int32}`: Dictionary mapping each amino acid type to a unique ID number.
+- `IdToAa::Dict{Int32, Char}`: Dictionary mapping each ID number to its corresponding amino acid type.
+- `ResToLongAtomType::Dict{Tuple{Char, Bool}, Char}`: Dictionary mapping standard amino acids to their modified forms when at the beginning or end of a sequence.
+- `LongAtomTypesToRes::Dict{Char, Tuple{Char, Bool}}`: Reverse mapping of `ResToLongAtomType`.
+- `OneToCharge::Dict{Char, Float}`: Dictionary containing the charge values of amino acids, modified based on simulation type.
+- `OneToMass::Dict{Char, Float}`: Dictionary containing the mass values of amino acids.
+- `OneToSigma::Dict{Char, Float}`: Dictionary containing the sigma values of amino acids.
+- `OneToLambda::Dict{Char, Float}`: Dictionary containing the lambda values of amino acids.
+- `OneToHPSDihedral0110::Dict{Char, Any}`: Dictionary containing dihedral parameters for a specific configuration.
+- `OneToHPSDihedral1001::Dict{Char, Any}`: Dictionary containing dihedral parameters for another configuration.
+
+**Notes**:
+- If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding.
+- The charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1 / (1 + 10^(pH - 6))`.
+- If `SimulationType` is "HPS-Alpha", predefined values for charge, lambda, and sigma are used.
+- If an unknown `SimulationType` is provided, the function falls back on the user-supplied dictionaries for charge, lambda, and sigma values.
+"""
 function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
     #Define Aminoacids to ID Dict
     AtomTypes= Set(join(Sequences))
@@ -509,8 +560,8 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
                 push!(LongAtomTypes, ResToLongAtomType[(Sequence[1], true)] )#
                 AaToId[ResToLongAtomType[(Sequence[1], true)] ] = index_cnt+=1
                 NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
-            else
-                NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
+            #else
+            #    NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
             end
             if( ~((Sequence[end], false) in  keys(ResToLongAtomType)))
                 ResToLongAtomType[(Sequence[end], false)] = Char(cnt+=1)
@@ -518,8 +569,8 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
                 AaToId[ResToLongAtomType[(Sequence[end], false)] ] = index_cnt+=1
                 NewSequences[id] = NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
                 #Sequence[length(Sequence)] =  ResToLongAtomType[(Sequence[lengthSequence)], false)]
-            else
-                NewSequences[id] =  NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
+            #else
+            #    NewSequences[id] =  NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
             end
         end
     end
