@@ -5,7 +5,7 @@ Write a data file with the sequence of each protein.
     
 **Arguments**
 - `filename::String`: Path where the data will be saved.
-- `Sequences::List{String}`: List of protein sequences.
+- `Sequences::Array{String}`: List of protein sequences.
 
 **Creat**:
 * Write a file with all Sequences.
@@ -53,7 +53,7 @@ Write a data file that contains position, charge, mass and diameter for the Amin
 **Arguments**
 - `filename::String`: Path where the data will be saved.
 - `pos::Array`: List of positions for each Aminoacid.
-- `Sequences::List{String}`: List of protein sequences.
+- `Sequences::Array{String}`: List of protein sequences.
 - `ToMass::Dict()`: Dictionary defining the mass for the Aminoacids.
 - `ToDiameter::Dict()`: Dictionary defining the diameter for the Aminoacids.
 - `image::`: Corection of the Positions because of boundery condition.

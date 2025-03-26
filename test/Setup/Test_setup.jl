@@ -6,7 +6,7 @@ Sequences=["MRPVFV","MRPVF","MRPV","MRP"]
 SimulationType="Calvados2"
 pH=7.5
 
-@testset "Calvados2 AtomTypes" begin
+@testset "DetermineCalvados2AtomTypes" begin
     AtomTypes_test=Set(join(Sequences))
     AaToId_test = Dict{Char,Int32}()
     for (index, value) in enumerate(AtomTypes_test)
@@ -110,67 +110,4 @@ end
 
     @test (ϵ_r_test≈ϵ_r)
     @test isapprox(κ_test,κ; atol=1e-5)
-end
-
-
-filename_test="./test/Setup/GSD_write_test.gsd"
-filename="./test/Setup/GSD_write.gsd"
-touch(filename_test)
-@testset "writeGSDStartFile" begin
-    sequences=["MRPVFV","MRPVF","MRPV","MRP"]
-    N=18
-    set=Set(join(sequences))
-    AAToID=Dict()
-    coor=fill(3,4,maximum(length(seq) for seq in sequences),3)
-    for (num,atom) in enumerate(set)
-        AAToID[atom]=num
-    end
-
-    snapshot=GSDFormat.Frame()
-    snapshot.configuration.step=1
-    snapshot.configuration.dimensions=3
-    snapshot.configuration.box=[20,30,20,0,0,0]./10.0
-    snapshot.particles.N=N
-    #snapshot.particles.position=reshape(permutedims(coor, (2,1,3)), (size(coor, 1)*size(coor, 2), 3))./10.0
-    IDToAA=Dict(value=>key for (key,value) in AAToID)
-    println(IDToAA)
-    snapshot.particles.types =  [string(IDToAA[Id]) for Id in  sort(collect(values(AAToID))) ]
-    snapshot.particles.typeid = [Int32(AAToID[AA])-1 for AA in join(sequences)]
-    #snapshot.particles.image = reshape(permutedims(coor, (2,1,3)), (size(coor, 1)*size(coor, 2), 3))
-    mass_charge=Array([1,2,3,4,5,6,7,8,9,8,7,6,5,4,3,2,1,2])
-    snapshot.particles.mass = mass_charge
-    snapshot.particles.charge = mass_charge
-    snapshot.particles.diameter = [Float32(AAToID[AA])/10.0  for AA in join(sequences)]
-
-    snapshot.bonds.N=N-1
-    snapshot.bonds.types = ["O-O"]
-    snapshot.bonds.typeid = zeros(Int32, N-1)
-    #snapshot.bonds.group = getBonds(sequences, M=2)
-
-    UseAngles=false
-    if UseAngles
-        # Create Angles
-        snapshot.angles.N = N-1
-        snapshot.angles.types = ["O-O-O"]
-        snapshot.angles.typeid = zeros(Int32, N-2)
-        snapshot.angles.group = getBonds(sequences, M=3)
-
-        # Create Dihedrals
-        snapshot.dihedrals.N =  N-3
-        Ditypes=[]
-        DiMap=Dict()
-        DiList=[0,0,0,0,0,0,0]
-
-        snapshot.dihedrals.types = ["$(ids[1])-$(ids[2])-$(ids[3])-$(ids[4])" for ids in collect(keys(DihedralMap))]#string.(collect(values(DihedralMap)))
-        snapshot.dihedrals.typeid = [DihedralMap[DihedralList[key,:]]-1 for key in axes(DihedralList,1)] ### convert to python numbering
-        snapshot.dihedrals.group = getBonds(Sequences, M=4)
-    end
-
-    file = GSDFormat.open(filename_test, 'w')
-    GSDFormat.append(file, snapshot)
-    GSDFormat.close(file)
-
-    #HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,[20,30,20],coor,AAToID,sequences,coor,mass_charge,mass_charge,DiMap,DiList,AAToID,false)
-
-    #@test files_are_equal(filename_test,filename)
 end

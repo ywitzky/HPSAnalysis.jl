@@ -509,7 +509,7 @@ end
 Define escential Parameters for the Simulation based on the Simulation Type.
     
 **Arguments**
-- `Sequences::List{String}`: List of sequences of Proteins.
+- `Sequences::Array{String}`: List of sequences of Proteins.
 - `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
 - `pH::Float`: pH-value of the system.
 
@@ -535,7 +535,7 @@ A tuple containing:
 
 **Notes**:
 - If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding.
-- The charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1 / (1 + 10^(pH - 6))`.
+- The charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1/(1+10^(pH-6))`.
 - If `SimulationType` is "HPS-Alpha", predefined values for charge, lambda, and sigma are used.
 - If an unknown `SimulationType` is provided, the function falls back on the user-supplied dictionaries for charge, lambda, and sigma values.
 """
@@ -935,6 +935,32 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
+@doc raw"""
+    writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
+
+A GSD data file is written, that include the parameters for the Simulation witch are given as Arguments.
+    
+**Arguments**
+- `FileName::String`: Name of the output GSD file.
+- `NAtoms::Int`: The total number of amino acids (atoms) in the system.
+- `NBonds::Int`: The number of bonds between amino acids (`NAtoms - 1`).
+- `NAngles::Int`: The number of angles formed between amino acids (`NAtoms - 2`).
+- `NDihedrals::Int`: The number of dihedral angles between amino acids (`NAtoms - 3`).
+- `Box::Vector{Float}`: 3-element vector specifying the dimensions of the simulation box
+- `Positions::Array{Float}`: Array of the atomic coordinates of the Aminoacids.
+- `AaToId::Dict{Char, Int}`: Dictionary mapping each amino acid type to a unique ID number.
+- `Sequences::Array{String}`: A list of protein sequences, where each sequence is represented as a string of amino acids.
+- `InputImage::Array{Int}`: An array used to determine periodic boundary conditions and correct atomic positions.
+- `InputMasses::Array{Float}`: A 1D array specifying the mass of each amino acid.
+- `InputCharges::Array{Float}`: A 1D array specifying the electric charge of each amino acid.
+- `DihedralMap::Dict`: A dictionary mapping unique dihedral angle definitions (four atom indices) to dihedral types.
+- `DihedralList::Matrix{Int}`: A matrix where each row defines a specific dihedral angle using atom indices.
+- `AaToSigma::Dict{Char, <:Real}`: A dictionary mapping amino acid types to their Lennard-Jones σ-parameter (used in force field calculations).
+- `UseAngles::Bool`: If `true`, angle and dihedral interactions are included in the GSD file.
+
+**Creates**:
+* Writes the GSD data files.
+"""
 function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSDFormat.Frame()    
@@ -942,6 +968,8 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     snapshot.configuration.dimensions = 3 
     snapshot.configuration.box = [Box[1],Box[2], Box[3], 0, 0, 0]./10.0 #4:6 are tilt
     snapshot.particles.N = NAtoms
+    # pos = zeros(length(Sequences), maximum(length.(Sequences)), 3)
+    # reshape -> [N_total, 3]
     snapshot.particles.position = reshape(permutedims(Positions, (2,1,3)), (size(Positions, 1)*size(Positions, 2), 3))./10.0 ### permute to get alignment in memory, reshape to match gsd formart
     IdToAa = Dict(value => key for (key, value) in AaToId)
     snapshot.particles.types =  [string(IdToAa[Id]) for Id in  sort(collect(values(AaToId))) ] #string.(collect(keys(AaToId)))
