@@ -368,7 +368,7 @@ function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real,
 
     xaxis = axes(Sim.SlabHistogramSeries)[1]
     ### newer iterations dont measure at every frame. Detect which frames actually contain data
-    NMeasurements= sum(Sim.SlabHistogramSeries[0,Sim.NSteps-Windowlength:Sim.NSteps,1].!=0.0)
+    NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
     fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 

@@ -1,5 +1,5 @@
 @doc raw"""
-    computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+    computeClustersByCOM(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
 
 Computes clusters based on distances between protein COMs and cutoff.
 
@@ -12,7 +12,7 @@ Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps 
 **Returns**:
 - `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains.
 """
-function computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+function computeClustersByCOM(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
     ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
     Clusters = Vector{Vector{Vector{Int}}}()
 
@@ -213,4 +213,84 @@ function computeCOMsOfCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
         push!(Coms, tmp)
     end
     return Coms
+end
+
+@inline function isOverlapping1D(xmin1,xmax1,xmin2,xmax2)
+    return xmax1 >= xmin2 && xmax2 >= xmin1
+end
+
+@inline function isOverlapping3D(minima::Array{R}, maxima::Array{R}, I::Int,J::Int, BoxLength::Vector{R}) where {Int<:Integer, R<:Real}
+    res  = true
+    for i in 1:3
+        res &= (isOverlapping1D(minima[i,I],maxima[i,I],minima[i,J],maxima[i,J])|| isOverlapping1D(minima[i,I],maxima[i,I],minima[i,J]+BoxLength[i],maxima[i,J]+BoxLength[i]) || isOverlapping1D(minima[i,I],maxima[i,I],minima[i,J]-BoxLength[i],maxima[i,J]-BoxLength[i]))
+    end 
+    return res 
+end
+
+function computeClustersByBeadDistance(Sim::SimData{T,Int}; Cutoff=5.0) where {Int<:Integer, T<:Real}
+
+    Clusters = Vector{Vector{Vector{Int}}}()
+
+    minima = zeros(T,3, Sim.NChains)
+    maxima = zeros(T,3, Sim.NChains)
+
+    Cut_half = Cutoff/2.0f0
+    for (i,step) in enumerate(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)
+        println("Step $step/$(Sim.NSteps)")
+        G = Graphs.SimpleGraph{Int}()
+        add_vertices!(G, Sim.NChains)
+        for I in 1:Sim.NChains
+            Range_I=  Sim.ChainStart[I]:Sim.ChainStop[I]
+
+            minima[1,I] = minimum(Sim.x_uw[Range_I, step])-Cut_half
+            maxima[1,I] = maximum(Sim.x_uw[Range_I, step])+Cut_half
+            minima[2,I] = minimum(Sim.y_uw[Range_I, step])-Cut_half
+            maxima[2,I] = maximum(Sim.y_uw[Range_I, step])+Cut_half
+            minima[3,I] = minimum(Sim.z_uw[Range_I, step])-Cut_half
+            maxima[3,I] = maximum(Sim.z_uw[Range_I, step])+Cut_half
+
+            minima[1,I] -= Sim.BoxLength[1].*round.(Int,  minima[1,I]./Sim.BoxLength[1])
+            minima[2,I] -= Sim.BoxLength[2].*round.(Int,  minima[2,I]./Sim.BoxLength[2])
+            minima[3,I] -= Sim.BoxLength[3].*round.(Int,  minima[3,I]./Sim.BoxLength[3])
+
+            maxima[1,I] -= Sim.BoxLength[1].*round.(Int,  maxima[1,I]./Sim.BoxLength[1])
+            maxima[2,I] -= Sim.BoxLength[2].*round.(Int,  maxima[2,I]./Sim.BoxLength[2])
+            maxima[3,I] -= Sim.BoxLength[3].*round.(Int,  maxima[3,I]./Sim.BoxLength[3])
+        end
+
+
+        for I in 1:Sim.NChains
+            Range_I = Sim.ChainStart[I]:Sim.ChainStop[I]
+
+            for J in I+1:Sim.NChains
+                Range_J = Sim.ChainStart[J]:Sim.ChainStop[J]
+
+                ### check if there is already overlap between the bounding boxes of the proteins
+                #if isOverlapping3D(minima, maxima, I,J, Sim.BoxLength)
+
+                    dx = Sim.x_uw[Range_I, step] .- Sim.x_uw[Range_J, step]
+                    dy = Sim.y_uw[Range_I, step] .- Sim.y_uw[Range_J, step]
+                    dz = Sim.z_uw[Range_I, step] .- Sim.z_uw[Range_J, step]
+
+                    dx -= Sim.BoxLength[1].*round.(Int, dx./Sim.BoxLength[1])
+                    dy -= Sim.BoxLength[2].*round.(Int, dy./Sim.BoxLength[2])
+                    dz -= Sim.BoxLength[3].*round.(Int, dz./Sim.BoxLength[3])
+
+                    dist_sqr = dx.^2 .+dy.^2 .+dz.^2
+
+                    if any(dist_sqr.<Cutoff^2)
+                        add_edge!(G, I,J)
+                    end
+                #end
+            end
+        end
+
+        fill!(Sim.ChargeChainContactMatrix, 0)
+        push!(Clusters,  weakly_connected_components(G))
+
+    end
+
+    Sim.ClusterRange = Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps
+    Sim.Clusters = Clusters
+    return Clusters
 end
