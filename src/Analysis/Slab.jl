@@ -92,6 +92,21 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
     nothing
 end
 
+@doc raw"""
+    computeDensityHistogram(Sim::SimData{R,I}, DivLength=I(10)) where {R<:Real, I<:Integer}
+Computes a logarithmic histogram of densities of the subcubes of the simulation box.
+
+The simulation box is divided into *DivLength*^4 subboxes where each dimension is divided into *DivLength* many subsections and the axes according to Sim.SlabAxis is divided into *DivLength*^2 many subsections.
+
+Subboxes that are empty or those that contain the boundary of the simulation box are not considered for the histogram.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `DivLength=I(10))`: Division factor determining the length of each subbox. 
+
+**Creat**:
+* `Sim.DensityHist`: Stores subcube densities with logarithmic indices.
+"""
 function computeDensityHistogram(Sim::HPSAnalysis.SimData{R,I}, DivLength=I(10))  where {R<:Real, I<:Integer}
     if !(Sim.SlabAxis in [1,2,3])
         ArgumentError("SlabAxis is not properly specified.")
@@ -101,21 +116,17 @@ function computeDensityHistogram(Sim::HPSAnalysis.SimData{R,I}, DivLength=I(10))
     dims[Sim.SlabAxis] *= DivLength### subdivide long axis for finer grid
     offset  = Sim.BoxSize[:,1]
     divider = Sim.BoxLength./R.(dims)
-    BoxHist = zeros(R,  (I.(dims)...) ) ### atom , step in x,y,z makes this more efficient since memory is aligned in last index
-    indices = zeros(I,  (I.(dims)...) ) 
+    BoxHist = zeros(R,  (I.(dims)...) ) ### atom , step in x,y,z makes this 
     ind = zeros(I, 3)
-    tmp = zeros(R, 3)
 
     bools = zeros(Bool,3)
-    bools_tmp = zeros(Bool,3)
-
     cnt = 0 
 
     ### convert from dalton/AA^3 to kg/L=g/mL  divided by Volume element per bin
     volume = prod(divider)
-    NRes = 1000
-    conversion = R(1.66053906660/volume*NRes) ### *NRes for indicing later
-    Sim.DensityHist = zeros(R, 2*NRes)
+    res = 80 ### take 80 minorticks per power of 10
+    conversion = R(1.66053906660/volume)
+    Sim.DensityHist = zeros(R, 8*res) ### overexpect indices from 10^-6 to 10^1
     xoff = I(dims[3]*dims[2])
     yoff = I(dims[3])
     for step in  Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps
@@ -137,13 +148,13 @@ function computeDensityHistogram(Sim::HPSAnalysis.SimData{R,I}, DivLength=I(10))
             @inbounds BoxHist[ind[1], ind[2], ind[3]] += Sim.Masses[atom]
         end
         BoxHist .*=  conversion
-        indices .= ceil.(I,BoxHist).+I(1)
+        indices = ceil.(I,log10.(filter(x->x!=0.0 ,BoxHist[:])).*res).+I(6*res)
 
         for i in indices
             Sim.DensityHist[i] += R(1)
         end
+        fill!(BoxHist, 0.0)
     end
-
     Sim.DensityHist ./= length(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)*prod(dims)
 end
 
