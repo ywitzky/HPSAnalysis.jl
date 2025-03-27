@@ -1,10 +1,6 @@
-function files_are_equal(file1::String, file2::String)::Bool
-    return read(file1, String) == read(file2, String)
-end
+filename_test="$(SetupTestPath)/GSD_write_test.gsd"
+filename="$(SetupTestPath)/GSD_write.gsd"
 
-filename_test="./test/Setup/GSD_write_test.gsd"
-filename="./test/Setup/GSD_write.gsd"
-touch(filename_test)
 @testset "writeGSDStartFile" begin
     sequences=["MNAM"]
     N=4

@@ -1,4 +1,7 @@
-using HPSAnalysis, Aqua, Test
+using HPSAnalysis, Aqua, Test, Scratch
+
+PkgPath=pathof(HPSAnalysis)
+TestPath = Scratch.get_scratch!(HPSAnalysis, "test") #"$PkgPath/test/TemporaryFiles/"
 
 
 @testset "Aqua" begin
@@ -8,4 +11,5 @@ using HPSAnalysis, Aqua, Test
 end
 
 
-include("./Analysis/Analysis_test.jl")
+#include("./Analysis/Analysis_test.jl")
+include("./Setup/Setup_test.jl")

@@ -25,7 +25,6 @@ pH=7.5
         OneToCharge_test = deepcopy(BioData.OneToHPSCharge)
         OneToLambda_test = deepcopy(BioData.OneToHPSUrryLambda)
         OneToSigma_test  = deepcopy(BioData.OneToHPSCalvadosSigma)
-    
     elseif SimulationType=="Calvados2"
         AaToId_test['a']=Int32(6)
         AaToId_test['b']=Int32(7)
@@ -36,7 +35,6 @@ pH=7.5
         LongAtomTypesToRes_test['b']=('V',0)
         LongAtomTypesToRes_test['c']=('F',0)
         LongAtomTypesToRes_test['d']=('P',0)
-    
     else
         OneToCharge_test = deepcopy(BioData.OneToHPSCharge)
         OneToLambda_test = deepcopy(BioData.OneToCalvados2Lambda)

@@ -1,14 +1,7 @@
 using HPSAnalysis,Test,Printf
 
-filename_test="./test/Setup/HOOMD_write_test.csv"
-filename="./test/Setup/HOOMD_write.csv"
-touch(filename_test)
-touch(filename)
-
-function files_are_equal(file1::String, file2::String)::Bool
-    return read(file1, String) == read(file2, String)
-end
-
+filename_test="$SetupTestPath/HOOMD_write_test.csv"
+filename="$SetupTestPath/HOOMD_write.csv"
 
 @testset "WriteHOOMDSequences" begin
     sequences=["MRPVFV","MRPVF","MRPV","MRP"]
