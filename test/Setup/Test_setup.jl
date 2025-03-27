@@ -2,8 +2,7 @@ using HPSAnalysis,Test
 using HPSAnalysis.BioData
 using GSDFormat
 
-Sequences=["MRPVFV","MRPVF","MRPV","MRP"]
-SimulationType_list=["Calvados2","HPS-Alpha","else"]
+SimulationType_list=["HPS-Alpha","else"]
 PH_list=[7.5,8.0]
 
 @testset "DetermineCalvados2AtomTypes" begin
@@ -28,16 +27,6 @@ PH_list=[7.5,8.0]
                 OneToCharge_test = deepcopy(BioData.OneToHPSCharge)
                 OneToLambda_test = deepcopy(BioData.OneToHPSUrryLambda)
                 OneToSigma_test  = deepcopy(BioData.OneToHPSCalvadosSigma)
-            elseif SimulationType=="Calvados2"
-                AaToId_test['a']=Int32(6)
-                AaToId_test['b']=Int32(7)
-                AaToId_test['c']=Int32(8)
-                AaToId_test['d']=Int32(9)
-                Long=Set(['a','b','c','d'])
-                LongAtomTypesToRes_test['a']=('M',1)
-                LongAtomTypesToRes_test['b']=('V',0)
-                LongAtomTypesToRes_test['c']=('F',0)
-                LongAtomTypesToRes_test['d']=('P',0)
             else
                 OneToCharge_test = deepcopy(BioData.OneToHPSCharge)
                 OneToLambda_test = deepcopy(BioData.OneToCalvados2Lambda)
@@ -45,42 +34,6 @@ PH_list=[7.5,8.0]
             end
 
             LongAtomTypes_test=union(AtomTypes_test, Long)
-
-            if SimulationType=="Calvados2"
-                OneToCharge_test = deepcopy(BioData.OneToHPSCharge)
-                OneToLambda_test = deepcopy(BioData.OneToCalvados2Lambda)
-                OneToSigma_test  = deepcopy(BioData.OneToHPSCalvadosSigma)
-                OneToCharge_test['H'] = 1. / ( 1 + 10^(pH-6) ) 
-
-                OneToCharge_test['a']=OneToCharge_test['M']+1
-                OneToMass_test['a']=OneToMass_test['M']+2.0
-                OneToSigma_test['a']=OneToSigma_test['M']
-                OneToLambda_test['a']=OneToLambda_test['M']
-                OneToHPSDihedral0110_test['a']=OneToHPSDihedral0110_test['M']
-                OneToHPSDihedral1001_test['a']=OneToHPSDihedral1001_test['M']
-
-                OneToCharge_test['b']=OneToCharge_test['V']-1
-                OneToMass_test['b']=OneToMass_test['V']+16.0
-                OneToSigma_test['b']=OneToSigma_test['V']
-                OneToLambda_test['b']=OneToLambda_test['V']
-                OneToHPSDihedral0110_test['b']=OneToHPSDihedral0110_test['V']
-                OneToHPSDihedral1001_test['b']=OneToHPSDihedral1001_test['V']
-
-                OneToCharge_test['c']=OneToCharge_test['F']-1
-                OneToMass_test['c']=OneToMass_test['F']+16.0
-                OneToSigma_test['c']=OneToSigma_test['F']
-                OneToLambda_test['c']=OneToLambda_test['F']
-                OneToHPSDihedral0110_test['c']=OneToHPSDihedral0110_test['F']
-                OneToHPSDihedral1001_test['c']=OneToHPSDihedral1001_test['F']
-
-                OneToCharge_test['d']=OneToCharge_test['P']-1
-                OneToMass_test['d']=OneToMass_test['P']+16.0
-                OneToSigma_test['d']=OneToSigma_test['P']
-                OneToLambda_test['d']=OneToLambda_test['P']
-                OneToHPSDihedral0110_test['d']=OneToHPSDihedral0110_test['P']
-                OneToHPSDihedral1001_test['d']=OneToHPSDihedral1001_test['P']
-            end
-
             IdToAa_test=Dict((v=>k) for (k,v) in AaToId_test)
 
             (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)=HPSAnalysis.Setup.DetermineCalvados2AtomTypes(Sequences,SimulationType,pH)
@@ -98,6 +51,90 @@ PH_list=[7.5,8.0]
             @test (OneToHPSDihedral0110_test==OneToHPSDihedral0110)
             @test (OneToHPSDihedral1001_test==OneToHPSDihedral1001)
         end
+    end
+end
+
+PH_list=[7.5,8.0]
+@testset "CalvadosSetup" begin
+    for pH in PH_list
+        Sequences=["MRPVFV","MRPVF","MRPV","MRP"]
+        AtomTypes_test=Set(join(Sequences))
+        AaToId_test = Dict{Char,Int32}()
+        for (index, value) in enumerate(AtomTypes_test)
+            AaToId_test[value]=index
+        end
+        Long=Set()
+        OneToCharge_test=Dict() 
+        OneToMass_test=deepcopy(BioData.AaToWeight)
+        OneToSigma_test=Dict() 
+        OneToLambda_test=Dict() 
+        OneToHPSDihedral0110_test=deepcopy(BioData.OneToHPSDihedral0110)
+        OneToHPSDihedral1001_test=deepcopy(BioData.OneToHPSDihedral1001)
+        LongAtomTypesToRes_test=Dict{Char,Tuple{Char,Bool}}()
+
+        AaToId_test['a']=Int32(6)
+        AaToId_test['b']=Int32(7)
+        AaToId_test['c']=Int32(8)
+        AaToId_test['d']=Int32(9)
+        Long=Set(['a','b','c','d'])
+        LongAtomTypesToRes_test['a']=('M',1)
+        LongAtomTypesToRes_test['b']=('V',0)
+        LongAtomTypesToRes_test['c']=('F',0)
+        LongAtomTypesToRes_test['d']=('P',0)
+
+        LongAtomTypes_test=union(AtomTypes_test, Long)
+
+        OneToCharge_test = deepcopy(BioData.OneToHPSCharge)
+        OneToLambda_test = deepcopy(BioData.OneToCalvados2Lambda)
+        OneToSigma_test  = deepcopy(BioData.OneToHPSCalvadosSigma)
+        OneToCharge_test['H'] = 1. / ( 1 + 10^(pH-6) ) 
+
+        OneToCharge_test['a']=OneToCharge_test['M']+1
+        OneToMass_test['a']=OneToMass_test['M']+2.0
+        OneToSigma_test['a']=OneToSigma_test['M']
+        OneToLambda_test['a']=OneToLambda_test['M']
+        OneToHPSDihedral0110_test['a']=OneToHPSDihedral0110_test['M']
+        OneToHPSDihedral1001_test['a']=OneToHPSDihedral1001_test['M']
+
+        OneToCharge_test['b']=OneToCharge_test['V']-1
+        OneToMass_test['b']=OneToMass_test['V']+16.0
+        OneToSigma_test['b']=OneToSigma_test['V']
+        OneToLambda_test['b']=OneToLambda_test['V']
+        OneToHPSDihedral0110_test['b']=OneToHPSDihedral0110_test['V']
+        OneToHPSDihedral1001_test['b']=OneToHPSDihedral1001_test['V']
+
+        OneToCharge_test['c']=OneToCharge_test['F']-1
+        OneToMass_test['c']=OneToMass_test['F']+16.0
+        OneToSigma_test['c']=OneToSigma_test['F']
+        OneToLambda_test['c']=OneToLambda_test['F']
+        OneToHPSDihedral0110_test['c']=OneToHPSDihedral0110_test['F']
+        OneToHPSDihedral1001_test['c']=OneToHPSDihedral1001_test['F']
+
+        OneToCharge_test['d']=OneToCharge_test['P']-1
+        OneToMass_test['d']=OneToMass_test['P']+16.0
+        OneToSigma_test['d']=OneToSigma_test['P']
+        OneToLambda_test['d']=OneToLambda_test['P']
+        OneToHPSDihedral0110_test['d']=OneToHPSDihedral0110_test['P']
+        OneToHPSDihedral1001_test['d']=OneToHPSDihedral1001_test['P']
+
+        IdToAa_test=Dict((v=>k) for (k,v) in AaToId_test)
+
+        (AtomTypes_C2, LongAtomTypes_C2, AaToId_C2, IdToAa_C2,ResToLongAtomType_C2, LongAtomTypesToRes_C2, OneToCharge_C2, OneToMass_C2, OneToSigma_C2, OneToLambda_C2, OneToHPSDihedral0110_C2, OneToHPSDihedral1001_C2)=HPSAnalysis.Setup.DetermineCalvados2AtomTypes(Sequences,"Calvados2",pH)
+        Sequences=["MRPVFV","MRPVF","MRPV","MRP"]
+        (AtomTypes_C3, LongAtomTypes_C3, AaToId_C3, IdToAa_C3,ResToLongAtomType_C3, LongAtomTypesToRes_C3, OneToCharge_C3, OneToMass_C3, OneToSigma_C3, OneToLambda_C3, OneToHPSDihedral0110_C3, OneToHPSDihedral1001_C3)=HPSAnalysis.Setup.DetermineCalvados2AtomTypes(Sequences,"Calvados3",pH)
+
+        @test (AtomTypes_test==AtomTypes_C2 && AtomTypes_test==AtomTypes_C3)
+        @test (LongAtomTypes_test==LongAtomTypes_C2&&LongAtomTypes_test==LongAtomTypes_C3)
+        @test (AaToId_test==AaToId_C2&&AaToId_test==AaToId_C3)
+        @test (IdToAa_test==IdToAa_C2&&IdToAa_test==IdToAa_C3)
+        #@test (ResToLongAtomType_test==ResToLongAtomType_C2)
+        @test (LongAtomTypesToRes_test==LongAtomTypesToRes_C2&&LongAtomTypesToRes_test==LongAtomTypesToRes_C3)
+        @test (OneToCharge_test==OneToCharge_C2&&OneToCharge_test==OneToCharge_C3)
+        @test (OneToMass_test==OneToMass_C2&&OneToMass_test==OneToMass_C3)
+        @test (OneToSigma_test==OneToSigma_C2&&OneToSigma_test==OneToSigma_C3)
+        @test (OneToLambda_test==OneToLambda_C2&&OneToLambda_test==OneToLambda_C3)
+        @test (OneToHPSDihedral0110_test==OneToHPSDihedral0110_C2&&OneToHPSDihedral0110_test==OneToHPSDihedral0110_C3)
+        @test (OneToHPSDihedral1001_test==OneToHPSDihedral1001_C2&&OneToHPSDihedral1001_test==OneToHPSDihedral1001_C3)
     end
 end
 

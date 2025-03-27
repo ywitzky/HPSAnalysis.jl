@@ -531,11 +531,7 @@ A tuple containing:
 **Notes**:
 - If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding. Also the charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1/(1+10^(pH-6))`.
 """
-function CalvadosSetup(Sequences,AtomTypes,pH)
-    AaToId = Dict{Char,Int32}()
-    for (index, value) in enumerate(AtomTypes)
-        AaToId[value]=index
-    end
+function CalvadosSetup(Sequences,AtomTypes,pH,AaToId)
     index_cnt = length(AtomTypes)
     LongAtomTypes=deepcopy(AtomTypes)
     ResToLongAtomType = Dict()
@@ -578,9 +574,8 @@ function CalvadosSetup(Sequences,AtomTypes,pH)
             OneToHPSDihedral1001[e] = OneToHPSDihedral1001[AA]
         end
     end
-    IdToAa=Dict( (v => k) for (k, v) in AaToId)
 
-    return (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
+    return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
 
 
@@ -630,10 +625,7 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
     LongAtomTypes=deepcopy(AtomTypes)
     ResToLongAtomType = Dict()
     LongAtomTypesToRes=Dict()
-    OneToCharge = Dict()
     OneToMass = deepcopy(BioData.AaToWeight)
-    OneToSigma = Dict()
-    OneToLambda = Dict() 
     OneToHPSDihedral0110 = deepcopy(BioData.OneToHPSDihedral0110)
     OneToHPSDihedral1001 = deepcopy(BioData.OneToHPSDihedral1001)
     if SimulationType=="HPS-Alpha"
@@ -641,7 +633,7 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
         OneToLambda = deepcopy(BioData.OneToHPSUrryLambda)
         OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
     elseif SimulationType=="Calvados2"||SimulationType=="Calvados3"
-        (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)=CalvadosSetup(Sequences,AtomTypes,pH)
+        (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)=CalvadosSetup(Sequences,AtomTypes,pH,AaToId)
     else ### take the ones which are supplied
         OneToCharge = deepcopy(OneToChargeDef)
         OneToLambda = deepcopy(OneToLambdaDef)
@@ -731,6 +723,9 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     if SimulationType=="Calvados2+Alpha"
         AlphaAddition = true
         SimulationType="Calvados2"
+    elseif SimulationType=="Calvados3+Alpha"
+        AlphaAddition = true
+        SimulationType="Calvados3"
     else
         AlphaAddition=false
     end
