@@ -17,7 +17,7 @@ from hoomd import ashbaugh_plugin
 
 PWD = os.getcwd()
 
-def run(FolderPath, Restart=False):#, GPUNUM):
+def run(FolderPath, Restart=False, ExtendedSteps=0):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
     Params = readParam(f"{FolderPath}/HOOMD_Setup/Params.txt")
@@ -56,7 +56,14 @@ def run(FolderPath, Restart=False):#, GPUNUM):
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
     if Restart:
-        RestartPath=FolderPath+Params["Simname"] +"_Restart.gsd"
+        NFramesOld = RestartPath=FolderPath+Params["Simname"] +"_Restart.gsd"
+        NStepsOld=NFramesOld*Params["NOut"]
+        NewGoal = np.max(ExtendedSteps, Params["NSteps"]) ### Either extend to meet initial goal or extend simulations.
+        Params["NSteps"] = np.max(NewGoal-NStepsOld,0) ### avoid negativ steps
+
+        with open(f"{FolderPath}/HOOMD_Setup/{Params["Simname"]} +_RestartLog.txt", 'a+') as f:
+            f.write(f"Restart at frame: {NFramesOld} corresponding to timestep {NStepsOld} trying to extend to {NewGoal} by running {Params["NSteps"]} additional steps.")
+
         CopyLastFrameToRestartFile(FolderPath+Params["Trajectory"], RestartPath)
         sim.create_state_from_gsd(filename=RestartPath)
     else:

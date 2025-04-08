@@ -916,7 +916,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     Data.IDToResName = Dict( (v => string(k)) for (k, v) in ResNameToID)
 
     #Matrix of the start and end values of each chain
-    Data.ChainStart = zeros(eltype(Data.NSteps), NChains)
+    Data.ChainStart = zeros(eltype(Data.NSteps), Data.NChains)
     Data.ChainStop  = zeros(eltype(Data.NSteps), Data.NChains)
     Data.ChainStart[1] = 1
     Data.ChainStop[1] = length(Data.Sequences[1])

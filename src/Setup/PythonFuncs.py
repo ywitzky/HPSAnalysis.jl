@@ -370,6 +370,8 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
         with gsd.hoomd.open(RestartPath, mode='w') as f2:
             f2.append(snapshot)
 
+        return len(f)
+
 
 
 
