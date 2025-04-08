@@ -56,16 +56,19 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
     if Restart:
-        NFramesOld = RestartPath=FolderPath+Params["Simname"] +"_Restart.gsd"
-        NStepsOld=NFramesOld*Params["NOut"]
-        NewGoal = np.max(ExtendedSteps, Params["NSteps"]) ### Either extend to meet initial goal or extend simulations.
-        Params["NSteps"] = np.max(NewGoal-NStepsOld,0) ### avoid negativ steps
+        TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
+        lastTrajectory = Params['Trajectory'] if TrajectoryNumber==1 else f"{Params['Trajectory'][:-4]}_{TrajectoryNumber-1}.gsd"
 
-        with open(f"{FolderPath}/HOOMD_Setup/{Params["Simname"]} +_RestartLog.txt", 'a+') as f:
-            f.write(f"Restart at frame: {NFramesOld} corresponding to timestep {NStepsOld} trying to extend to {NewGoal} by running {Params["NSteps"]} additional steps.")
+        RestartPath=f"{FolderPath}{Params['Simname']}_Restart_{TrajectoryNumber}.gsd"
+        CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
 
-        CopyLastFrameToRestartFile(FolderPath+Params["Trajectory"], RestartPath)
+        NewGoal = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps ### Either extend to meet initial goal or extend simulations.
+        Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
+
+        with open(f"{FolderPath}/HOOMD_Setup/{Params['Simname']} +_RestartLog.txt", 'a+') as f:
+            f.write(f"Restart at timestep {NStepsOld} trying to extend to {NewGoal} by running {Params['NSteps']} additional steps.")
         sim.create_state_from_gsd(filename=RestartPath)
+        Params["Trajectory"] = f"{Params['Trajectory'][:-4]}_{TrajectoryNumber}.gsd"
     else:
         if Params["Create_Start_Config"]:
             snapshot = gsd.hoomd.Frame()  
@@ -107,7 +110,9 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         else:
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
-
+    if Params["NSteps"] ==0:
+        print("The number of necessary steps is zero. No simulation will be run.")
+        return -1
 
     forces = []
 
@@ -225,26 +230,27 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
-    for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
-        print(f"fac {fac}")
-        for i in range(10):
-            integrator.dt = Params["dt"]/fac
-            sim.run(100)#Params["NSteps"])
-            sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
+    if not Restart:
+        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
+            print(f"fac {fac}")
+            for i in range(10):
+                integrator.dt = Params["dt"]/fac
+                sim.run(100)#Params["NSteps"])
+                sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
 
     ### start simulation
     sim.operations.writers.append(gsd_writer)
 
     integrator.dt = Params["dt"]
+    print(Params["NSteps"])
     sim.run(Params["NSteps"])
     
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
 
-def restart(FolderPath):
-    run(FolderPath, Restart=True)
-
+def restart(FolderPath, ExtendedSteps=0):
+    run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)
 
 if __name__ == '__main__':
     if len(sys.argv)<2:
