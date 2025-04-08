@@ -11,5 +11,5 @@ TestPath = Scratch.get_scratch!(HPSAnalysis, "test") #"$PkgPath/test/TemporaryFi
 end
 
 
-#include("./Analysis/Analysis_test.jl")
+include("./Analysis/Analysis_test.jl")
 include("./Setup/Setup_test.jl")
