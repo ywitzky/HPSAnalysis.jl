@@ -463,6 +463,22 @@ function rescalePositions(pos, boxSize, Sequences, image, rescale_factor=5.5/3.8
     return correctPositionInBounds(uw_pos, boxSize, Sequences)
 end
 
+@doc raw"""
+    DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltConcentration=-1)
+
+Calculates the constants for the Yukawa potencial for given temperature and salt concentration.
+    
+**Arguments**
+- `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+
+**Optional Arguments**:
+- `Temperature::Float`: Temperature of the Simulation.
+- `SaltConcentration::Float`: Salt concentration of the Simulation.
+
+**Return**:
+* `ϵ_r::Float`: Temperature-dependent dielectric constant.
+* `κ::Float`: Invers of the Debye length.
+"""
 function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltConcentration=-1)
     ### constants
 	e = 1.602*10.0^-(19) ### Charge of electron
@@ -487,7 +503,41 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
     return (ϵ_r, κ)
 end
 
-#Creat the Dictionaries for AA to Charge, Mass, Sigma, Lambda and Dihedral
+@doc raw"""
+    DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
+
+Define escential Parameters for the Simulation based on the Simulation Type.
+    
+**Arguments**
+- `Sequences::Array{String}`: List of sequences of Proteins.
+- `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+- `pH::Float`: pH-value of the system.
+
+**Optional Arguments**:
+- `OneToChargeDef::Dict()`: Dictionary defining the charge for the Aminoacids.
+- `OneToLambdaDef::Dict()`: Dictionary defining the Lambda for the Aminoacids.
+- `OneToSigmaDef::Dict()`: Dictionary defining the Sigma for the Aminoacids.
+
+**Return**:
+A tuple containing:
+- `AtomTypes::Set{Char}`: Set of unique amino acid types in the provided sequences.
+- `LongAtomTypes::Set{Char}`: Set of amino acid types where the first and last amino acid in a sequence are treated as distinct types.
+- `AaToId::Dict{Char, Int32}`: Dictionary mapping each amino acid type to a unique ID number.
+- `IdToAa::Dict{Int32, Char}`: Dictionary mapping each ID number to its corresponding amino acid type.
+- `ResToLongAtomType::Dict{Tuple{Char, Bool}, Char}`: Dictionary mapping standard amino acids to their modified forms when at the beginning or end of a sequence.
+- `LongAtomTypesToRes::Dict{Char, Tuple{Char, Bool}}`: Reverse mapping of `ResToLongAtomType`.
+- `OneToCharge::Dict{Char, Float}`: Dictionary containing the charge values of amino acids, modified based on simulation type.
+- `OneToMass::Dict{Char, Float}`: Dictionary containing the mass values of amino acids.
+- `OneToSigma::Dict{Char, Float}`: Dictionary containing the sigma values of amino acids.
+- `OneToLambda::Dict{Char, Float}`: Dictionary containing the lambda values of amino acids.
+- `OneToHPSDihedral0110::Dict{Char, Any}`: Dictionary containing dihedral parameters for a specific configuration.
+- `OneToHPSDihedral1001::Dict{Char, Any}`: Dictionary containing dihedral parameters for another configuration.
+
+**Notes**:
+- If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding. Also the charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1/(1+10^(pH-6))`.
+- If `SimulationType` is "HPS-Alpha", predefined values for charge, lambda, and sigma are used.
+- If an unknown `SimulationType` is provided, the function falls back on the user-supplied dictionaries for charge, lambda, and sigma values.
+"""
 function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
     #Define Aminoacids to ID Dict
     AtomTypes= Set(join(Sequences))
@@ -509,8 +559,8 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
                 push!(LongAtomTypes, ResToLongAtomType[(Sequence[1], true)] )#
                 AaToId[ResToLongAtomType[(Sequence[1], true)] ] = index_cnt+=1
                 NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
-            else
-                NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
+            #else
+            #    NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
             end
             if( ~((Sequence[end], false) in  keys(ResToLongAtomType)))
                 ResToLongAtomType[(Sequence[end], false)] = Char(cnt+=1)
@@ -518,8 +568,8 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
                 AaToId[ResToLongAtomType[(Sequence[end], false)] ] = index_cnt+=1
                 NewSequences[id] = NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
                 #Sequence[length(Sequence)] =  ResToLongAtomType[(Sequence[lengthSequence)], false)]
-            else
-                NewSequences[id] =  NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
+            #else
+            #    NewSequences[id] =  NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
             end
         end
     end
@@ -593,6 +643,7 @@ end
 
 @doc raw"""
     writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6.0, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
+
 Writes the start configuration for a molecular dynamics simulation.
     
 **Arguments**
@@ -884,6 +935,32 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
+@doc raw"""
+    writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
+
+A GSD data file is written, that include the parameters for the Simulation witch are given as Arguments.
+    
+**Arguments**
+- `FileName::String`: Name of the output GSD file.
+- `NAtoms::Int`: The total number of amino acids (atoms) in the system.
+- `NBonds::Int`: The number of bonds between amino acids (`NAtoms - 1`).
+- `NAngles::Int`: The number of angles formed between amino acids (`NAtoms - 2`).
+- `NDihedrals::Int`: The number of dihedral angles between amino acids (`NAtoms - 3`).
+- `Box::Vector{Float}`: 3-element vector specifying the dimensions of the simulation box
+- `Positions::Array{Float}`: Array of the atomic coordinates of the Aminoacids.
+- `AaToId::Dict{Char, Int}`: Dictionary mapping each amino acid type to a unique ID number.
+- `Sequences::Array{String}`: A list of protein sequences, where each sequence is represented as a string of amino acids.
+- `InputImage::Array{Int}`: An array used to determine periodic boundary conditions and correct atomic positions.
+- `InputMasses::Array{Float}`: A 1D array specifying the mass of each amino acid.
+- `InputCharges::Array{Float}`: A 1D array specifying the electric charge of each amino acid.
+- `DihedralMap::Dict`: A dictionary mapping unique dihedral angle definitions (four atom indices) to dihedral types.
+- `DihedralList::Matrix{Int}`: A matrix where each row defines a specific dihedral angle using atom indices.
+- `AaToSigma::Dict{Char, <:Real}`: A dictionary mapping amino acid types to their Lennard-Jones σ-parameter (used in force field calculations).
+- `UseAngles::Bool`: If `true`, angle and dihedral interactions are included in the GSD file.
+
+**Creates**:
+* Writes the GSD data files.
+"""
 function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSDFormat.Frame()    
@@ -891,6 +968,8 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     snapshot.configuration.dimensions = 3 
     snapshot.configuration.box = [Box[1],Box[2], Box[3], 0, 0, 0]./10.0 #4:6 are tilt
     snapshot.particles.N = NAtoms
+    # pos = zeros(length(Sequences), maximum(length.(Sequences)), 3)
+    # reshape -> [N_total, 3]
     snapshot.particles.position = reshape(permutedims(Positions, (2,1,3)), (size(Positions, 1)*size(Positions, 2), 3))./10.0 ### permute to get alignment in memory, reshape to match gsd formart
     IdToAa = Dict(value => key for (key, value) in AaToId)
     snapshot.particles.types =  [string(IdToAa[Id]) for Id in  sort(collect(values(AaToId))) ] #string.(collect(keys(AaToId)))
