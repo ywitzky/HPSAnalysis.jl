@@ -80,7 +80,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.particles.typeid = InputTypes.astype(np.int32)
             snapshot.particles.image = InputImage
 
-            snapshot.configuration.box = [Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0] #4:6 are tilt
+            snapshot.configuration.box = [Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0]
 
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
@@ -89,7 +89,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.bonds.N = NBeads-NChains
             snapshot.bonds.types = ['O-O']
             snapshot.bonds.typeid = np.zeros(snapshot.bonds.N, dtype=np.uint32)
-            snapshot.bonds.group = InputBonds#.astype(np.uint32)
+            snapshot.bonds.group = InputBonds
 
             ## Create Angles
             snapshot.angles.N = NBeads-2*NChains

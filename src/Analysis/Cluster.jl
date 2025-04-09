@@ -12,7 +12,7 @@ Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps 
 **Returns**:
 - `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains.
 """
-function computeClustersByCOM(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+function computeClustersByChainCOM(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
     ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
     Clusters = Vector{Vector{Vector{Int}}}()
 
@@ -227,6 +227,20 @@ end
     return res 
 end
 
+@doc raw"""
+    computeClustersByBeadDistance(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=5.0) where{T<:Real, Int<:Integer}
+
+Computes clusters based on minimal distances between amino acids of protein and cutoff.
+
+Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps by naivly comparing all pairs of proteins, computing the minimal distance between any two amino acids of those proteins and adding an edge in the network if the distance is below the given cutoff. Returns the concatenation of groups of IDs belonging to weekly connected graph components of each frame.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `Cutoff::Float`: Distance criterion for a Cluster.
+
+**Returns**:
+- `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains for each step.
+"""
 function computeClustersByBeadDistance(Sim::SimData{T,Int}; Cutoff=5.0) where {Int<:Integer, T<:Real}
 
     Clusters = Vector{Vector{Vector{Int}}}()
@@ -239,7 +253,7 @@ function computeClustersByBeadDistance(Sim::SimData{T,Int}; Cutoff=5.0) where {I
         println("Step $step/$(Sim.NSteps)")
         G = Graphs.SimpleGraph{Int}()
         add_vertices!(G, Sim.NChains)
-        for I in 1:Sim.NChains
+        #=for I in 1:Sim.NChains
             Range_I=  Sim.ChainStart[I]:Sim.ChainStop[I]
 
             minima[1,I] = minimum(Sim.x_uw[Range_I, step])-Cut_half
@@ -257,20 +271,19 @@ function computeClustersByBeadDistance(Sim::SimData{T,Int}; Cutoff=5.0) where {I
             maxima[2,I] -= Sim.BoxLength[2].*round.(Int,  maxima[2,I]./Sim.BoxLength[2])
             maxima[3,I] -= Sim.BoxLength[3].*round.(Int,  maxima[3,I]./Sim.BoxLength[3])
         end
-
+        =#
 
         for I in 1:Sim.NChains
             Range_I = Sim.ChainStart[I]:Sim.ChainStop[I]
 
             for J in I+1:Sim.NChains
-                Range_J = Sim.ChainStart[J]:Sim.ChainStop[J]
-
+                for j in  Sim.ChainStart[J]:Sim.ChainStop[J]
                 ### check if there is already overlap between the bounding boxes of the proteins
                 #if isOverlapping3D(minima, maxima, I,J, Sim.BoxLength)
 
-                    dx = Sim.x_uw[Range_I, step] .- Sim.x_uw[Range_J, step]
-                    dy = Sim.y_uw[Range_I, step] .- Sim.y_uw[Range_J, step]
-                    dz = Sim.z_uw[Range_I, step] .- Sim.z_uw[Range_J, step]
+                    dx = Sim.x_uw[Range_I, step] .- Sim.x_uw[j, step]
+                    dy = Sim.y_uw[Range_I, step] .- Sim.y_uw[j, step]
+                    dz = Sim.z_uw[Range_I, step] .- Sim.z_uw[j, step]
 
                     dx -= Sim.BoxLength[1].*round.(Int, dx./Sim.BoxLength[1])
                     dy -= Sim.BoxLength[2].*round.(Int, dy./Sim.BoxLength[2])
@@ -280,8 +293,10 @@ function computeClustersByBeadDistance(Sim::SimData{T,Int}; Cutoff=5.0) where {I
 
                     if any(dist_sqr.<Cutoff^2)
                         add_edge!(G, I,J)
+                        continue
                     end
                 #end
+                end
             end
         end
 

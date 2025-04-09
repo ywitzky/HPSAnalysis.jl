@@ -381,13 +381,3 @@ def CountNumberOfTrajectoryFiles(FolderPath):
         with gsd.hoomd.open(f"{FolderPath}{file}") as f:
            sum_val += len(f)
     return len(trajectoryfiles), sum_val
-
-    
-
-
-
-
-
-
-
-
