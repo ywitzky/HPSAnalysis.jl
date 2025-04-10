@@ -117,13 +117,15 @@ Write a data file that contains all Parameters of the Simulation.
 **Creat**:
 * Write a file with all Parameters of the Simulation that are given from the Arguments.
 """
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0)
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]))
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
+    write(io, "Domains: $(domain)\n")
     write(io, "Seed: $Seed\n")
     write(io, "Temp: $Temp\n")
     write(io, "ionic: $ionic\n")
     write(io, "pH: $pH\n")
+    write(io, "SimulationType: $SimType\n")
     write(io, "NSteps: $NSteps\n")
     write(io, "NOut: $NOut\n")
     write(io, "dt: $Timestep\n")

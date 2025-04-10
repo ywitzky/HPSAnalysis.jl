@@ -487,7 +487,7 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
     NA = 6.02214086 * 10.0^23 # 1/mol Avogadro constant
 
     ### Saltconcentration in mol/L
-    if SaltConcentration==-1 || SimulationType!="Calvados2"
+    if SaltConcentration==-1 || !in(SimulationType, ["Calvados2","Calvados3"])
         κ = 10.0 # Å, Screening length
         ϵ_r = 80.0 # what ever? I think unitless, relative permitivity
     else
@@ -531,7 +531,7 @@ A tuple containing:
 **Notes**:
 - If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding. Also the charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1/(1+10^(pH-6))`.
 """
-function CalvadosSetup(Sequences,AtomTypes,pH,AaToId)
+function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
     index_cnt = length(AtomTypes)
     LongAtomTypes=deepcopy(AtomTypes)
     ResToLongAtomType = Dict()
@@ -558,11 +558,17 @@ function CalvadosSetup(Sequences,AtomTypes,pH,AaToId)
 
     OneToCharge = deepcopy(BioData.OneToHPSCharge)
     OneToMass = deepcopy(BioData.AaToWeight)
-    OneToLambda = deepcopy(BioData.OneToCalvados2Lambda)
     OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
     OneToHPSDihedral0110 = deepcopy(BioData.OneToHPSDihedral0110)
     OneToHPSDihedral1001 = deepcopy(BioData.OneToHPSDihedral1001)
-    OneToCharge['H'] = 1.0/(1+10^(pH-6))  ### HIS is pH-Dependent for calvados2
+    OneToCharge['H'] = 1.0/(1+10^(pH-6))  ### HIS is pH-Dependent for Calvados2/Calvados3
+
+    if SimulationType=="Calvados2"
+        OneToLambda = deepcopy(BioData.OneToCalvados2Lambda)
+    elseif SimulationType=="Calvados3"
+        OneToLambda = deepcopy(BioData.OneToCalvados3Lambda)
+    end
+
     for e in LongAtomTypes ### added the charge modifications for the first/last amino acids
         if ~(e in keys(OneToCharge))
             (AA, front) = LongAtomTypesToRes[e]
@@ -580,7 +586,7 @@ end
 
 
 @doc raw"""
-    DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
+    DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
 
 Define escential Parameters for the Simulation based on the Simulation Type.
     
@@ -614,7 +620,7 @@ A tuple containing:
 - If `SimulationType` is "HPS-Alpha", predefined values for charge, lambda, and sigma are used.
 - If an unknown `SimulationType` is provided, the function falls back on the user-supplied dictionaries for charge, lambda, and sigma values.
 """
-function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
+function DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
     #Define Aminoacids to ID Dict
     AtomTypes= Set(join(Sequences))
     AaToId = Dict{Char,Int32}()
@@ -633,7 +639,7 @@ function DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeD
         OneToLambda = deepcopy(BioData.OneToHPSUrryLambda)
         OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
     elseif SimulationType=="Calvados2"||SimulationType=="Calvados3"
-        (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)=CalvadosSetup(Sequences,AtomTypes,pH,AaToId)
+        (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)=CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
     else ### take the ones which are supplied
         OneToCharge = deepcopy(OneToChargeDef)
         OneToLambda = deepcopy(OneToLambdaDef)
@@ -704,7 +710,7 @@ Writes the start configuration for a molecular dynamics simulation.
 **Creates**:
 * Writes data files with the start configuration.
 """
-function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
+function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0,domain=Vector{Tuple{Int, Int}}())
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
@@ -731,7 +737,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     end
     
     #Creat the Dictionaries for AA to Charge, Mass, Sigma, Lambda and Dihedral
-    (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineCalvados2AtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
+    (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
     #Define lenght of all chains
     NAtomTypes = length(LongAtomTypes)
 
@@ -786,7 +792,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH) ### BoxLength has to be convert to nm
+        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
@@ -857,7 +863,6 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
                 else
                     dihedralid += 1
                     if MixingRule=="1-1001-1"
-                        #ID_min  = 
                         Res_min = (ResId-1)>=1 ? AaToId[Seq[ResId-1]] : 0
                         Res_max = (ResId)<=(length(Seq)-4) ? AaToId[Seq[ResId+4]] : -1
                         key = (sort([Res_min,AaToId[Res], AaToId[Seq[ResId+3]], Res_max]))
@@ -943,8 +948,6 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
         end
         write(StartFile,"cd ../$(RelPaths[RunNum]) \n")
         write(RestartFile,"cd ../$(RelPaths[RunNum]) \n")\
-        #if ProteinsPerSlurmFile>1
-
         write(RestartFile,"srun -n $(MPICores[RunNum]) --exclusive --exact --cpus-per-task=$(OMPCores[RunNum]) \$lmp -in \$BASEPATH/../$(RelPaths[RunNum])/$(Protein)_restart.lmp $(LmpAddOn)  -sf omp -package omp $(OMPCores[RunNum]) &\n")
         write(StartFile,"srun -n $(MPICores[RunNum]) --exclusive --exact --cpus-per-task=$(OMPCores[RunNum]) \$lmp -in \$BASEPATH/../$(RelPaths[RunNum])/$(Protein).lmp $(LmpAddOn)  -sf omp -package omp $(OMPCores[RunNum]) & \n")
         write(StartFile, "cd \$BASEPATH\n\n")

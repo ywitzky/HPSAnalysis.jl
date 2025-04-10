@@ -20,16 +20,20 @@ PWD = os.getcwd()
 def run(FolderPath, Restart=False):#, GPUNUM):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
+    #new Parameter SimType Calvados3 default C2
+    #new Parameter Domain
     Params = readParam(f"{FolderPath}/HOOMD_Setup/Params.txt")
 
     Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}/HOOMD_Setup/Sequences.txt")
 
     InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}/HOOMD_Setup/Particles.txt", NBeads, Seqs)
-
+    print(InputTypes)
     if Params["UseAngles"]:
         dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}/HOOMD_Setup/DihedralMap.txt", Seqs, InputTypes)
+    else:
+        dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs=[],[],[],[],[]
 
-
+    #Other LambdaDict for C2/C3
     IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}/HOOMD_Setup/Dictionaries.txt")
 
 
@@ -75,11 +79,27 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
 
-            # Connect particles with bonds.
-            snapshot.bonds.N = NBeads-NChains
-            snapshot.bonds.types = ['O-O']
-            snapshot.bonds.typeid = np.zeros(snapshot.bonds.N, dtype=np.uint32)
-            snapshot.bonds.group = InputBonds#.astype(np.uint32)
+
+            if Params["SimulationType"]=="Calvados3":
+                forces = []
+                ### Harmonic bonds
+                harmonic = hoomd.md.bond.Harmonic()
+                harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
+                forces.append(harmonic)
+                #print(Params["Domain_begin"])
+
+                B_N,B_types,B_typeid,B_group=BondC3(NBeads, Params["Domains"],harmonic, InputPositions.astype(np.float32))
+            
+            else:#also Calvados2
+                B_N = NBeads-NChains
+                B_types = ['O-O']
+                B_typeid = np.zeros(B_N, dtype=np.int32)
+                B_group = InputBonds#.astype(np.uint32)
+
+            snapshot.bonds.N = B_N
+            snapshot.bonds.types = B_types
+            snapshot.bonds.typeid = B_typeid
+            snapshot.bonds.group = B_group
 
             ## Create Angles
             snapshot.angles.N = NBeads-2*NChains
@@ -87,11 +107,11 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
             snapshot.angles.group = InputAngles
 
-            # Create Angles
-            snapshot.dihedrals.N =  NBeads-3*NChains 
-            snapshot.dihedrals.types = list(dihedral_list)
-            snapshot.dihedrals.typeid =  dihedral_AllIDs
-            snapshot.dihedrals.group = InputDihedrals
+            ## Create Dihedrals
+            #snapshot.dihedrals.N =  NBeads-3*NChains 
+            #snapshot.dihedrals.types = []#list(dihedral_list)
+            #snapshot.dihedrals.typeid =  dihedral_AllIDs
+            #snapshot.dihedrals.group = InputDihedrals
 
             with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
                 f.append(snapshot)
@@ -101,13 +121,12 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
 
-
-    forces = []
-
-    ### Harmonic bonds
-    harmonic = hoomd.md.bond.Harmonic()
-    harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
-    forces.append(harmonic)
+    if Params["SimulationType"]!="Calvados3":
+        forces = []
+        ### Harmonic bonds
+        harmonic = hoomd.md.bond.Harmonic()
+        harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
+        forces.append(harmonic)
 
     if Params["UseAngles"]:
         cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])

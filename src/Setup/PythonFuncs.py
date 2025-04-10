@@ -4,6 +4,7 @@ import hoomd.md
 import copy
 import gsd.hoomd
 from hoomd import ashbaugh_plugin
+import ast
 
 def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
     IDs = IDs.astype(int)+1
@@ -36,11 +37,12 @@ def readSequences(fileName):
     tmp = ""
     Seqs = []
     for line in file.readlines():
-        Seqs.append(line.strip())
-        NBeads+=len(line.strip())
-        tmp+=line.strip()
+        ##Up to now
+        Seqs.append(line.strip())#List of N times a protein
+        NBeads+=len(line.strip())#NBeads=N*len(protein)
+        tmp+=line.strip()#One String with N times a protein
 
-    NChains = len(Seqs)
+    NChains = len(Seqs)#N
 
     #InputBonds = np.zeros((NBeads-NChains,2), dtype=int)
     InputBonds=[]
@@ -54,7 +56,7 @@ def readSequences(fileName):
     for Seq in Seqs:
         for (i,aa) in enumerate(Seq[:-1]):
             #InputBonds[cb+i,:] = [cnt+i,cnt+i+1]
-            InputBonds.append([cnt+i, cnt+i+1])
+            InputBonds.append([cnt+i, cnt+i+1])#[[0,1],[1,2],...,[N-1,N]]
 
         for (i,aa) in enumerate(Seq[:-2]):
             InputAngles[ca+i,:] = [cnt+i,cnt+i+1,cnt+i+2]
@@ -76,7 +78,6 @@ def readParticleData(fileName, Nparticles, Sequences):
     InputPositions[:,0] = x/10.0
     InputPositions[:,1] = y/10.0
     InputPositions[:,2] = z/10.0
-    InputTypes -= 1 #convert from array start 1 to 0
     Diameter /= 10.0
 
     InputImage[:,0] = ix
@@ -139,8 +140,10 @@ def readParam(filename):
     ParamDict["Create_Start_Config"] = True
     file = open(filename, "r")
     for line in file.readlines():
-        key, value = line.split()
+        key, value = line.split(": ",1)
+        #value=chomp(value)
         key = key.strip(":")
+        value=value.strip()
         ParamDict[key] = parseKeywords(key, value)
 
     if ParamDict["Alt_GSD_Start"]=="-" and ParamDict["Minimise"]:
@@ -370,9 +373,57 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
         with gsd.hoomd.open(RestartPath, mode='w') as f2:
             f2.append(snapshot)
 
+def check_fold(folded_domain,i,j):
+    check=False
+    for dom in folded_domain:
+        if (i in range(dom[0],dom[1])) and (j in range(dom[0],dom[1])):
+            check=True
+    return check
 
+def BondC3(NBeads, Domains, harmonic, coordinates):
+    Domains=ast.literal_eval(Domains)
+    index=1
+    seqdomain=[]
+    B_N=0
+    B_types = ['O-O']
+    B_typeid = []# np.zeros(NBeads, dtype=np.uint32)
+    B_group = []#.astype(np.uint32)
 
+    length=np.zeros((len(coordinates),len(coordinates)))
+    for i in range(len(coordinates)):
+        for j in range(i, len(coordinates)):
+            length[i][j]=np.sqrt((coordinates[i][0]-coordinates[j][0])**2+(coordinates[i][1]-coordinates[j][1])**2+(coordinates[i][2]-coordinates[j][2])**2)
+    
+    for dom in Domains:
+        seqdomain+=range(dom[0],dom[1]+1)
+    for i in range(NBeads-1):
+        if i in seqdomain or i+1 in seqdomain:
+            hmbondname="O-O_D"+str(index)
+            harmonic.params[hmbondname]=dict(k=8033,r0=length[i][i+1])
+            B_types.append(hmbondname)
+            B_typeid.append(index)
+            index+=1
+            B_group.append([i,i+1])
+            B_N+=1
+        else:
+            B_typeid.append(0)
+            B_group.append([i,i+1])
+            B_N+=1
 
+    binds="bond_"
+    index=len(B_types)
+    for i in range(NBeads-2):
+        for j in range(i+2,NBeads-1):
+            if check_fold(Domains, i,j):
+                k=700
+                if length[i][j]<0.9:
+                    d = length[i][j]
+                    bondname=binds+str(index)
+                    B_types.append(bondname)
+                    B_typeid=np.append(B_typeid,index)
+                    B_group.append([i,j])
+                    index+=1
+                    harmonic.params[bondname]=dict(k=k,r0=d)
+                    B_N+=1
 
-
-
+    return B_N,B_types,B_typeid,B_group
