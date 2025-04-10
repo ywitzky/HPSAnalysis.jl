@@ -4,6 +4,8 @@ import hoomd.md
 import copy
 import gsd.hoomd
 from hoomd import ashbaugh_plugin
+import re
+import os
 
 def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
     IDs = IDs.astype(int)+1
@@ -371,8 +373,11 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
             f2.append(snapshot)
 
 
-
-
-
-
-
+def CountNumberOfTrajectoryFiles(FolderPath):
+    data =os.listdir(FolderPath)
+    trajectoryfiles=[e for e in data if re.search("traj",e) and re.search(".gsd", e)]
+    sum_val=0
+    for file in trajectoryfiles:
+        with gsd.hoomd.open(f"{FolderPath}{file}") as f:
+           sum_val += len(f)
+    return len(trajectoryfiles), sum_val
