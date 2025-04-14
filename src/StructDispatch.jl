@@ -105,7 +105,7 @@ module StructDispatch
         end
         
         for (ind, argument) in enumerate(Arguments)
-            if ArgumentTypes[ind]!= nothing
+            if !isnothing(ArgumentTypes[ind])
                 str *= "$argument::$(ArgumentTypes[ind]), "
             else
                 precompile *= "$(argument)"
@@ -157,7 +157,7 @@ module StructDispatch
             end    
         end
         for (ind, argument) in enumerate(Arguments)
-            if ArgumentTypes[ind]!= nothing
+            if !isnothing(ArgumentTypes[ind])
                 str *= "$argument::$(ArgumentTypes[ind]), "
             else
                 precompile *= "$(argument)"
@@ -201,7 +201,7 @@ module StructDispatch
                 end
             end
             for (ind, argument) in enumerate(Arguments)
-                if ArgumentTypes[ind]!= nothing
+                if !isnothing(ArgumentTypes[ind])
                     precompile *= "$(ArgumentTypes[ind]),"
                 #else
                 #    precompile *= "$(argument)"
@@ -215,7 +215,7 @@ module StructDispatch
         #    println("Precompile failed: $(funcname)")
         end
         
-        if funcname==Symbol("computeSlabHistogram") && true
+        #=if funcname==Symbol("computeSlabHistogram") && true
             #println(str)
             println(new_func)
             println(ex)
@@ -224,7 +224,7 @@ module StructDispatch
            # println(OtherFuncVars)
            # println(Arguments)
           #  println(String.(ArgumentTypes))
-        end
+        end=#
     
         return quote 
             $(esc(new_func))

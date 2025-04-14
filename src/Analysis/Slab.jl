@@ -1,3 +1,21 @@
+function getUnwrappedSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
+    if Sim.SlabAxis==1
+        SlabCoord = Unwrapped ? Sim.x_uw : Sim.x
+    elseif Sim.SlabAxis==2
+        SlabCoord = Unwrapped ? Sim.y_uw : Sim.y
+    elseif Sim.SlabAxis == 3
+        SlabCoord = Unwrapped ? Sim.z_uw : Sim.z
+    else 
+        ArgumentError("SlabAxis is not properly specified.")
+    end
+    return SlabCoord
+end
+
+@inline function getRecenteredPositions(SlabCoord::Array{R}, atom ,j, step, AxisCOM, Len, Len_inv) where {R<:Real}
+    pos = (SlabCoord[atom,step]-AxisCOM[j]) ### center slab at 0
+    pos -= Len*round(Int32, pos*Len_inv)    ### wrap back to central images
+end
+
 @doc raw"""
     computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
 Computes centered slab histograms along Sim.SlabAxis.
@@ -19,15 +37,7 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
 
     AxisCOM = computeCOMOfLargestCluster(Sim)
 
-    if Sim.SlabAxis==1
-        SlabCoord = Sim.x_uw
-    elseif Sim.SlabAxis==2
-        SlabCoord = Sim.y_uw
-    elseif Sim.SlabAxis == 3
-        SlabCoord = Sim.z_uw
-    else 
-        ArgumentError("SlabAxis is not properly specified.")
-    end
+    SlabCoord =  getUnwrappedSlabCoordinate(Sim)
 
     Len = deepcopy(Sim.BoxLength[Sim.SlabAxis])
     Len_inv = 1.0/Len
@@ -37,10 +47,8 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
     ### array with 1:N steps for -boxwidth:boxwitdh in the direction of the slab
     Sim.SlabHistogramSeries = OffsetArray(zeros(R, Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
 
-
     AllAxis = [1,2,3]
     deleteat!(AllAxis, Sim.SlabAxis)
-
 
     ### convert from dalton/AA^3 to kg/L=g/mL  divided by Volume element per bin
     volume =((Sim.BoxSize[AllAxis[1],2]-Sim.BoxSize[AllAxis[1],1])*(Sim.BoxSize[AllAxis[2],2]-Sim.BoxSize[AllAxis[2],1]))
@@ -64,9 +72,8 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
         end
 
         for atom in 1:Sim.NAtoms 
-            pos = (SlabCoord[atom,step]-AxisCOM[j])-0.5 ### center slab at 0
-            pos -= Len*round(I, pos*Len_inv)            ### wrap back to central images
-            ind = ceil(Int32,((pos)/Sim.Resolution))    ### get index according to resolution
+            pos = getRecenteredPositions(SlabCoord, atom,j , step, AxisCOM, Len, Len_inv)
+            ind = ceil(Int32,((pos-0.5)/Sim.Resolution))    ### get index according to resolution
             if ind == lowestind-1
                 ind = highestind
             end
@@ -207,4 +214,72 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.
     end
 
     return ρ_dense, ρ_dilute, ind_dense, ind_dilute
+end
+
+@inline function getVoxelIndex(pos, res, off)
+    ceil(Int32,((pos)/res))+off
+end
+
+
+function computeBinderCumulantsOfSlabDensities(Sim::HPSAnalysis.SimData{R,I}, indices_dilute, indices_dense)  where {R<:Real, I<:Integer}
+
+end
+
+function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_dilute, indices_dense)  where {R<:Real, I<:Integer}
+    AxisCOM = computeCOMOfLargestCluster(Sim)
+
+    AllAxis = [1,2,3]
+    deleteat!(AllAxis, Sim.SlabAxis)
+
+    ### convert from dalton/AA^3 to kg/L=g/mL  divided by Volume element per bin
+    d1 = Sim.BoxLength[AllAxis[1]]/12.0
+    d2 = Sim.BoxLength[AllAxis[2]]/12.0
+    volume =d1*d2
+    conversion = 1.66053906660/volume/Sim.Resolution
+
+    ### get Long Axis and short axis depending on selection
+    SlabCoord =  getUnwrappedSlabCoordinate(Sim)
+    tmp = deepcopy(Sim.SlabAxis)
+    Sim.SlabAxis= AllAxis[1]
+    Axis1 =  getUnwrappedSlabCoordinate(Sim)
+    Sim.SlabAxis= AllAxis[2]
+    Axis2 =  getUnwrappedSlabCoordinate(Sim)
+    Sim.SlabAxis= tmp
+
+    Len = deepcopy(Sim.BoxLength[Sim.SlabAxis])
+    Len_inv = 1.0/Len
+
+    ### divide short axes into 12 sub boxes
+    DenseCumulantBoxes  = zeros(R, 12,12, Sim.NSteps)
+    DiluteCumulantBoxes = zeros(R, 12,12, Sim.NSteps)
+
+    dilute_cutoff = indices_dilute .* Sim.Resolution
+    dense_cutoff = indices_dense .* Sim.Resolution
+
+    for (j,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
+        if j %200 == 0 println("step $j/$(length(Sim.ClusterRange))") end
+
+        for atom in 1:Sim.NAtoms
+            ### recenter histogram according to Cluster COMs
+            pos = getRecenteredPositions(SlabCoord, atom ,j, step, AxisCOM, Len, Len_inv)
+
+            if abs(pos)< dense_cutoff[step]
+                ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
+                ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
+                DenseCumulantBoxes[ind1, ind2, step] += Sim.Masses[atom]
+            end
+
+            if abs(pos)> dilute_cutoff[step]
+                ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
+                ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
+                DiluteCumulantBoxes[ind1, ind2, step] += Sim.Masses[atom]
+            end
+        end
+        DenseCumulantBoxes[:,:,step] /= dense_cutoff[step]*2 
+        DiluteCumulantBoxes[:,:,step] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff[step]*2 )
+    end
+    DenseCumulantBoxes  *= conversion
+    DiluteCumulantBoxes *= conversion
+
+    return DenseCumulantBoxes, DiluteCumulantBoxes
 end
