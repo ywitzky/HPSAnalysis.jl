@@ -29,18 +29,17 @@ HPSAnalysis.Setup.WriteDihedrals("$TestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 sim.run("$TestPath")
 data=GSDFormat.open("$(TestPath)$(SimName)_StartConfiguration.gsd","r")
 
-for (i,frame) in enumerate(data)
-    global particle_N_test = frame.particles.N
-    global particle_position_test = frame.particles.position
-    global particle_types_test = frame.particles.types
-    global particle_typeid_test = frame.particles.typeid
-    global particle_image_test = frame.particles.image
+frame = data[1]
+particle_N_test = frame.particles.N
+particle_position_test = frame.particles.position
+particle_types_test = frame.particles.types
+particle_typeid_test = frame.particles.typeid
+particle_image_test = frame.particles.image
 
-    global bond_N_test=frame.bonds.N
-    global bond_types_test=frame.bonds.types
-    global bond_typid_test=frame.bonds.typeid
-    global bond_group_test=frame.bonds.group
-end
+bond_N_test=frame.bonds.N
+bond_types_test=frame.bonds.types
+bond_typid_test=frame.bonds.typeid
+bond_group_test=frame.bonds.group
 
 typesid=UInt32[1, 3, 4, 2, 0, 1, 3, 4, 2, 0]
 coor=Float32[0.0 -0.4 0.0; 0.0 -0.3 0.0; 0.1 -0.2 -0.1; 0.05 -0.1 -0.05; 0.0 0.0 -0.1; 0.0 0.0 0.1; -0.05 0.1 0.05; -0.1 0.2 0.1; 0.0 0.3 0.0; 0.0 0.4 0.0]

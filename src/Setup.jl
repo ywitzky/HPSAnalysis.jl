@@ -677,6 +677,144 @@ function getImageCopyNumber(pos, boxSize, Sequences)
     return image
 end
 
+function startConficutationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneToLambdaDef,OneToSigmaDef,MixingRule="1-1001-1")
+    #Define Number of all Aminoacids, Bonds, Angles and Dihedrals, set AlphaAddition
+    NAtoms=0
+    NBonds=0
+    NAngles=0
+    NDihedrals=0
+    for Seq in Sequences
+        NAtoms += length(Seq)
+        NBonds += length(Seq)-1
+        NAngles += length(Seq)-2
+        NDihedrals += length(Seq)-3
+    end
+
+    AlphaAddition=false
+    if SimulationType=="Calvados2+Alpha"
+        AlphaAddition = true
+        SimulationType="Calvados2"
+    elseif SimulationType=="Calvados3+Alpha"
+        AlphaAddition = true
+        SimulationType="Calvados3"
+    else
+        AlphaAddition=false
+    end
+
+    (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
+    #Define lenght of all chains
+    NAtomTypes = length(LongAtomTypes)
+
+    #if AlphaAddition then determine the Dihedral
+    dihedral_short_map=Dict()
+    dihedral_list = zeros(Int32, (0,0))
+    dihedral_long_map=Dict()
+    dihedral_eps=[]
+    if AlphaAddition
+        (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
+        NDihedralsTypes = length(dihedral_eps)
+    end
+    return NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list
+end
+
+function writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list)
+    mkpath("./HOOMD_Setup")
+        WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)
+        WriteHOOMDParticlesInput("./HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
+        if AlphaAddition
+            WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
+        end
+        (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
+
+        BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
+        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain) ### BoxLength has to be convert to nm
+        WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
+        InputMasses = [OneToMass[res] for res in join(Sequences)]
+        InputCharges = [OneToCharge[res] for res in join(Sequences)]
+        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition)    
+end
+
+function writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
+    writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
+    writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
+
+    file = open(StartFileName*".txt", "w");
+    write(file, Info)
+
+    write(file, "\n\t $NAtoms \t atoms\n")
+    write(file, "\t $NBonds \t bonds\n")
+    write(file, "\t $NAngles \t angles\n")
+    write(file, "\t $NDihedrals \t dihedrals\n\n")
+
+    write(file, "\t $NAtomTypes \t atom types\n")
+    write(file, "\t 1 \t bond types\n")
+    write(file, "\t 1 \t angle types\n")
+    write(file, "\t $NDihedralsTypes \t dihedral types\n\n")
+
+    write(file,"\t $(BoxSize[1]) \t $(BoxSize[2]) \t xlo xhi\n")
+    write(file,"\t $(BoxSize[3]) \t $(BoxSize[4]) \t ylo yhi\n")
+    write(file,"\t $(BoxSize[5]) \t $(BoxSize[6]) \t zlo zhi\n\n")
+
+    write(file, "Masses \n#\n")
+    for (index, value) in enumerate(LongAtomTypes)
+        write(file, "\t $(AaToId[value]) \t $(OneToMass[value]) \t ### $(value in AtomTypes ? value : LongAtomTypesToRes[value] ) \n")
+    end
+
+    write(file,"\nAtoms\n# A comment that is needed to read stuff accurately\n")
+
+    atomid=0
+    moleculeid=0
+    for (SeqId, Sequence) in enumerate(Sequences)
+        moleculeid+=1
+        for (ResId,Res) in enumerate(Sequence)
+            atomid +=1
+            write(file, "\t $atomid \t $(@sprintf("%6i", moleculeid)) \t  $(@sprintf("%2i", AaToId[Res])) \t  $(@sprintf("%3.5f", OneToCharge[Res])) \t $(@sprintf("%5.5f", pos[SeqId,ResId,1])) \t $(@sprintf("%5.5f", pos[SeqId,ResId,2])) \t $(@sprintf("%5.5f", pos[SeqId,ResId,3])) \t $(@sprintf("%i", image[SeqId,ResId,1])) \t $(@sprintf("%i", image[SeqId,ResId,2])) \t $(@sprintf("%i", image[SeqId,ResId,3]))\n")
+        end
+    end 
+
+    write(file,"\nBonds\n#\n")
+    bonds = getBonds(Sequences;M=2)
+    for bid in axes(bonds,1)
+        write(file, "\t $bid \t 1 \t  $(bonds[bid, 1]) \t  $(bonds[bid, 1]) \n")
+    end
+    write(file, "\n\n")
+
+
+    write(file,"\nAngles\n#\n")
+
+    angles = getBonds(Sequences;M=3)
+    for bid in axes(bonds,1)
+        write(file, "\t $bid \t 1 \t  $(angles[bid, 1]) \t  $(angles[bid, 1]) \t  $(angles[bid, 2])\n")
+    end
+    write(file, "\n\n")
+
+
+    write(file,"\nDihedrals\n#\n")
+    atomid=0
+    dihedralid = 0
+    for (SeqId, Seq) in enumerate(Sequences)
+        for (ResId,Res) in enumerate(Seq)
+            atomid +=1
+            if (ResId>(length(Seq)-3) )
+                continue
+            else
+                dihedralid += 1
+                if MixingRule=="1-1001-1"
+                    Res_min = (ResId-1)>=1 ? AaToId[Seq[ResId-1]] : 0
+                    Res_max = (ResId)<=(length(Seq)-4) ? AaToId[Seq[ResId+4]] : -1
+                    key = (sort([Res_min,AaToId[Res], AaToId[Seq[ResId+3]], Res_max]))
+                elseif MixingRule=="1001"
+                    key = (sort([AaToId[Res], AaToId[Seq[ResId+3]]]))
+                elseif MixingRule=="0110"
+                    key = (sort([AaToId[Seq[ResId+1]], AaToId[Seq[ResId+2]]]))
+                end
+                write(file, "\t $dihedralid \t $(dihedral_long_map[key]) \t  $atomid \t  $(atomid+1) \t $(atomid+2) \t $(atomid+3)\n")
+            end
+        end
+    end
+    close(file)    
+end
+
 @doc raw"""
     writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6.0, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
 
@@ -710,44 +848,12 @@ Writes the start configuration for a molecular dynamics simulation.
 **Creates**:
 * Writes data files with the start configuration.
 """
-function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0,domain=Vector{Tuple{Int, Int}}())
+function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
-    #Define Number of all Aminoacids, Bonds, Angles and Dihedrals, set AlphaAddition
-    NAtoms= 0
-    NBonds=0
-    NAngles=0
-    NDihedrals=0
-    for Seq in Sequences
-        NAtoms += length(Seq)
-        NBonds += length(Seq)-1
-        NAngles += length(Seq)-2
-        NDihedrals += length(Seq)-3
-    end
-    AlphaAddition=false
-    if SimulationType=="Calvados2+Alpha"
-        AlphaAddition = true
-        SimulationType="Calvados2"
-    elseif SimulationType=="Calvados3+Alpha"
-        AlphaAddition = true
-        SimulationType="Calvados3"
-    else
-        AlphaAddition=false
-    end
-    
-    #Creat the Dictionaries for AA to Charge, Mass, Sigma, Lambda and Dihedral
-    (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
-    #Define lenght of all chains
-    NAtomTypes = length(LongAtomTypes)
+    NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list=startConficutationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneToLambdaDef,OneToSigmaDef,MixingRule)
 
-    #if AlphaAddition then determine the Dihedral
-    dihedral_short_map=Dict()
-    dihedral_list = zeros(Int32, (0,0))
-    if AlphaAddition
-        (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
-        NDihedralsTypes = length(dihedral_eps)
-    end
 
     #Set start coordinates for the AA, with different variations
     if InitStyle=="Slab"
@@ -783,100 +889,9 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
 
     #Write all Inputs, Parameters (Yukawa Interaction with Debye-Hückle), Dictionaries and the Start-File
     if HOOMD
-        mkpath("./HOOMD_Setup")
-        WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)
-        WriteHOOMDParticlesInput("./HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
-        if AlphaAddition
-            WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
-        end
-        (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
-
-        BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain) ### BoxLength has to be convert to nm
-        WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
-        InputMasses = [OneToMass[res] for res in join(Sequences)]
-        InputCharges = [OneToCharge[res] for res in join(Sequences)]
-        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition)
+        writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list)
     else
-        writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
-        writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
-
-        file = open(StartFileName*".txt", "w");
-        write(file, Info)
-
-        write(file, "\n\t $NAtoms \t atoms\n")
-        write(file, "\t $NBonds \t bonds\n")
-        write(file, "\t $NAngles \t angles\n")
-        write(file, "\t $NDihedrals \t dihedrals\n\n")
-
-        write(file, "\t $NAtomTypes \t atom types\n")
-        write(file, "\t 1 \t bond types\n")
-        write(file, "\t 1 \t angle types\n")
-        write(file, "\t $NDihedralsTypes \t dihedral types\n\n")
-
-        write(file,"\t $(BoxSize[1]) \t $(BoxSize[2]) \t xlo xhi\n")
-        write(file,"\t $(BoxSize[3]) \t $(BoxSize[4]) \t ylo yhi\n")
-        write(file,"\t $(BoxSize[5]) \t $(BoxSize[6]) \t zlo zhi\n\n")
-
-        write(file, "Masses \n#\n")
-        for (index, value) in enumerate(LongAtomTypes)
-            write(file, "\t $(AaToId[value]) \t $(OneToMass[value]) \t ### $(value in AtomTypes ? value : LongAtomTypesToRes[value] ) \n")
-        end
-
-        write(file,"\nAtoms\n# A comment that is needed to read stuff accurately\n")
-
-        atomid=0
-        moleculeid=0
-        for (SeqId, Sequence) in enumerate(Sequences)
-            moleculeid+=1
-            for (ResId,Res) in enumerate(Sequence)
-                atomid +=1
-                write(file, "\t $atomid \t $(@sprintf("%6i", moleculeid)) \t  $(@sprintf("%2i", AaToId[Res])) \t  $(@sprintf("%3.5f", OneToCharge[Res])) \t $(@sprintf("%5.5f", pos[SeqId,ResId,1])) \t $(@sprintf("%5.5f", pos[SeqId,ResId,2])) \t $(@sprintf("%5.5f", pos[SeqId,ResId,3])) \t $(@sprintf("%i", image[SeqId,ResId,1])) \t $(@sprintf("%i", image[SeqId,ResId,2])) \t $(@sprintf("%i", image[SeqId,ResId,3]))\n")
-            end
-        end 
-
-        write(file,"\nBonds\n#\n")
-        bonds = getBonds(Sequences;M=2)
-        for bid in axes(bonds,1)
-            write(file, "\t $bid \t 1 \t  $(bonds[bid, 1]) \t  $(bonds[bid, 1]) \n")
-        end
-        write(file, "\n\n")
-
-
-        write(file,"\nAngles\n#\n")
-
-        angles = getBonds(Sequences;M=3)
-        for bid in axes(bonds,1)
-            write(file, "\t $bid \t 1 \t  $(angles[bid, 1]) \t  $(angles[bid, 1]) \t  $(angles[bid, 2])\n")
-        end
-        write(file, "\n\n")
-
-
-        write(file,"\nDihedrals\n#\n")
-        atomid=0
-        dihedralid = 0
-        for (SeqId, Seq) in enumerate(Sequences)
-            for (ResId,Res) in enumerate(Seq)
-                atomid +=1
-                if (ResId>(length(Seq)-3) )
-                    continue
-                else
-                    dihedralid += 1
-                    if MixingRule=="1-1001-1"
-                        Res_min = (ResId-1)>=1 ? AaToId[Seq[ResId-1]] : 0
-                        Res_max = (ResId)<=(length(Seq)-4) ? AaToId[Seq[ResId+4]] : -1
-                        key = (sort([Res_min,AaToId[Res], AaToId[Seq[ResId+3]], Res_max]))
-                    elseif MixingRule=="1001"
-                        key = (sort([AaToId[Res], AaToId[Seq[ResId+3]]]))
-                    elseif MixingRule=="0110"
-                        key = (sort([AaToId[Seq[ResId+1]], AaToId[Seq[ResId+2]]]))
-                    end
-                    write(file, "\t $dihedralid \t $(dihedral_long_map[key]) \t  $atomid \t  $(atomid+1) \t $(atomid+2) \t $(atomid+3)\n")
-                end
-            end
-        end
-
-        close(file)
+        writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
     end
 end
 

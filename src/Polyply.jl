@@ -5,6 +5,7 @@ module Polyply
 #using .BioData, .ProteinSequences
 using ..BioData: OneToThree
 using DataStructures
+polyply = "/localscratch/Programs/hoomd/.cpu2/bin/polyply"
 
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
@@ -16,6 +17,12 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
     for name in (NameSet)
         ind = findfirst(x-> x==name, Names)
         SeqString = []
+        f = open("$(OutputPath)$(name).fasta","w+")
+        write(f,"$name PROTEIN\n")
+        write(f,Sequences[ind][1:5])
+        close(f,)
+
+        
         for AA in Sequences[ind]
             ### treat phosphorylated resdidues like 
             if AA == '#'
@@ -28,14 +35,21 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
                 push!(SeqString, "$(OneToThree[AA]):1")
             end
         end
-       run(`polyply gen_params -name $(name) -lib martini3 -seq $SeqString -o $(OutputPath)$(name).itp`)
+        run(`$polyply gen_params  -name $(name) -seq $SeqString -lib martini3  -o $(OutputPath)$(name).itp`) #-lib martini3
+        #run(`$polyply gen_params -seqf $(OutputPath)$(name).fasta -name $(name) -lib martini3  -o $(OutputPath)$(name).itp`)
     end
 end
 
 function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
+
+    write(f, "[ defaults ]\n; nbfunc        comb-rule       gen-pairs       fudgeLJ fudgeQQ\n1             1               no              1.0     1.0\n")
+
+
     write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0.itp\" \n")
+    #write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0_nucleobases_v1.itp\" \n")
+    #write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0_nucleobases_v1.itp\" \n")
     NameSet = Set(Names)
     Occurences = counter(Names)
     for name in NameSet
@@ -50,7 +64,10 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
 end
 
 function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
-    run(`polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $Box`)
+    println("adsfhg")
+    println("$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $Box")
+    #run(`source /localscratch/Programs/hoomd/.cpu2/bin/activate`)
+    run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $(Box)`)
 end
 
 function readPDB(Filename, x,y,z)

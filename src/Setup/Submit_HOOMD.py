@@ -7,7 +7,7 @@ import numpy as np
 import gsd.hoomd
 import hoomd
 import hoomd.md
-import h5py
+#import h5py
 
 import sys
 from PythonFuncs import *
@@ -200,10 +200,10 @@ def run(FolderPath, Restart=False):#, GPUNUM):
         logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
         logger_pres.add(sim, quantities=["timestep"])
         logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
-        hdf5_writer = hoomd.write.HDF5Log(
-            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
-        )
-        sim.operations.writers.append(hdf5_writer)
+        #hdf5_writer = hoomd.write.HDF5Log(
+        #    trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
+        #)
+        #sim.operations.writers.append(hdf5_writer)
     else:
         print("Thermodynamic Quantities are not tracked!")
 
