@@ -1,17 +1,9 @@
 
 module Polyply
-#include("BioData.jl")
-#include("ProteinSequences.jl")
-#using .BioData, .ProteinSequences
 using HPSAnalysis
 using ..BioData: OneToThree
-#using DataStructures, 
 using Scratch
 
-
-#PyEnvPath = PyEnvPath = Scratch.get_scratch!(HPSAnalysis, "PythonEnvironment") 
-#polyply = "$(PyEnvPath)/PolyplyEnv/bin/polyply"
-println(HPSAnalysis.EnvironmentPath)
 polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
 
 

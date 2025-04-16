@@ -2,15 +2,6 @@ using HPSAnalysis
 PkgSourcePath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
 
 EnvironmentPath= HPSAnalysis.getPythonEnvironment()
-#=
-file="$(PkgSourcePath)../data/EnvironmentPath.txt" 
-if isfile(file)
-    f = open(file,"r")
-    EnvironmentPath = readline(f)
-end
-if EnvironmentPath==""
-    @warn("Python Environment has not been specified. All tests regarding Polyply and HOOMD scripts will be omitted.")
-end=#
 
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python3"
 
