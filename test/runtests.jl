@@ -1,12 +1,24 @@
 using HPSAnalysis
 PkgSourcePath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
-EnvironmentPath="/localscratch/Programs/hoomd/.cpu2/bin/python3"
-ENV["PYCALL_JL_RUNTIME_PYTHON"]=EnvironmentPath
 
-using PyCall, Test, Scratch#, Aqua
+EnvironmentPath= HPSAnalysis.getPythonEnvironment()
+#=
+file="$(PkgSourcePath)../data/EnvironmentPath.txt" 
+if isfile(file)
+    f = open(file,"r")
+    EnvironmentPath = readline(f)
+end
+if EnvironmentPath==""
+    @warn("Python Environment has not been specified. All tests regarding Polyply and HOOMD scripts will be omitted.")
+end=#
+
+ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python3"
+
+using PyCall, Test, Scratch, Aqua
 pushfirst!(pyimport("sys")."path", "$(PkgSourcePath)/Setup/")
 
-TestPath = Scratch.get_scratch!(HPSAnalysis, "test") #"$PkgPath/test/TemporaryFiles/"
+TestPath = Scratch.get_scratch!(HPSAnalysis, "test") 
+
 #@testset "Aqua" begin
 #    Aqua.test_all(HPSAnalysis; deps_compat=(ignore=[:Printf, :Mmap, :Libdl, :LinearAlgebra, :Statistics,:Test], ), project_extras=false, )
     ### ignore standard libraries, not sure how to deal with them im PackageCompatUI/add compats manually

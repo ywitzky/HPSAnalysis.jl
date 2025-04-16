@@ -3,9 +3,17 @@ module Polyply
 #include("BioData.jl")
 #include("ProteinSequences.jl")
 #using .BioData, .ProteinSequences
+using HPSAnalysis
 using ..BioData: OneToThree
-using DataStructures
-polyply = "/localscratch/Programs/hoomd/.cpu2/bin/polyply"
+#using DataStructures, 
+using Scratch
+
+
+#PyEnvPath = PyEnvPath = Scratch.get_scratch!(HPSAnalysis, "PythonEnvironment") 
+#polyply = "$(PyEnvPath)/PolyplyEnv/bin/polyply"
+println(HPSAnalysis.EnvironmentPath)
+polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
+
 
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
@@ -17,12 +25,7 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
     for name in (NameSet)
         ind = findfirst(x-> x==name, Names)
         SeqString = []
-        f = open("$(OutputPath)$(name).fasta","w+")
-        write(f,"$name PROTEIN\n")
-        write(f,Sequences[ind][1:5])
-        close(f,)
 
-        
         for AA in Sequences[ind]
             ### treat phosphorylated resdidues like 
             if AA == '#'
@@ -35,21 +38,22 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
                 push!(SeqString, "$(OneToThree[AA]):1")
             end
         end
-        run(`$polyply gen_params  -name $(name) -seq $SeqString -lib martini3  -o $(OutputPath)$(name).itp`) #-lib martini3
-        #run(`$polyply gen_params -seqf $(OutputPath)$(name).fasta -name $(name) -lib martini3  -o $(OutputPath)$(name).itp`)
+        run(`$polyply gen_params  -name $(name) -seq $SeqString -lib martini3  -o $(OutputPath)$(name).itp`) 
     end
 end
 
 function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
+    write(f,"#include \"$(HPSAnalysis.PkgSourcePath)/../data/Polyply/martini_v3.0.0.itp\" \n")
 
-    write(f, "[ defaults ]\n; nbfunc        comb-rule       gen-pairs       fudgeLJ fudgeQQ\n1             1               no              1.0     1.0\n")
+    write(f, "[ atomtypes ]\n")
+    write(f, "VS 0.00 0.000 V 0.0 0.0\n\n")
 
 
-    write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0.itp\" \n")
-    #write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0_nucleobases_v1.itp\" \n")
-    #write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0_nucleobases_v1.itp\" \n")
+    write(f, "[ nonbond_params ]\n")
+    write(f, "VS    W   1 0.4650000000    0.5000000000\n\n")
+    
     NameSet = Set(Names)
     Occurences = counter(Names)
     for name in NameSet
@@ -64,10 +68,23 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
 end
 
 function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
-    println("adsfhg")
-    println("$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $Box")
-    #run(`source /localscratch/Programs/hoomd/.cpu2/bin/activate`)
     run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $(Box)`)
+end
+
+function readSimpleGRO(Filename, x,y,z)
+    f = open(Filename)
+    readline(f) ### command that generate the file
+    readline(f) ### the number of lines
+    ind=1
+    while !eof(f) 
+        line = readline(f)
+        if length(line)>15 && line[14:15]=="CA"
+            x[ind, 1] = parse(Float32, line[21:28])
+            y[ind, 1] = parse(Float32, line[29:37])
+            z[ind, 1] = parse(Float32, line[38:44])
+            ind+=1
+        end
+    end
 end
 
 function readPDB(Filename, x,y,z)
@@ -88,47 +105,4 @@ function readPDB(Filename, x,y,z)
     end
 end
 
-end #Polyply
-
-#=
-
-SimulationName = "TestSimulation"
-BoxSize=[15, 15,70] 
-WorkPath="/localscratch/Programs/Polyply/"
-Proteins=["RS31","RS31","RS31","RS31","RS31a","RS40", "RS41" ]
-Proteins = []
-Prot = "RS41"
-for i in 1:110
-    push!(Proteins, Prot)
-end
-Seqs = [] #eros(String, length(Proteins))
-for (ind, Prot) in enumerate(Proteins)
-    push!(Seqs , ProteinSequences.NameToSeq[Prot])
-end
-
-### generate Martini ITP Files
-#GenerateITPFilesOfSequence(Proteins, Seqs, "$(WorkPath)ITPS_Files/")
-
-### Generate Topology files
-TopologyFile = "$(WorkPath)TestTopology.top"
-#GenerateSlabTopologyFile(TopologyFile,"$(WorkPath)ITPS_Files/", Proteins, SimulationName)
-
-### generate coordinates
-#GenerateCoordinates(WorkPath, SimulationName, BoxSize, TopologyFile)
-
-#convert to PDB
-#ConvertGroToPDB(WorkPath, SimulationName)
-
-
-NumAtoms = zeros(Int32, 1)
-for Prot in Proteins
-    NumAtoms[1] = length(ProteinSequences.NameToSeq[Prot]) + NumAtoms[1]
-end
-NAtoms = NumAtoms[1]
-
-x  = zeros( (NAtoms, 1))
-y  = zeros( (NAtoms, 1))
-z  = zeros( (NAtoms, 1))
-
-readPDB("$(WorkPath)$SimulationName.pdb", x,y,z)
-=#
+end 

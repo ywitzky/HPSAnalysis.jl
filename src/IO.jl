@@ -958,10 +958,11 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
 
         ### convert to PDB
-        Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
+        #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
     end
     ### read positons from pdb
-    Polyply.readPDB("$(InitFiles)$SimulationName.pdb", Data.x,Data.y,Data.z)
+    #Polyply.readPDB("$(InitFiles)$SimulationName.pdb", Data.x,Data.y,Data.z)
+    Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
 
     ### sync RAM to disk before closing,
     Mmap.sync!(Data.x)
