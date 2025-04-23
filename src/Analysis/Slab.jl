@@ -165,6 +165,20 @@ function computeDensityHistogram(Sim::HPSAnalysis.SimData{R,I}, DivLength=I(10))
     Sim.DensityHist ./= length(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)*prod(dims)
 end
 
+function computeSlabDensities_Help!(SlabHistogramSeries::OffsetArrays.OffsetArray{R, 3, Array{R, 3}}, density::Array{R},step::I) where {R<:Real, I<:Int}
+    fill!(density,zero(R))
+    N = extrema(axes(SlabHistogramSeries,1))[2]-1
+
+    for i in 0:N 
+        density[i+1] += SlabHistogramSeries[i, step,1]
+        density[i+1] += SlabHistogramSeries[-i, step,1]
+    end
+    density ./= 2.0
+    return density
+end
+
+
+
 @doc raw"""
     computeSlabHistogram(Sim::SimData; Width=25, MaxVal=0.9, Surface_fac=0.8)
 
@@ -172,7 +186,9 @@ Computes average density within dense phase and dilute phase as well as the indi
 
 A mirror symmetric density around zero is computed from which dense phase approximation ρ\_app is defined as the mean value of the first **Width** steps. The dense phase boundary is **Surface_fac** times the distance **r_dense** at which the density drops below **MaxVal** times ρ\_app. Similarly the dilute phase boundary is the distance at which the density drops below **1-MaxVal** times ρ\_app plus **r_dense** times (1-**Surface_fac**).
 """
-function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.9, Surface_fac=0.8)  where {R<:Real, I<:Integer}
+function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.9, Surface_fac=0.8, safety=75.0)  where {R<:Real, I<:Integer}
+
+    safety_ = ceil(Int32, safety/Sim.Resolution)
 
     ### compute mirror symmetric density of centered histogram
     N = extrema(axes(Sim.SlabHistogramSeries,1))[2]-1
@@ -185,32 +201,36 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.
     ind_dilute = zeros(I, NSteps)
 
     for step in axes(Sim.SlabHistogramSeries,2)
-        fill!(density,zero(R))
-
-        for i in 0:N 
-            density[i+1] += Sim.SlabHistogramSeries[i, step,1]
-            density[i+1] += Sim.SlabHistogramSeries[-i, step,1]
-        end
-        density /= 2.0
+        computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
 
         avg = mean(density[1:Width])
 
         tmp = findlast(density.>avg*MaxVal)
         diff = tmp *(1-Surface_fac)
         ind_dense[step] = round(I, tmp*Surface_fac)
-        ρ_dense[step] = mean(density[1:ind_dense[step]])
+        ρ_dense[step] = mean(density[1:ind_dense[step]]) ### will be overwritten lated
 
         N_dilute = 2*ind_dense[step]*1/Surface_fac< N ? 2*ind_dense[step]*1/Surface_fac :  N-Width
         N_dilute =  ceil(I, N_dilute)
         avg = mean(density[N_dilute:end])
 
-        ind_dilute[step] = ceil(I,findfirst(density.-avg .<(1.0-MaxVal)*(ρ_dense[step]-avg)) + diff )
+        ind_dilute[step] = ceil(I,findfirst(density.-avg .<(1.0-MaxVal)*(ρ_dense[step]-avg)))
+    end
 
-        ρ_dilute[step] = mean(density[ind_dilute[step]:end])
+    global_ind_dilute = min(maximum(ind_dilute)+safety_, N)
+    global_ind_dense  = minimum(ind_dense)
+
+    for step in axes(Sim.SlabHistogramSeries,2)
+        computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
+        ρ_dense[step] = mean(density[1:global_ind_dense]) 
+        ρ_dilute[step] = mean(density[global_ind_dilute:end])
 
         ### ### convert to indexing starting at 0 for usage in offset array of SlabHistogramSeries
-        ind_dense[step] -= 1
-        ind_dilute[step] -= 1 
+        #ind_dense[step] -= 1
+        #ind_dilute[step] -= 1 
+
+        ind_dense[step]  = global_ind_dilute - 1
+        ind_dilute[step] = global_ind_dense - 1 
     end
 
     return ρ_dense, ρ_dilute, ind_dense, ind_dilute
