@@ -37,7 +37,7 @@ end
 function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
-    write(f,"#include \"$(HPSAnalysis.PkgSourcePath)/../data/Polyply/martini_v3.0.0.itp\" \n")
+    write(f,"#include \"$(HPSAnalysis.PkgPath)/data/Polyply/martini_v3.0.0.itp\" \n")
 
     write(f, "[ atomtypes ]\n")
     write(f, "VS 0.00 0.000 V 0.0 0.0\n\n")
