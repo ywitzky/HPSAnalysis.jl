@@ -6,6 +6,8 @@ module Polyply
 using ..BioData: OneToThree
 using DataStructures
 
+polyply="/localscratch/Python3.13Environments/HPSAnalysis/bin/polyply"
+
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
     run(`$GMX_Path editconf -f $(Path)$(Filename).gro -o $(Path)$(Filename).pdb`)
@@ -28,7 +30,7 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
                 push!(SeqString, "$(OneToThree[AA]):1")
             end
         end
-       run(`polyply gen_params -name $(name) -lib martini3 -seq $SeqString -o $(OutputPath)$(name).itp`)
+       run(`$polyply gen_params -name $(name) -lib martini3 -seq $SeqString -o $(OutputPath)$(name).itp`)
     end
 end
 
@@ -36,6 +38,9 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
     write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0.itp\" \n")
+    write(f, "[ atomtypes ]\n")
+    write(f, "VS 0.00 0.000 V 0.0 0.0\n\n")
+
     NameSet = Set(Names)
     Occurences = counter(Names)
     for name in NameSet
@@ -50,7 +55,7 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
 end
 
 function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
-    run(`polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $Box`)
+    run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $Box`)
 end
 
 function readPDB(Filename, x,y,z)
