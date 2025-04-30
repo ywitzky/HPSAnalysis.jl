@@ -966,8 +966,8 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
     ### sync RAM to disk before closing,
     Mmap.sync!(Data.x)
-    Mmap.sync!(Data.x)
-    Mmap.sync!(Data.x)
+    Mmap.sync!(Data.y)
+    Mmap.sync!(Data.z)
     close(Data.xio)
     close(Data.yio)
     close(Data.zio)
