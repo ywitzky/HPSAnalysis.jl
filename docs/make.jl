@@ -11,8 +11,8 @@ makedocs(
     authors = "Yannick Witzky",
     format = Documenter.HTML(;edit_link=:commit,
     prettyurls = get(ENV, "CI", nothing) == "true"), # easier local build
-    size_threshold_ignore = ["listfunctions.md"]
-    ), # easier local build
+   # size_threshold_ignore = ["listfunctions.md"]
+   # ), # easier local build
     modules = [HPSAnalysis],
     repo = "https://gitlab.rlp.net/ywitzky/HPSAnalysis.jl",
     pages = [
@@ -20,6 +20,7 @@ makedocs(
         "Setup" => "setup.md",
         "Slab Analysis" => "SlabAnalysis.md",
         "List of functions" => "listfunctions.md",
+        "Installation" => "Requirements.md",
     ],
 )
 
