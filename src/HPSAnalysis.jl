@@ -11,7 +11,5 @@ include("./Data.jl")
 include("./Polyply.jl")
 include("./IO.jl")
 include("./Analysis.jl")
-include("./Unify.jl")
 include("./Plot.jl")
-include("./HREMD.jl")
 end # module HPSAnalysis
