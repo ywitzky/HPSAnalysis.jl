@@ -64,10 +64,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         RestartPath=f"{FolderPath}{Params['Simname']}_Restart_{TrajectoryNumber}.gsd"
         CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
 
-
         NewGoal = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps ### Either extend to meet initial goal or extend simulations.
-        print(f"{ExtendedSteps} {NewGoal}")
-
 
         Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
 

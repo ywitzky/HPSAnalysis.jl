@@ -208,6 +208,16 @@ function readH5MD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return size(Sim.x,2)
 end
 
+function CountStepsInGSDTrajectoryFiles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    N=0
+    for file in getGSDTrajectoryFiles(Sim)
+        gsdfileobj = GSDFormat.open_gsd(file, "r";application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
+        N += convert(Int32, GSDFormat.get_nframes(gsdfileobj))
+    end
+    N
+end
+
+
 function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String, Minimize=false, NumSteps=-1, Delimiter=" ")  where {T<:Real,I<:Integer}
     readEnergyFile(Sim; EnergyFile=EnergyFile, NumSteps=NumSteps)
     N = Sim.NSteps
@@ -229,9 +239,8 @@ function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String,
             end
         end
     elseif Sim.TrajectoryFile[end-2:end] =="gsd"
-        gsdfileobj= GSDFormat.open_gsd(Sim.TrajectoryFile, "r";application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
-        N = convert(I, GSDFormat.get_nframes(gsdfileobj))
-        Sim.NSteps= N
+        Sim.NSteps= CountStepsInGSDTrajectoryFiles(Sim)
+        N= Sim.NSteps
     else
         error("Can find TrajectoryFile:\"$TrajectoryFile\".")
     end
