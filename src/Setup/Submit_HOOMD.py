@@ -7,7 +7,7 @@ import numpy as np
 import gsd.hoomd
 import hoomd
 import hoomd.md
-#import h5py
+import h5py
 
 import sys
 from PythonFuncs import *
@@ -17,7 +17,7 @@ from hoomd import ashbaugh_plugin
 
 PWD = os.getcwd()
 
-def run(FolderPath, Restart=False):#, GPUNUM):
+def run(FolderPath, Restart=False, ExtendedSteps=0):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
     #new Parameter SimType Calvados3 default C2
@@ -27,7 +27,7 @@ def run(FolderPath, Restart=False):#, GPUNUM):
     Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}/HOOMD_Setup/Sequences.txt")
 
     InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}/HOOMD_Setup/Particles.txt", NBeads, Seqs)
-    print(InputTypes)
+    
     if Params["UseAngles"]:
         dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}/HOOMD_Setup/DihedralMap.txt", Seqs, InputTypes)
     else:
@@ -36,16 +36,13 @@ def run(FolderPath, Restart=False):#, GPUNUM):
     #Other LambdaDict for C2/C3
     IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}/HOOMD_Setup/Dictionaries.txt")
 
-
     ### constants 
     bondLength = 0.38
-
 
     kb = 0.00831446262
     kT = kb*Params["Temp"]
 
     ### Prepare HOOMD 
-    
     tmp = []
     for i in IDS: 
         tmp.append(str(IDToResName[i]))
@@ -60,9 +57,24 @@ def run(FolderPath, Restart=False):#, GPUNUM):
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
     if Restart:
-        RestartPath=FolderPath+Params["Simname"] +"_Restart.gsd"
-        CopyLastFrameToRestartFile(FolderPath+Params["Trajectory"], RestartPath)
+        TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
+        NStepsOld *= Params["NOut"] 
+        lastTrajectory = Params['Trajectory'] if TrajectoryNumber==1 else f"{Params['Trajectory'][:-4]}_{TrajectoryNumber-1}.gsd"
+
+        RestartPath=f"{FolderPath}{Params['Simname']}_Restart_{TrajectoryNumber}.gsd"
+        CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
+
+
+        NewGoal = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps ### Either extend to meet initial goal or extend simulations.
+        print(f"{ExtendedSteps} {NewGoal}")
+
+
+        Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
+
+        with open(f"{FolderPath}/HOOMD_Setup/{Params['Simname']} +_RestartLog.txt", 'a+') as f:
+            f.write(f"Restart at timestep {NStepsOld} trying to extend to {NewGoal} by running {Params['NSteps']} additional steps.\n")
         sim.create_state_from_gsd(filename=RestartPath)
+        Params["Trajectory"] = f"{Params['Trajectory'][:-4]}_{TrajectoryNumber}.gsd"
     else:
         if Params["Create_Start_Config"]:
             snapshot = gsd.hoomd.Frame()  
@@ -107,11 +119,11 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
             snapshot.angles.group = InputAngles
 
-            ## Create Dihedrals
-            #snapshot.dihedrals.N =  NBeads-3*NChains 
-            #snapshot.dihedrals.types = []#list(dihedral_list)
-            #snapshot.dihedrals.typeid =  dihedral_AllIDs
-            #snapshot.dihedrals.group = InputDihedrals
+            # Create Angles
+            snapshot.dihedrals.N =  NBeads-3*NChains 
+            snapshot.dihedrals.types = list(dihedral_list)
+            snapshot.dihedrals.typeid =  dihedral_AllIDs
+            snapshot.dihedrals.group = InputDihedrals
 
             with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
                 f.append(snapshot)
@@ -120,6 +132,9 @@ def run(FolderPath, Restart=False):#, GPUNUM):
         else:
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
+    if Params["NSteps"] ==0:
+        print("The number of necessary steps is zero. No simulation will be run.")
+        return -1
 
     if Params["SimulationType"]!="Calvados3":
         forces = []
@@ -200,10 +215,10 @@ def run(FolderPath, Restart=False):#, GPUNUM):
         logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
         logger_pres.add(sim, quantities=["timestep"])
         logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
-        #hdf5_writer = hoomd.write.HDF5Log(
-        #    trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
-        #)
-        #sim.operations.writers.append(hdf5_writer)
+        hdf5_writer = hoomd.write.HDF5Log(
+            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
+        )
+        sim.operations.writers.append(hdf5_writer)
     else:
         print("Thermodynamic Quantities are not tracked!")
 
@@ -237,26 +252,27 @@ def run(FolderPath, Restart=False):#, GPUNUM):
 
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
-    for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
-        print(f"fac {fac}")
-        for i in range(10):
-            integrator.dt = Params["dt"]/fac
-            sim.run(100)#Params["NSteps"])
-            sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
+    if not Restart:
+        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
+            print(f"fac {fac}")
+            for i in range(10):
+                integrator.dt = Params["dt"]/fac
+                sim.run(100)#Params["NSteps"])
+                sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
 
     ### start simulation
     sim.operations.writers.append(gsd_writer)
 
     integrator.dt = Params["dt"]
+    print(Params["NSteps"])
     sim.run(Params["NSteps"])
     
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
 
-def restart(FolderPath):
-    run(FolderPath, Restart=True)
-
+def restart(FolderPath, ExtendedSteps=0):
+    run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)
 
 if __name__ == '__main__':
     if len(sys.argv)<2:

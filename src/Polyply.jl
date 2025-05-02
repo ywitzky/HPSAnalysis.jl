@@ -77,6 +77,10 @@ function readSimpleGRO(Filename, x,y,z)
             ind+=1
         end
     end
+    ### convert from nm to Angstroem
+    x .*= 10.0
+    y .*= 10.0
+    z .*= 10.0
 end
 
 function readPDB(Filename, x,y,z)

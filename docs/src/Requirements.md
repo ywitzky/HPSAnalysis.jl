@@ -13,5 +13,7 @@ The module named Setup allows to set up Calvados2 and Calvados3 via the Python w
 * martinize2 (Calvados3)
 * HOOMD
 * GSD
+* Numpy
+* h5py
 
 For the tests to work, one needs to activate the Python environment before starting Julia and safe the Path to the Python executable in the file "/HPSAnalysis/data/EnvironmentPath.txt" . 
