@@ -1,8 +1,6 @@
 
 module Polyply
-#include("BioData.jl")
-#include("ProteinSequences.jl")
-#using .BioData, .ProteinSequences
+
 using ..BioData: OneToThree
 using DataStructures
 

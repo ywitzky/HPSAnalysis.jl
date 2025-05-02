@@ -8,7 +8,6 @@ include("./Setup.jl")
 
  
 include("./Data.jl")
-include("./Polyply.jl")
 include("./IO.jl")
 include("./Analysis.jl")
 include("./Plot.jl")

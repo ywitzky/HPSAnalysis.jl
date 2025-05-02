@@ -6,6 +6,8 @@ using GSDFormat, Printf
 
 include("../data/BioData.jl")
 include("Setup/HOOMD_Setup.jl")
+include("./Setup/Polyply.jl")
+
 using .BioData
 
 
