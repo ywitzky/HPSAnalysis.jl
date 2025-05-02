@@ -71,47 +71,4 @@ function readPDB(Filename, x,y,z)
     end
 end
 
-end #Polyply
-
-#=
-
-SimulationName = "TestSimulation"
-BoxSize=[15, 15,70] 
-WorkPath="/localscratch/Programs/Polyply/"
-Proteins=["RS31","RS31","RS31","RS31","RS31a","RS40", "RS41" ]
-Proteins = []
-Prot = "RS41"
-for i in 1:110
-    push!(Proteins, Prot)
-end
-Seqs = [] #eros(String, length(Proteins))
-for (ind, Prot) in enumerate(Proteins)
-    push!(Seqs , ProteinSequences.NameToSeq[Prot])
-end
-
-### generate Martini ITP Files
-#GenerateITPFilesOfSequence(Proteins, Seqs, "$(WorkPath)ITPS_Files/")
-
-### Generate Topology files
-TopologyFile = "$(WorkPath)TestTopology.top"
-#GenerateSlabTopologyFile(TopologyFile,"$(WorkPath)ITPS_Files/", Proteins, SimulationName)
-
-### generate coordinates
-#GenerateCoordinates(WorkPath, SimulationName, BoxSize, TopologyFile)
-
-#convert to PDB
-#ConvertGroToPDB(WorkPath, SimulationName)
-
-
-NumAtoms = zeros(Int32, 1)
-for Prot in Proteins
-    NumAtoms[1] = length(ProteinSequences.NameToSeq[Prot]) + NumAtoms[1]
-end
-NAtoms = NumAtoms[1]
-
-x  = zeros( (NAtoms, 1))
-y  = zeros( (NAtoms, 1))
-z  = zeros( (NAtoms, 1))
-
-readPDB("$(WorkPath)$SimulationName.pdb", x,y,z)
-=#
+end 

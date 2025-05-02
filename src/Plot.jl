@@ -317,8 +317,6 @@ end
 function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
     axis = 0:length(Sim.RGAutocorr[1,:])-1
-    println(axis)
-    println(maximum(axes(Sim.RGAutocorr[1,:])))
     avg = sum(Sim.RGAutocorr, dims=1)[1,:]./Sim.NChains
 
     for chain in 1:Sim.NChains
