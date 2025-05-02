@@ -4,7 +4,6 @@ module HPSAnalysis
 include("../data/BioData.jl")
 include("../data/ProteinSequences.jl")
 
-include("./Xtc.jl") 
 include("./Setup.jl")
 
  

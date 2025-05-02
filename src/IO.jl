@@ -1,6 +1,7 @@
 
 using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat
 
+include("./IO/Xtc.jl")
 include("./IO/IO_HOOMD.jl")
 include("./IO/Sequence_IO.jl")
 
