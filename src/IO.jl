@@ -1,10 +1,7 @@
 
-using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat#, gsd # ProfileView,
+using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat
 
-### preliminary GSD_wrapper include
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/GSD/src/gsd.jl")
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/GSD/src/HOOMDTrajectory.jl")
-
+include("./IO/Xtc.jl")
 include("./IO/IO_HOOMD.jl")
 include("./IO/Sequence_IO.jl")
 

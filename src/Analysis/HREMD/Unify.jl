@@ -98,7 +98,6 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
     return Results
 end
 
-
 function Average(Data::Vector, Axis::Int32)   
     NDataPoints = Float64(size(Data)[Axis])
     Mean = Statistics.mean(Data, dims=Axis) *NDataPoints
@@ -150,8 +149,6 @@ end
 function CMA_Finalize(Obj)
     CMA = Obj.SUM ./Obj.Weight
     if Obj.N==1
-        #println(Obj.SQR," ",Obj.SUM," ",CMA," ",Obj.Weight )
-        #println()
         CMA_σ = @. sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight)))
         return Float64.(CMA), Float64.(CMA_σ), zeros(Float64, size(CMA))
     end
@@ -160,7 +157,6 @@ function CMA_Finalize(Obj)
         CMA_σ = @. sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight)))
         CMA_err= @. CMA_σ/sqrt((Obj.N-1))
     else
-        #println(Obj.SQR," ",Obj.SUM," ",CMA," ",Obj.Weight)
         CMA_σ = @.  sqrt( ((Obj.SQR-2.0*CMA*Obj.SUM +CMA^2*Obj.Weight)/(Obj.Weight-1)))
         CMA_err= @. CMA_σ/sqrt( (Obj.N))
     end

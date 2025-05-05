@@ -2,16 +2,12 @@ module Setup
 
 export createDenseStartingPosition, writeCollectedSlurmScript
 
-### preliminary GSD_wrapper include
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
-using GSDFormat
+using GSDFormat, Printf
 
-#include("ProteinSequences.jl")
-#using .ProteinSequences
-using Printf
-include("BioData.jl")
+include("../data/BioData.jl")
 include("Setup/HOOMD_Setup.jl")
+include("./Setup/Polyply.jl")
+
 using .BioData
 
 
