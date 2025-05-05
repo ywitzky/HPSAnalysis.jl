@@ -27,7 +27,7 @@ def run(FolderPath, Restart=False):#, GPUNUM):
     Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}/HOOMD_Setup/Sequences.txt")
 
     InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}/HOOMD_Setup/Particles.txt", NBeads, Seqs)
-    print(InputTypes)
+    #print(InputTypes)
     if Params["UseAngles"]:
         dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}/HOOMD_Setup/DihedralMap.txt", Seqs, InputTypes)
     else:
@@ -43,6 +43,7 @@ def run(FolderPath, Restart=False):#, GPUNUM):
 
     kb = 0.00831446262
     kT = kb*Params["Temp"]
+    forces = []
 
     ### Prepare HOOMD 
     
@@ -81,16 +82,19 @@ def run(FolderPath, Restart=False):#, GPUNUM):
 
 
             if Params["SimulationType"]=="Calvados3":
-                forces = []
+                #print("Bin in C3")
+                #forces = []
                 ### Harmonic bonds
                 harmonic = hoomd.md.bond.Harmonic()
                 harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
-                forces.append(harmonic)
                 #print(Params["Domain_begin"])
 
-                B_N,B_types,B_typeid,B_group=BondC3(NBeads, Params["Domains"],harmonic, InputPositions.astype(np.float32))
+                #B_N,B_types,B_typeid,B_group,harmonic=Bonds_for_C3(f"{FolderPath}/RS31_0.itp",NBeads, Params["Domains"],harmonic)
+                B_N,B_types,B_typeid,B_group,harmonic=BondC3(NBeads, Params["Domains"],harmonic, InputPositions.astype(np.float32),InputImage,[Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0])
+                forces.append(harmonic)
             
-            else:#also Calvados2
+            else:#Calvados2
+                #print("Bin in C2_Bond")
                 B_N = NBeads-NChains
                 B_types = ['O-O']
                 B_typeid = np.zeros(B_N, dtype=np.int32)
@@ -122,7 +126,8 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
 
     if Params["SimulationType"]!="Calvados3":
-        forces = []
+        print("Bin in C2")
+        #forces = []
         ### Harmonic bonds
         harmonic = hoomd.md.bond.Harmonic()
         harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
