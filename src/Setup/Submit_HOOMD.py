@@ -49,11 +49,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     Types = np.array(tmp)
 
 
-    if Params["Device"]=="GPU":
-        device = hoomd.device.GPU()
-    else:
-        device = hoomd.device.CPU()
-
+    device = hoomd.device.GPU() if Params["Device"]=="GPU" else hoomd.device.CPU()
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
     if Restart:
@@ -117,6 +113,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.angles.group = InputAngles
 
             # Create Angles
+            print(InputDihedrals)
             snapshot.dihedrals.N =  NBeads-3*NChains 
             snapshot.dihedrals.types = list(dihedral_list)
             snapshot.dihedrals.typeid =  dihedral_AllIDs
@@ -207,15 +204,17 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     sim.operations.writers.append(table)
         
 
+    hdf5_writer=[]
     if True:
     ### track presure
         logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
         logger_pres.add(sim, quantities=["timestep"])
+        logger_pres.add(sim, quantities=["initial_timestep"])
         logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
+        write_mode = 'a' if Restart else 'w'
         hdf5_writer = hoomd.write.HDF5Log(
-            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
+            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode=write_mode, logger=logger_pres
         )
-        sim.operations.writers.append(hdf5_writer)
     else:
         print("Thermodynamic Quantities are not tracked!")
 
@@ -234,34 +233,33 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
     sim.operations.integrator=integrator
 
-	#
-
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
-
-    ### optimise cell list buffer
-    now = sim.timestep
-    if now is None:
-        now = 0
-    hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
-    hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
     if not Restart:
         for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
-            print(f"fac {fac}")
             for i in range(10):
                 integrator.dt = Params["dt"]/fac
-                sim.run(100)#Params["NSteps"])
+                sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
+
+
+    ### optimise cell list buffer
+    now = sim.timestep
+    if now is None:
+        now = 0
+    hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.After(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
+    hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.After(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
     ### start simulation
     sim.operations.writers.append(gsd_writer)
+    sim.operations.writers.append(hdf5_writer)
 
     integrator.dt = Params["dt"]
-    print(Params["NSteps"])
+    print(f"Run simulation for {Params['NSteps']} steps")
     sim.run(Params["NSteps"])
     
     print(f"TPS: {sim.tps:0.5g}")

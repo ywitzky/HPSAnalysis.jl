@@ -56,6 +56,7 @@ StatsBase = "0.34"
 Test = "1.6"
 julia = "1.6"
 libgsd_jll = "3.2.1"
+PyCall="1.96"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"

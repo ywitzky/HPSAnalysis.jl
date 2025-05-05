@@ -4,7 +4,7 @@ import HPSAnalysis.BioData as BioData
 using GSDFormat 
 
 Seq=["DEGHKDEGHK"]
-HPSAnalysis.Setup.WriteHOOMD;equences("$SetupTestPath/HOOMD_Setup/Sequences.txt", Seq)
+HPSAnalysis.Setup.WriteHOOMDSequences("$SetupTestPath/HOOMD_Setup/Sequences.txt", Seq)
 
 N=10
 NChains=1
