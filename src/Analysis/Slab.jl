@@ -229,8 +229,8 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.
         #ind_dense[step] -= 1
         #ind_dilute[step] -= 1 
 
-        ind_dense[step]  = global_ind_dilute - 1
-        ind_dilute[step] = global_ind_dense - 1 
+        ind_dense[step]  = global_ind_dense - 1
+        ind_dilute[step] = global_ind_dilute - 1 
     end
 
     return ρ_dense, ρ_dilute, ind_dense, ind_dilute
