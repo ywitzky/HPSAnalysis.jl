@@ -79,7 +79,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.particles.typeid = InputTypes.astype(np.int32)
             snapshot.particles.image = InputImage
 
-            snapshot.configuration.box = [Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0] #4:6 are tilt
+            snapshot.configuration.box = [Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0]
 
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
