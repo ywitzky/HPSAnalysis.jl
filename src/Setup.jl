@@ -588,11 +588,11 @@ end
 @doc raw"""
     DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
 
-Define escential Parameters for the Simulation based on the Simulation Type.
+Defines essential Parameters for the simulation based on the type of the simulation.
     
 **Arguments**
-- `Sequences::Array{String}`: List of sequences of Proteins.
-- `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+- `Sequences::Array{String}`: List of sequences of proteins.
+- `SimulationType::String`: Type of simulation (e.g.: "Calvados2").
 - `pH::Float`: pH-value of the system.
 
 **Optional Arguments**:
