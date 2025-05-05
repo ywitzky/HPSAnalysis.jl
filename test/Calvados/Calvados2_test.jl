@@ -1,7 +1,10 @@
 SimName="test"
 
+import HPSAnalysis.BioData as BioData
+using GSDFormat 
+
 Seq=["DEGHKDEGHK"]
-HPSAnalysis.Setup.WriteHOOMDSequences("$TestPath/HOOMD_Setup/Sequences.txt", Seq)
+HPSAnalysis.Setup.WriteHOOMD;equences("$SetupTestPath/HOOMD_Setup/Sequences.txt", Seq)
 
 N=10
 NChains=1
@@ -21,13 +24,16 @@ position=[0.0 0.0 1.0 0.5 0.0 0.0 -0.5 -1.0 0.0 0.0;;;-4.0 -3.0 -2.0 -1.0 0.0 0.
 coor=fill(0.0,1,maximum(length(seq) for seq in Seq),3)
 
 
-HPSAnalysis.Setup.WriteHOOMDParticlesInput("$TestPath/HOOMD_Setup/Particles.txt",position,BioData.OneToHPSCharge,AaToId,Seq,BioData.AaToWeight,BioData.OneToHPSCalvadosSigma,coor)
-HPSAnalysis.Setup.WriteDictionaries("$TestPath/HOOMD_Setup/Dictionaries.txt", BioData.OneToHPSCharge, AaToId,BioData.AaToWeight, BioData.OneToHPSCalvadosSigma, BioData.OneToCalvados2Lambda)
-HPSAnalysis.Setup.WriteParams("$TestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,Device="CPU", UseCharge=false, Create_Start_Config=true)
-HPSAnalysis.Setup.WriteDihedrals("$TestPath/HOOMD_Setup/DihedralMap.txt",[],0)
+HPSAnalysis.Setup.WriteHOOMDParticlesInput("$SetupTestPath/HOOMD_Setup/Particles.txt",position,BioData.OneToHPSCharge,AaToId,Seq,BioData.AaToWeight,BioData.OneToHPSCalvadosSigma,coor)
+HPSAnalysis.Setup.WriteDictionaries("$SetupTestPath/HOOMD_Setup/Dictionaries.txt", BioData.OneToHPSCharge, AaToId,BioData.AaToWeight, BioData.OneToHPSCalvadosSigma, BioData.OneToCalvados2Lambda)
+HPSAnalysis.Setup.WriteParams("$SetupTestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,Device="CPU", UseCharge=false, Create_Start_Config=true)
+HPSAnalysis.Setup.WriteDihedrals("$SetupTestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 
-sim.run("$TestPath")
-data=GSDFormat.open("$(TestPath)$(SimName)_StartConfiguration.gsd","r")
+#cd(SetupTestPath)
+#run(`$(ENV["PYCALL_JL_RUNTIME_PYTHON"]) $(PkgSourcePath)/Setup/Submit_HOOMD.py`)
+
+sim.run("$SetupTestPath")
+data=GSDFormat.open("$(SetupTestPath)$(SimName)_StartConfiguration.gsd","r")
 
 frame = data[1]
 particle_N_test = frame.particles.N

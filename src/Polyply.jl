@@ -1,19 +1,8 @@
 
 module Polyply
-#include("BioData.jl")
-#include("ProteinSequences.jl")
-#using .BioData, .ProteinSequences
 using HPSAnalysis
 using ..BioData: OneToThree
-#using DataStructures, 
 using Scratch
-using DataStructures
-using BioStructures
-using DSSP_jll
-
-#PyEnvPath = PyEnvPath = Scratch.get_scratch!(HPSAnalysis, "PythonEnvironment") 
-#polyply = "$(PyEnvPath)/PolyplyEnv/bin/polyply"
-#println(HPSAnalysis.EnvironmentPath)
 polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
 
 
@@ -47,8 +36,7 @@ end
 function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
-    #write(f,"#include \"$(HPSAnalysis.PkgSourcePath)/../data/Polyply/martini_v3.0.0.itp\" \n")
-    write(f,"#include \"/localscratch/Programs/Polyply/martini_v300/martini_v3.0.0.itp\" \n")
+    write(f,"#include \"$(HPSAnalysis.PkgPath)/data/Polyply/martini_v3.0.0.itp\" \n")
 
     write(f, "[ atomtypes ]\n")
     write(f, "VS 0.00 0.000 V 0.0 0.0\n\n")

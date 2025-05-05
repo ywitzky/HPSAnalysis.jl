@@ -1,7 +1,10 @@
 SimName="test"
 
+import HPSAnalysis.BioData as BioData
+using GSDFormat 
+
 Seq=["DEGHKDEGHK"]
-HPSAnalysis.Setup.WriteHOOMDSequences("$TestPath/HOOMD_Setup/Sequences.txt", Seq)
+HPSAnalysis.Setup.WriteHOOMDSequences("$SetupTestPath/HOOMD_Setup/Sequences.txt", Seq)
 
 N=10
 NChains=1
@@ -21,26 +24,26 @@ position=[0.0 0.0 1.0 0.5 0.0 0.0 -0.5 -1.0 0.0 0.0;;;-4.0 -3.0 -2.0 -1.0 0.0 0.
 coor=fill(0.0,1,maximum(length(seq) for seq in Seq),3)
 
 
-HPSAnalysis.Setup.WriteHOOMDParticlesInput("$TestPath/HOOMD_Setup/Particles.txt",position,BioData.OneToHPSCharge,AaToId,Seq,BioData.AaToWeight,BioData.OneToHPSCalvadosSigma,coor)
-HPSAnalysis.Setup.WriteDictionaries("$TestPath/HOOMD_Setup/Dictionaries.txt", BioData.OneToHPSCharge, AaToId,BioData.AaToWeight, BioData.OneToHPSCalvadosSigma, BioData.OneToCalvados2Lambda)
-HPSAnalysis.Setup.WriteParams("$TestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,domain=Array([[3,8]]),Device="CPU", UseCharge=false, Create_Start_Config=true,SimType="Calvados3")
-HPSAnalysis.Setup.WriteDihedrals("$TestPath/HOOMD_Setup/DihedralMap.txt",[],0)
+HPSAnalysis.Setup.WriteHOOMDParticlesInput("$SetupTestPath/HOOMD_Setup/Particles.txt",position,BioData.OneToHPSCharge,AaToId,Seq,BioData.AaToWeight,BioData.OneToHPSCalvadosSigma,coor)
+HPSAnalysis.Setup.WriteDictionaries("$SetupTestPath/HOOMD_Setup/Dictionaries.txt", BioData.OneToHPSCharge, AaToId,BioData.AaToWeight, BioData.OneToHPSCalvadosSigma, BioData.OneToCalvados2Lambda)
+HPSAnalysis.Setup.WriteParams("$SetupTestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,domain=Array([[3,8]]),Device="CPU", UseCharge=false, Create_Start_Config=true,SimType="Calvados3")
+HPSAnalysis.Setup.WriteDihedrals("$SetupTestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 
-sim.run("$TestPath")
-data=GSDFormat.open("$(TestPath)$(SimName)_StartConfiguration.gsd","r")
+sim.run("$SetupTestPath")
+data=GSDFormat.open("$(SetupTestPath)$(SimName)_StartConfiguration.gsd","r")
 
-for (i,frame) in enumerate(data)
-    global particle_N_test = frame.particles.N
-    global particle_position_test = frame.particles.position
-    global particle_types_test = frame.particles.types
-    global particle_typeid_test = frame.particles.typeid
-    global particle_image_test = frame.particles.image
 
-    global bond_N_test=frame.bonds.N
-    global bond_types_test=frame.bonds.types
-    global bond_typid_test=frame.bonds.typeid
-    global bond_group_test=frame.bonds.group
-end
+frame = data[1]
+particle_N_test = frame.particles.N
+particle_position_test = frame.particles.position
+particle_types_test = frame.particles.types
+particle_typeid_test = frame.particles.typeid
+particle_image_test = frame.particles.image
+
+bond_N_test=frame.bonds.N
+bond_types_test=frame.bonds.types
+bond_typid_test=frame.bonds.typeid
+bond_group_test=frame.bonds.group
 
 typesid=UInt32[1, 3, 4, 2, 0, 1, 3, 4, 2, 0]
 coor=Float32[0.0 -0.4 0.0; 0.0 -0.3 0.0; 0.1 -0.2 -0.1; 0.05 -0.1 -0.05; 0.0 0.0 -0.1; 0.0 0.0 0.1; -0.05 0.1 0.05; -0.1 0.2 0.1; 0.0 0.3 0.0; 0.0 0.4 0.0]
