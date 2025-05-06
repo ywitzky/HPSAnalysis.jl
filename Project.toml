@@ -6,7 +6,9 @@ version = "0.2.1"
 [deps]
 BioAlignments = "00701ae9-d1dc-5365-b64a-a3a3ebf5695e"
 BioSequences = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
+BioStructures = "de9282ab-8554-53be-b2d6-f6c222edabfc"
 BioSymbols = "3c28c6f8-a34d-59c4-9654-267d177fcfa9"
+DSSP_jll = "74334e00-59ce-546d-b517-81f3b7e1d491"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -35,6 +37,7 @@ libgsd_jll = "e4d6e05a-3816-5255-9332-8392038f2e0f"
 Aqua = "0.8.9"
 BioAlignments = "3"
 BioSequences = "3.4.0"
+BioStructures = "4.4"
 BioSymbols = "5"
 DataFrames = "1.0.1"
 DataStructures = "0.18.8"
@@ -59,8 +62,8 @@ libgsd_jll = "3.2.1"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Aqua", "Test", "PyCall"]

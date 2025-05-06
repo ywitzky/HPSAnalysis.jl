@@ -2,7 +2,7 @@
 module Polyply
 using HPSAnalysis
 using ..BioData: OneToThree
-using Scratch
+using Scratch, DataStructures
 polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
 
 
@@ -41,19 +41,18 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     write(f, "[ atomtypes ]\n")
     write(f, "VS 0.00 0.000 V 0.0 0.0\n\n")
 
-
     write(f, "[ nonbond_params ]\n")
     write(f, "VS    W   1 0.4650000000    0.5000000000\n\n")
     
     NameSet = Set(Names)
     Occurences = counter(Names)
     for name in NameSet
-        write(f, "#include \"$(ITPPath)$(name)_0.itp\" \n")
+        write(f, "#include \"$(ITPPath)$(name).itp\" \n")
     end
     write(f,"\n[ system ]\n; name\nProtein Sim\n\n[ molecules ]\n; name  number\n")
 
     for (ind, name) in enumerate(NameSet)
-        write(f, "$(name)_0 $(Occurences[name])\n")
+        write(f, "$(name) $(Occurences[name])\n")
     end
     close(f)
 end

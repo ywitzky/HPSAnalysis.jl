@@ -928,8 +928,6 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         Data.ChainStop[i] = Data.ChainStop[i-1]+length(Seq)
     end
 
-
-
     ### allocate disk space for X
     #creat path for the coordinates
     Data.xio= open(Data.xFilePath,"w+")
@@ -957,7 +955,11 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         HPSAnalysis.Polyply.folded_data(Proteins, Data.Sequences,InitFiles,Alpha_Fold_path,to_pdb_path,domains)
         TopologyFile = "$(InitFiles)TestTopology.top"
         protein=uppercase(protein)
-        itpPath="$(Data.BasePath)/"
+
+        itpPath="$(InitFiles)ITPS_Files/"
+        mkpath(itpPath)
+        Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
+
         HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,"$(itpPath)", Proteins, Data.SimulationName)
 
         ### generate coordinates
