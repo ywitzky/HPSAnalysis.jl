@@ -947,12 +947,18 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     if SimulationType=="Calvados3"
         mkpath("$(InitFiles)Elastic_Files/")
         protein=lowercase(protein)
-        ###folded_data checks if the are AlphaFold_datas, they need a structure like folded_(ProteinName->capitalized) haben
-        Alpha_Fold_path="$(Data.BasePath)/../../../AlphaFold_Fold_Data/fold_$(protein)/fold_$(protein)_model_0.cif"
-        to_pdb_path="$(Data.BasePath)/../../../AlphaFold_Fold_Data/fold_$(protein)/fold_$(protein)_model_0.pdb"
+        ###folded_data checks if the are AlphaFold_datas, they need a structure like folded_(ProteinName->capitalized) 
+
+
+        ProteinToCif =Dict("RS31" => "/localscratch/test/fold_rs31/fold_$(protein)_model_0.cif")# "$(Data.BasePath)/../../../AlphaFold_Fold_Data/fold_$(protein)/fold_$(protein)_model_0.cif")
+
+        ProteinToDomain = Dict("RS31" => [(1, 70), (90,150)])
+
         ###Creat a pdb data from the AlphaFold cif data
-        #println(Proteins)
-        HPSAnalysis.Polyply.folded_data(Proteins, Data.Sequences,InitFiles,Alpha_Fold_path,to_pdb_path,domains)
+        HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
+
+        HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
+
         TopologyFile = "$(InitFiles)TestTopology.top"
         protein=uppercase(protein)
 
@@ -985,8 +991,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         #Data.x[:,1]=x_coor
         #Data.y[:,1]=y_coor
         #Data.z[:,1]=z_coor
-    end
-    if SimulationType=="Calvados2"
+    elseif SimulationType=="Calvados2"
         if Regenerate
             ### generate Martini ITP Files
             mkpath("$(InitFiles)ITPS_Files/")

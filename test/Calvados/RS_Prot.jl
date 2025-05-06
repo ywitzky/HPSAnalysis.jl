@@ -48,7 +48,6 @@ for (protID, protein) in enumerate(ToCreate)
                 push!(NewDomain, [dom[1]+shift, dom[2]+shift])
             end
         end
-        println(NewDomain)
 
         Info ="SLAB Simulation script for $protein.\n\n"
         BoxLengthShort=Float32(350.0)
