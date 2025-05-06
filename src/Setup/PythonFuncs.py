@@ -5,6 +5,7 @@ import copy
 import gsd.hoomd
 from hoomd import ashbaugh_plugin
 import ast
+from CifFile import ReadCif
 
 def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
     IDs = IDs.astype(int)+1
@@ -380,7 +381,7 @@ def check_fold(folded_domain,i,j):
             check=True
     return check
 
-def BondC3(NBeads, Domains, harmonic, coordinates):
+def BondC3(NBeads, Domains, harmonic, coordinates,image,box):
     Domains=ast.literal_eval(Domains)
     index=1
     seqdomain=[]
@@ -399,6 +400,7 @@ def BondC3(NBeads, Domains, harmonic, coordinates):
     for i in range(NBeads-1):
         if i in seqdomain or i+1 in seqdomain:
             hmbondname="O-O_D"+str(index)
+            #print(length[i][i+1])
             harmonic.params[hmbondname]=dict(k=8033,r0=length[i][i+1])
             B_types.append(hmbondname)
             B_typeid.append(index)
@@ -426,4 +428,116 @@ def BondC3(NBeads, Domains, harmonic, coordinates):
                     harmonic.params[bondname]=dict(k=k,r0=d)
                     B_N+=1
 
-    return B_N,B_types,B_typeid,B_group
+    return B_N,B_types,B_typeid,B_group,harmonic
+    
+def convert_cif_to_pdb(cifFile, entry_id, output_pdb):
+    cf = ReadCif(cifFile)
+
+    group = cf[entry_id]["_atom_site.group_PDB"]
+    atom_id = cf[entry_id]["_atom_site.id"]
+    atom_type = cf[entry_id]["_atom_site.type_symbol"]
+    atom_name = cf[entry_id]["_atom_site.label_atom_id"]
+    alt_id = cf[entry_id]["_atom_site.label_alt_id"]
+    res_name = cf[entry_id]["_atom_site.label_comp_id"]
+    chain_id = cf[entry_id]["_atom_site.auth_asym_id"]
+    res_seq = cf[entry_id]["_atom_site.auth_seq_id"]
+    ins_code = cf[entry_id]['_atom_site.pdbx_PDB_ins_code']
+    #cf.get("_atom_site.pdbx_PDB_ins_code", [" "] * len(group))  # fallback, if not present
+    x = cf[entry_id]["_atom_site.Cartn_x"]
+    y = cf[entry_id]["_atom_site.Cartn_y"]
+    z = cf[entry_id]["_atom_site.Cartn_z"]
+    occupancy = cf[entry_id]["_atom_site.occupancy"]
+    b_factor = cf[entry_id]["_atom_site.B_iso_or_equiv"]
+    element = cf[entry_id]["_atom_site.type_symbol"]
+
+    with open(output_pdb, "w") as f:
+        for i in range(len(group)):
+            pdb_line = (
+                "{:<6}{:>5} {:>4}{:<1}{:>3} {:>1}{:>4}{:<1}   "
+                "{:>8.3f}{:>8.3f}{:>8.3f}{:>6.2f}{:>6.2f}          {:>2}\n"
+            ).format(
+                group[i], int(atom_id[i]), atom_name[i], alt_id[i] if alt_id[i] != '.' else ' ',
+                res_name[i], chain_id[i], int(res_seq[i]), ins_code[i] if ins_code[i] != '?' else ' ',
+                float(x[i]), float(y[i]), float(z[i]), float(occupancy[i]), float(b_factor[i]),
+                element[i].rjust(2)
+            )
+            f.write(pdb_line)
+
+
+
+### Not in use
+def checkBB(atom_num,next_num,atoms_types):
+    index=[]
+    for line in atoms_types[:-1]:
+        fields=line.split()
+        #print(fields[0], atom_num)
+        if float(fields[0])==atom_num or float(fields[0])==next_num:
+            if fields[4]=="BB":
+                #print("True")
+                index.append(float(fields[2]))
+    #print([True,index])
+    return [True,index]
+
+
+### Not in use
+def Bonds_for_C3(itp_Path, NBeads, Domains, harmonic):
+    ## add dict
+    C3_bonds = []
+    in_box = False
+    with open(itp_Path) as file:
+        for line in file:
+            #print(in_box)
+            stripped = line.strip()
+            if in_box:
+                C3_bonds.append(line)
+            if not in_box:
+                if stripped.startswith("; Rubber band"):
+                    in_box = True
+            if not stripped and in_box:
+                break
+    C3_atoms = []
+    in_box = False
+    with open(itp_Path) as file:
+        for line in file:
+            stripped = line.strip()
+            if in_box:
+                C3_atoms.append(line)
+            if not in_box:
+                if stripped.startswith("[ atoms ]"):
+                    in_box = True
+            if not stripped and in_box:
+                break
+    #print(C3_atoms)
+
+
+    Domains=ast.literal_eval(Domains)
+    index=1
+    seqdomain=[]
+    B_N=0
+    B_types = ['O-O']
+    B_typeid = []# np.zeros(NBeads, dtype=np.uint32)
+    B_group = []#.astype(np.uint32)
+    for dom in Domains:
+        seqdomain+=range(dom[0],dom[1]+1)
+    for i in range(NBeads-1):
+        B_typeid.append(0)
+        B_group.append([i,i+1])
+        B_N+=1
+
+    index=len(B_types)
+    binds="bond_"
+    for line in C3_bonds[:-1]:
+        fields=line.split()
+        #print(fields)
+        check=checkBB(float(fields[0]),float(fields[1]),C3_atoms)
+        if check[0]:
+            bondname=binds+str(index)
+            #print(fields)
+            B_types.append(bondname)
+            B_typeid=np.append(B_typeid,index)
+            B_group.append([check[1][0],check[1][1]])
+            index+=1
+            harmonic.params[bondname]=dict(k=float(fields[4]),r0=float(fields[3]))#*10.0)
+            B_N+=1
+
+    return B_N,B_types,B_typeid,B_group,harmonic
