@@ -138,7 +138,7 @@ function RewriteCifToPDB(Sim::HPSAnalysis.SimData{T,I}, ProteinToCif,Proteins) w
         try
             readlines(CifPath)
         catch
-            @error "The is no AlphaFold data for protein $(Prot) at $(CifPath)."
+            @error "There is no AlphaFold data for protein $(Prot) at $(CifPath)."
         end
 
         cp(CifPath, "$(cifpath)/$(Prot).cif")

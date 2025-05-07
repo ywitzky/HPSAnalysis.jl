@@ -13,7 +13,7 @@ BasePath=SetupTestPath
 
 ToCreate =  ["RS31"]
 FoldedDomains = Dict("RS31" => [(1,70),(90,155)])
-ProteinToCif =Dict("RS31" => "/localscratch/test/fold_rs31/fold_RS31_model_0.cif")
+ProteinToCif =Dict("RS31" => "/localscratch/test/fold_rs31/fold_rs31_model_0.cif")
 ProteinToJSON =Dict("RS31" => "/localscratch/test/fold_rs31/fold_rs31_full_data_0.json")
 
 
@@ -64,11 +64,10 @@ for (protID, protein) in enumerate(ToCreate)
 
         ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
-        itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
-        #=
-        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 30_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=NewDomain,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=10_000, itp_Path)
+        #itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
 
-        sim.run("$(Path)/")
-        =#
+        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 30_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=10_000, ENM)
+
+        #sim.run("$(Path)/")
     end
 end
