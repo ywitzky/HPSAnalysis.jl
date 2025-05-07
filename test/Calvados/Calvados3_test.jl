@@ -3,6 +3,10 @@ SimName="test"
 import HPSAnalysis.BioData as BioData
 using GSDFormat 
 
+rm(SetupTestPath; force=true, recursive=true)
+mkpath("$SetupTestPath/HOOMD_Setup/")
+
+
 Seq=["DEGHKDEGHK"]
 HPSAnalysis.Setup.WriteHOOMDSequences("$SetupTestPath/HOOMD_Setup/Sequences.txt", Seq)
 
@@ -29,7 +33,8 @@ HPSAnalysis.Setup.WriteDictionaries("$SetupTestPath/HOOMD_Setup/Dictionaries.txt
 HPSAnalysis.Setup.WriteParams("$SetupTestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,domain=Array([[3,8]]),Device="CPU", UseCharge=false, Create_Start_Config=true,SimType="Calvados3")
 HPSAnalysis.Setup.WriteDihedrals("$SetupTestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 
-sim.run("$SetupTestPath")
+println(SetupTestPath)
+sim.run(SetupTestPath)
 data=GSDFormat.open("$(SetupTestPath)$(SimName)_StartConfiguration.gsd","r")
 
 
@@ -67,3 +72,6 @@ bondtypes=["O-O\0\0\0\0", "O-O_D1\0", "O-O_D2\0", "O-O_D3\0", "O-O_D4\0", "O-O_D
     @test bond_typid_test==bondid
     @test bond_group_test==bond_group
 end
+
+
+
