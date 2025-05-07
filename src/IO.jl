@@ -858,7 +858,7 @@ Creates the file structure and initialises particle positions for the given para
 **Returns**:
 * A tuple (pos, Data) containing the initial positions and the simulation data structure.
     """
-function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true,SimulationType="Calvados2",domains=FoldedDomain,protein)
+function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true,SimulationType="Calvados2",ProteinToDomain=Dict(),ProteinToCif=Dict())
     #Definition of Paths for the parameters
     Data = SimData()
     Data.BasePath= Path
@@ -945,52 +945,23 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     mkpath(InitFiles)
 
     if SimulationType=="Calvados3"
-        mkpath("$(InitFiles)Elastic_Files/")
-        protein=lowercase(protein)
-        ###folded_data checks if the are AlphaFold_datas, they need a structure like folded_(ProteinName->capitalized) 
+        if Regenerate
+            mkpath("$(InitFiles)Elastic_Files/")
+            ###Creat a pdb data from the AlphaFold cif data
+            HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
 
+            HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
 
-        ProteinToCif =Dict("RS31" => "/localscratch/test/fold_rs31/fold_$(protein)_model_0.cif")# "$(Data.BasePath)/../../../AlphaFold_Fold_Data/fold_$(protein)/fold_$(protein)_model_0.cif")
+            TopologyFile = "$(InitFiles)TestTopology.top"
+            itpPath="$(InitFiles)ITPS_Files/"
+            mkpath(itpPath)
+            Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
 
-        ProteinToDomain = Dict("RS31" => [(1, 70), (90,150)])
+            HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,"$(itpPath)", Proteins, Data.SimulationName)
 
-        ###Creat a pdb data from the AlphaFold cif data
-        HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
-
-        HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
-
-        TopologyFile = "$(InitFiles)TestTopology.top"
-        protein=uppercase(protein)
-
-        itpPath="$(InitFiles)ITPS_Files/"
-        mkpath(itpPath)
-        Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
-
-        HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,"$(itpPath)", Proteins, Data.SimulationName)
-
-        ### generate coordinates
-        HPSAnalysis.Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
-
-        HPSAnalysis.Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
-
-        #HPSAnalysis.Polyply.ElasticNetworkModel("$(InitFiles)Top_Files/$(SimulationName)", domains)
-        #pos = zeros(eltype(Data.x), Data.NAtoms, 3)
-        #pdb_lines=readlines("/localscratch/lafroehl/Hiwi/fold_rs31/test.pdb")
-        #pdb_lines=readlines("$(InitFiles)Top_Files/$(SimulationName)_cg_protein.pdb")
-        #x_coor,y_coor,z_coor=[],[],[]
-        #for line in pdb_lines
-        #    if startswith(line, "ATOM") && strip(line[13:16]) == "CA"
-        #        #println(strip(line[31:39]))
-        #        push!(x_coor, parse(Float64, strip(line[31:39])))
-        #        push!(y_coor, parse(Float64, strip(line[39:46])))
-        #        push!(z_coor, parse(Float64, strip(line[47:54])))
-        #    end
-        #end
-        #println("a1")
-        #println(length(Data.x[:,1]),length(x_coor))
-        #Data.x[:,1]=x_coor
-        #Data.y[:,1]=y_coor
-        #Data.z[:,1]=z_coor
+            ### generate coordinates
+            HPSAnalysis.Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+        end
     elseif SimulationType=="Calvados2"
         if Regenerate
             ### generate Martini ITP Files
@@ -1007,17 +978,10 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             ### convert to PDB
             #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
         end
-        ### read positons from pdb
-        #Polyply.readPDB("$(InitFiles)$SimulationName.pdb", Data.x,Data.y,Data.z)
-        Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
     end
-    #pos = zeros(eltype(Data.x), Data.NAtoms, 3)
-    #pos[:,1] .= Data.x[:,1]
-    #pos[:,2] .= Data.y[:,1]
-    #pos[:,3] .= Data.z[:,1]
+    ### read positons from gro
+    Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
 
-
-    #if false
     ### sync RAM to disk before closing,
     Mmap.sync!(Data.x)
     Mmap.sync!(Data.y)
@@ -1066,22 +1030,19 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         pos[:,2] .= Data.y[:,1]
     end
 
-    #println(pos)
-    #if false #SimulationType=="Calvados2"
     ### shift so that box center is at 0,0,0
-        pos[:,1] .-= BoxSize[1]/2
-        pos[:,2] .-= BoxSize[2]/2
-        pos[:,3] .-= BoxSize[3]/2
+    pos[:,1] .-= BoxSize[1]/2
+    pos[:,2] .-= BoxSize[2]/2
+    pos[:,3] .-= BoxSize[3]/2
 
-        Data.x[:,1] .=  pos[:,1]
-        Data.y[:,1] .=  pos[:,2]
-        Data.z[:,1] .=  pos[:,3]
+    Data.x[:,1] .=  pos[:,1]
+    Data.y[:,1] .=  pos[:,2]
+    Data.z[:,1] .=  pos[:,3]
 
-        Data.x_uw[:,1] .-= BoxSize[1]/2
-        Data.y_uw[:,1] .-= BoxSize[2]/2
-        Data.z_uw[:,1] .-= BoxSize[3]/2
-    #end
-    #println("f")
+    Data.x_uw[:,1] .-= BoxSize[1]/2
+    Data.y_uw[:,1] .-= BoxSize[2]/2
+    Data.z_uw[:,1] .-= BoxSize[3]/2
+
     tmp_x = Data.x_uw
     tmp_z = Data.z_uw
     Data.x_uw= deepcopy(Data.x)
@@ -1097,7 +1058,6 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     close(Data.x_uw_io)
     close(Data.y_uw_io)
     close(Data.z_uw_io)
-    #end
 
     return (pos, Data) 
 end

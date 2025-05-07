@@ -2,10 +2,8 @@ module Setup
 
 export createDenseStartingPosition, writeCollectedSlurmScript
 
-### preliminary GSD_wrapper include
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
-using GSDFormat
+
+using GSDFormat, HPSAnalysis, JSON
 
 #include("ProteinSequences.jl")
 #using .ProteinSequences
@@ -987,7 +985,81 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
+function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
 
+    ConstraintDict = DetermineCalvados3ENMfromAlphaFold(Sim, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
+
+    #=
+    data = getindex.(ConstraintDict["RS31"],3)
+    data_ = round.(data.*20.0)./20.0
+    println(length(data))
+    println(length(Set(data_)))
+    println(Set(data_))
+    =#
+    ### @TODO potentially reduce number of bond types by rounding the distances
+    #println(getindex.(ConstraintDict["RS31"],3))
+    println(length(ConstraintDict["RS31"]))
+    ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+
+
+end
+
+function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+    offsets = cumsum(length.(Sequences))
+
+    NBonds = sum(length(ConstraintDict[prot]) for prot in Proteins)
+    println(NBonds)
+    @error "Finish writing ComputeHOOMD_ENMIndices."
+    #=
+    for (i, Prot ) in enumerate(Proteins)
+
+    end
+    =#
+end
+
+function DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
+    ciffolder = "$(Sim.BasePath)/InitFiles/CifFiles"
+    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
+    for Prot in Set(Proteins)
+        if length(DomainDict[Prot])>0
+            CifPath = "$(ciffolder)/$(Prot).cif"
+            lines = readlines(CifPath)
+            x = zeros(length(lines))
+            y = zeros(length(lines))
+            z = zeros(length(lines))
+            plDDT = zeros(length(lines))
+
+            step = 1
+            for line in readlines(CifPath)
+                fields = strip.(split(line))
+                if !isempty(fields) && fields[1] == "ATOM" && fields[4] == BBProtein
+                    x[step] = parse(Float64, fields[11])
+                    y[step] = parse(Float64, fields[12])
+                    z[step] = parse(Float64, fields[13])
+                    plDDT[step]= parse(Float64, fields[15])
+                    step += 1
+                end
+            end
+            ConstraintDict[Prot] = []
+            pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
+            for Domain in DomainDict[Prot]
+                println(Domain)
+                for i in Domain[1]:Domain[2]
+                    if plDDT[i] < plDDTcut continue end
+                    for j in i+3: Domain[2]
+                        dist_sqr = (x[j]-x[i])^2+ (y[j]-y[i])^2+(z[j]-z[i])^2
+                        if dist_sqr < rcut^2 && plDDT[j] > plDDTcut  && pae[i][j]< pae_cut
+                            push!(ConstraintDict[Prot], (i,j, sqrt(dist_sqr)))
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return ConstraintDict
+end
+
+#=
 function checkBB(atom_num, next_num, atoms_types)
     index=Int32[]
     for line in atoms_types[1:end-1]
@@ -1004,7 +1076,9 @@ function checkBB(atom_num, next_num, atoms_types)
     return (true, index)
 end
 
-function Bonds_for_C3(itp_Path, NBeads, Domains)
+
+### deprecated
+function Bonds_for_C3_Martinize(itp_Path, NBeads, Domains)
     ## add dict
     C3_bonds = String[]
     in_box = false
@@ -1075,6 +1149,7 @@ function Bonds_for_C3(itp_Path, NBeads, Domains)
 
     return B_N,B_types,B_typeid,B_group
 end
+=#
 
 @doc raw"""
     writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}

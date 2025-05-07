@@ -6,13 +6,16 @@ ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python"
 
 using PyCall
 
-rm(SetupTestPath; force=true, recursive=true)
+#rm(SetupTestPath; force=true, recursive=true)
 mkpath("$SetupTestPath/HOOMD_Setup/")
 BasePath=SetupTestPath
 
 
 ToCreate =  ["RS31"]
-FoldedDomain=[[1,70],[90,155]]
+FoldedDomains = Dict("RS31" => [(1,70),(90,155)])
+ProteinToCif =Dict("RS31" => "/localscratch/test/fold_rs31/fold_RS31_model_0.cif")
+ProteinToJSON =Dict("RS31" => "/localscratch/test/fold_rs31/fold_rs31_full_data_0.json")
+
 
 Temperatures=300
 RunsPerProtein=1
@@ -41,13 +44,14 @@ for (protID, protein) in enumerate(ToCreate)
         Proteins = [deepcopy(protein) for _ in 1:NChains]
 
         ###FoldedDomain -> NChains * FoldedDomain
+        #=
         NewDomain = copy(FoldedDomain)
         for i in 1:NChains-1
             shift = i * length(Seq)
             for dom in FoldedDomain
                 push!(NewDomain, [dom[1]+shift, dom[2]+shift])
             end
-        end
+        end=#
 
         Info ="SLAB Simulation script for $protein.\n\n"
         BoxLengthShort=Float32(350.0)
@@ -56,11 +60,15 @@ for (protID, protein) in enumerate(ToCreate)
 
         SimulName = "$(protein)_$temp"
 
-        (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",domains=NewDomain,protein=protein)
+        (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=false; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
+
+        ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
         itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
+        #=
         HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 30_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=NewDomain,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=10_000, itp_Path)
 
         sim.run("$(Path)/")
+        =#
     end
 end

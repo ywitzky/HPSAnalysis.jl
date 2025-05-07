@@ -2,7 +2,8 @@
 module Polyply
 using HPSAnalysis
 using ..BioData: OneToThree
-using Scratch, DataStructures,BioStructures,DSSP_jll
+using Scratch, DataStructures,BioStructures,DSSP_jll, Printf
+
 
 polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
 martinize2 = "$(HPSAnalysis.EnvironmentPath)/bin/martinize2"
@@ -101,7 +102,6 @@ function readPDB(Filename, x,y,z)
         end
     end
 end
-#end
 
 ### Generate ITP files with AlphaFold Based Elastic Network model - not the one taken for the final sim
 function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Domains::Dict{String,Vector{Tuple{I2,I2}}}) where {T<:Real, I<:Integer, I2<:Integer}
@@ -127,12 +127,12 @@ function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Do
     end
 end
 
-using Printf
-
 ### Rewrite AlphaFold Cif InputFiles to PDB in Folder
 function RewriteCifToPDB(Sim::HPSAnalysis.SimData{T,I}, ProteinToCif,Proteins) where {T<:Real, I<:Integer}
-    subpath ="$(Sim.BasePath)/InitFiles/PDBFiles"
+    subpath = "$(Sim.BasePath)/InitFiles/PDBFiles"
+    cifpath = "$(Sim.BasePath)/InitFiles/CifFiles"
     mkpath(subpath)
+    mkpath(cifpath)
     for Prot in Set(Proteins)
         CifPath = ProteinToCif[Prot]
         try
@@ -141,8 +141,8 @@ function RewriteCifToPDB(Sim::HPSAnalysis.SimData{T,I}, ProteinToCif,Proteins) w
             @error "The is no AlphaFold data for protein $(Prot) at $(CifPath)."
         end
 
+        cp(CifPath, "$(cifpath)/$(Prot).cif")
         pdb_file = open("$(subpath)/$(Prot).pdb", "w")
-
         for line in readlines(CifPath)
             fields = strip.(split(line))
             if !isempty(fields) && fields[1] == "ATOM"
