@@ -68,6 +68,6 @@ for (protID, protein) in enumerate(ToCreate)
 
         HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 30_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=10_000, ENM)
 
-        #sim.run("$(Path)/")
+        sim.run("$(Path)/")
     end
 end

@@ -80,25 +80,29 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
 
+            B_N = NBeads-NChains
+            B_types = ['O-O']
+            B_typeid = np.zeros(B_N, dtype=np.int32)
+            B_group = InputBonds#.astype(np.uint32)
 
             if Params["SimulationType"]=="Calvados3":
-                #print("Bin in C3")
-                #forces = []
                 ### Harmonic bonds
                 harmonic = hoomd.md.bond.Harmonic()
                 harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
-                #print(Params["Domain_begin"])
 
-                #B_N,B_types,B_typeid,B_group,harmonic=Bonds_for_C3(f"{FolderPath}/RS31_0.itp",NBeads, Params["Domains"],harmonic)
-                B_N,B_types,B_typeid,B_group,harmonic=BondC3(NBeads, Params["Domains"],harmonic, InputPositions.astype(np.float32),InputImage,[Params["Lx"], Params["Ly"], Params["Lz"], 0, 0, 0])
+                ## read the ENM_indice data
+                ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
+                
+                for i in range(B_N):
+                    print(ENMB_types[i], ENMharmonic[i]["k"], (ENMharmonic[i]["r"]))
+                    harmonic.params[ENMB_types[i]] = dict(k=ENMharmonic[i]["k"], r0=(ENMharmonic[i]["r"]))
+                    
                 forces.append(harmonic)
             
-            else:#Calvados2
-                #print("Bin in C2_Bond")
-                B_N = NBeads-NChains
-                B_types = ['O-O']
-                B_typeid = np.zeros(B_N, dtype=np.int32)
-                B_group = InputBonds#.astype(np.uint32)
+            B_N += ENMB_N
+            B_types += ENMB_types
+            B_typeid = np.append(B_typeid, ENMB_typeid)
+            B_group = np.append(B_group, ENMB_group)
 
             snapshot.bonds.N = B_N
             snapshot.bonds.types = B_types
@@ -126,8 +130,6 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
 
     if Params["SimulationType"]!="Calvados3":
-        print("Bin in C2")
-        #forces = []
         ### Harmonic bonds
         harmonic = hoomd.md.bond.Harmonic()
         harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
@@ -226,8 +228,6 @@ def run(FolderPath, Restart=False):#, GPUNUM):
         nvt.gamma[name] = IDToMass[i]*10.0**-5
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
     sim.operations.integrator=integrator
-
-	#
 
     sim.operations.integrator.forces=forces
 

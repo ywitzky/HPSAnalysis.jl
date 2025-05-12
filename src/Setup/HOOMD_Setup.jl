@@ -148,3 +148,24 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     close(io);
 end
 
+@doc raw"""
+    WriteENM_HOOMD_Indices(filename::String, ENM)
+
+Write a data file with all necessary datas for the ENM in HOOMD.
+    
+**Arguments**
+- `filename::String`: Path where the data will be saved.
+- `ENM`: The necessary datas.
+
+**Creat**:
+* Write a file with all datas for the ENM.
+"""
+function WriteENM_HOOMD_Indices(filename::String, ENM)
+    ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
+    io = open(filename, "w")
+    write(io, "// N, ENMB_type, ENMB_typeid, ENMB_group_vector, harmonic\n")
+    for i in 1:ENMB_N
+        write(io, "$(i) , $(ENMB_types[i]) , $(ENMB_typeid[i]) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[i]]) \n")
+    end
+    close(io);
+end

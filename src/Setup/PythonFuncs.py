@@ -106,6 +106,38 @@ def readDictionaries(filename):
     IDToLambda  = dict(zip(ID, lamda_val.astype(float)))
     return ID, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda
 
+def convertDict(Dict):
+    """Convert julia Dict in Python Dict"""
+    Dict = Dict.replace("Dict(", "").replace(")", "")
+    pairs = [pair.split(" => ") for pair in Dict.split(", ")]
+    #print(pairs)
+    return {pair[0].strip(":"): float(pair[1]) for pair in pairs}
+
+def read_ENM_HOOD_indices(filename):
+    #B_N, B_types, B_typeid, B_group, harmonic= np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)
+    B_N, B_types, B_typeid, B_group, harmonic = [], [], [], [], []
+    with open(filename) as file:
+        for line in file:
+            if line.startswith("//"):
+                continue
+            parts = [part.strip() for part in line.split(",", 5)]
+            try:
+                B_N.append(int(parts[0]))
+                B_types.append(str(parts[1]))
+                B_typeid.append(int(parts[2]))
+                group1 = parts[3].strip("(")
+                group2 = parts[4].strip(")")
+                group_tuple = tuple((int(group1), int(group2)))
+                B_group.append(group_tuple)
+                harmonic_Dict = convertDict(parts[5])
+                harmonic.append(harmonic_Dict)
+            except ValueError as e:
+                print("Error by reading HOOMD indices")
+                continue
+    B_N = len(B_N)
+    return B_N, B_types, B_typeid, B_group, harmonic
+
+
 def readDihedrals(fileName, Sequences, IDs):
     file  = open(fileName,'r')
     line = file.readline()

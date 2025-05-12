@@ -727,6 +727,7 @@ function writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
         WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
+        WriteENM_HOOMD_Indices("./HOOMD_Setup/ENM_indices.txt", ENM)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
         writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, domain, ENM)    
@@ -985,6 +986,21 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
     close(slurm_file)
 end
 
+@doc raw"""
+    BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer}
+
+Calculate the Indices, that are nessesary to creat a start file im HOOMD.
+    
+**Arguments**
+- `Sim::HPSAnalysis.SimData{T,I}`: The simulation datas.
+- `DomainDict`: The Domains in which the ENM is active.
+- `Proteins`: List of Protein Names.
+- `Sequences`: The Sequences of the Proteins.
+- `ProteinJSON`: AlphaFold data of the Proteins.
+
+**Return**:
+* The nessesary Indices for HOOMD.
+"""
 function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
 
     ConstraintDict = DetermineCalvados3ENMfromAlphaFold(Sim, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
@@ -1003,14 +1019,28 @@ function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequ
     return HOOMD_Indices
 end
 
+@doc raw"""
+    ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+
+Calculate the Indices, that are nessesary to creat a start file im HOOMD.
+    
+**Arguments**
+- `ConstraintDict::Dictionary with atoms and lenght which will be connected via ENM.
+- `Sequences`: The Sequences of the Proteins.
+- `Proteins`: List of Protein Names.
+
+**Return**:
+* The nessesary Indices for HOOMD.
+"""
 function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     offsets = cumsum(length.(Sequences))
+    println(offsets)
 
-    NBonds = sum(length(ConstraintDict[prot]) for prot in Proteins)
-    println(NBonds)
+    #NBonds = sum(length(ConstraintDict[prot]) for prot in Proteins)
+    #println(NBonds)
     #@error "Finish writing ComputeHOOMD_ENMIndices."
-    #B_N = 0
-    B_types = ["0-0"]
+    NBonds = 0
+    B_types = []
     B_typeid = Int[]
     B_groups = Vector{Tuple{Int32, Int32}}()
     harmonic = Dict{String, Dict{Symbol, Float64}}()
@@ -1020,6 +1050,7 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     
     for (i, Prot ) in enumerate(Proteins)
         for index in 1:length(Sequences[i])
+            #println(off)
             #println(ConstraintDict[Prot][index])
             atom_1, atom_2, r0 = ConstraintDict[Prot][index]
             bondname = binds * "protein$(i)_" * string(atom_1) * "_" * string(atom_2)
@@ -1030,11 +1061,33 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
             #index += 1
             NBonds+= 1
         end
-        off += offsets[i]
+        #println(i)
+        off = offsets[i]
     end
+    #println(length(B_types))
+    #println(length(B_typeid))
+    #println(length(B_groups))
     return (NBonds, B_types, B_typeid, B_groups, harmonic)
 end
 
+@doc raw"""
+    DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
+
+Return a Dictionary of atoms and there distances that are nessesary for the Elastic Network Model.
+    
+**Arguments**
+- `Sim::HPSAnalysis.SimData{T,I}`: The simulation datas.
+- `DomainDict`: The Domains in which the ENM is active.
+- `Proteins`: List of Protein Names.
+- `ProteinJSON`: AlphaFold data of the Proteins.
+- `BBProtein`: The atom from which the AlphaFold datas are set for the aminoacid.
+- `rcut`: Cut of lenght for the ENM.
+- `plDDTcut`: Cut of plDDT for the ENM.
+- `pae_cut`: Cut of pae for the ENM.
+
+**Return**:
+* A Dictionary of atoms and lenghts.
+"""
 function DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
     ciffolder = "$(Sim.BasePath)/InitFiles/CifFiles"
     ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
@@ -1076,98 +1129,6 @@ function DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, Domai
     end
     return ConstraintDict
 end
-
-#=
-function checkBB(atom_num, next_num, atoms_types)
-    index=Int32[]
-    for line in atoms_types[1:end-1]
-        fields=split(line)
-        #print(fields[0], atom_num)
-        if parse(Int32, fields[1]) == atom_num || parse(Int32, fields[1]) == next_num
-            if fields[5] == "BB"
-                #print("True")
-                push!(index, parse(Int32,fields[3]))
-            end
-        end
-    end
-    #print([True,index])
-    return (true, index)
-end
-
-
-### deprecated
-function Bonds_for_C3_Martinize(itp_Path, NBeads, Domains)
-    ## add dict
-    C3_bonds = String[]
-    in_box = false
-    for line in eachline(itp_Path)
-        #print(in_box)
-        stripped = strip(line)
-        #println(stripped)
-        if in_box
-            push!(C3_bonds, line)
-        end
-        if !in_box && startswith(stripped, "; Rubber band")
-            in_box = true
-        elseif in_box && isempty(stripped)
-            break
-        end
-    end
-    C3_atoms = String[]
-    in_box = false
-    
-    for line in eachline(itp_Path)
-        stripped = strip(line)
-        if in_box
-            push!(C3_atoms, line)
-        end
-        if !in_box && startswith(stripped, "[ atoms ]")
-            in_box = true
-        elseif in_box && isempty(stripped)
-            break
-        end
-    end
-    #println(C3_atoms)
-
-
-    #Domains = eval(Meta.parse(Domains))
-    #seqdomain=collect(Iterators.flattern(doms[1]:doms[2] for dom in Domains))
-    B_N = 0
-    B_types = ["O-O"]
-    B_typeid = Int[]# np.zeros(NBeads, dtype=np.uint32)
-    B_group = Vector{Tuple{Int32, Int32}}()#.astype(np.uint32)
-    
-    for i in 1:NBeads-1
-        push!(B_typeid, 0)
-        push!(B_group, (i,i+1))
-        B_N += 1
-    end
-
-    index=length(B_types)
-    binds="bond_"
-    for line in C3_bonds[1:end-1]
-        fields = split(line)
-        #print(fields)
-        atom1, atom2 = parse(Int32, fields[1]), parse(Int32, fields[2])
-        r0, k = parse(Float32, fields[4]), parse(Float32, fields[5])
-        valid, bond_atom = checkBB(atom1,atom2,C3_atoms)
-        #println(valid)
-        if valid# && length(bond_atom)==2
-            #println("true")
-            bondname = binds * string(index)
-            #print(fields)
-            push!(B_types, bondname)
-            push!(B_typeid, index)
-            push!(B_group, (bond_atom[1],bond_atom[2]))
-            #harmonic.params[bondname] = Dict(:k=>k,:r0=r0)#*10.0)
-            B_N += 1
-            index += 1
-        end
-    end
-
-    return B_N,B_types,B_typeid,B_group
-end
-=#
 
 @doc raw"""
     writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
@@ -1218,16 +1179,19 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     # Create Bonds
     if SimulationType == "Calvados3"
         ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
-        println("BN:$((B_N)), EBN:$((ENMB_N))")
-        println("BN:$(length(B_types)), EBN:$(length(ENMB_types))")
-        println("BN:$(length(B_typeid)), EBN:$(length(ENMB_typeid))")
+        #println("BN:$((B_N)), EBN:$((ENMB_N))")
+        #println("Btyp:$(length(B_types)), EBtyp:$(length(ENMB_types))")
+        #println(ENMB_types)
+        #println("BN:$(length(B_typeid)), EBN:$(length(ENMB_typeid))")
         #### @TODO solve the DimensionMismatch
-        B_N = ENMB_N
+        B_N += ENMB_N
         B_types = vcat(B_types, ENMB_types)
         B_typeid = vcat(B_typeid, Int32.(ENMB_typeid))
         flattened = [x for pair in ENMB_group_vector for x in pair]
         ENMB_group_matrix = reshape(flattened, :, 2)
-        println("BN:$(length(B_group_matrix)), EBN:$(length(ENMB_group_matrix))")
+        #println("BN:$(length(B_group_matrix)), EBN:$(length(ENMB_group_matrix))")
+        #println(B_group_matrix)
+        #println(ENMB_group_matrix)
         B_group_matrix = vcat(B_group_matrix,ENMB_group_matrix)
     end
 
