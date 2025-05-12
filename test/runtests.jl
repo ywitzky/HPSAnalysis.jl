@@ -2,7 +2,6 @@ using HPSAnalysis
 PkgSourcePath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
 
 EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
-println(EnvironmentPath)
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python3"
 # might need to run the following lines once
 #ENV["PYTHON"]="$(EnvironmentPath)/bin/python3"
@@ -28,4 +27,7 @@ include("./Calvados/C_test.jl")
 =#
 SetupTestPath="$(TestPath)/Setup/"
 
-include("./Calvados/C_test.jl")
+sim = pyimport("Submit_HOOMD")
+mkpath("$SetupTestPath/HOOMD_Setup/")
+#include("./Calvados/Calvados2_test.jl")
+include("./Setup/Setup_test.jl")

@@ -48,7 +48,7 @@ filename="$(SetupTestPath)/GSD_write.gsd"
     GSDFormat.append(file, snapshot)
     GSDFormat.close(file)
 
-    HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,BoxSize,coor_notreshaped,AAToID,sequences,image_notreshaped,mass_charge,mass_charge,DiMap,DiList,AAToID,false)
+    HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,BoxSize,coor_notreshaped,AAToID,sequences,image_notreshaped,mass_charge,mass_charge,DiMap,DiList,AAToID,false, "test", [],[])
 
     @test files_are_equal(filename_test,filename)
 end

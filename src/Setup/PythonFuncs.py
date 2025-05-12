@@ -56,7 +56,6 @@ def readSequences(fileName):
     cnt = 0
     for Seq in Seqs:
         for (i,aa) in enumerate(Seq[:-1]):
-            #InputBonds[cb+i,:] = [cnt+i,cnt+i+1]
             InputBonds.append([cnt+i, cnt+i+1])#[[0,1],[1,2],...,[N-1,N]]
 
         for (i,aa) in enumerate(Seq[:-2]):
@@ -130,7 +129,7 @@ def parseKeywords(keyword, value):
         return value
     if keyword in ["Seed", "NSteps", "NOut"]:
         return int(value)
-    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor", "AHCutoff", "YukawaCutoff"]:
+    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor", "AHCutoff", "YukawaCutoff", "ionic", "pH"]:
         return float(value)
     if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config"]:
         return value=="True" or value=="true"
