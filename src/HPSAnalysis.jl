@@ -3,7 +3,6 @@ module HPSAnalysis
 ### helping stuff which probably should be seperate
 include("../data/BioData.jl")
 include("../data/ProteinSequences.jl")
-
 include("./Setup.jl")
 
  

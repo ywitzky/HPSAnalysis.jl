@@ -4,7 +4,7 @@ module Polyply
 using ..BioData: OneToThree
 using DataStructures
 
-polyply="/localscratch/Python3.13Environments/HPSAnalysis/bin/polyply"
+polyply="/localscratch/Python3.13Environments/OldPython/bin/polyply"
 
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
