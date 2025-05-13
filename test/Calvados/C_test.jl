@@ -4,7 +4,7 @@ mkpath("$SetupTestPath/HOOMD_Setup/")
 
 
 @testset "Calvados Tests" begin
-    #include("./Calvados2_test.jl")
-    #include("./Calvados3_test.jl")
-    include("RS_Prot.jl")
+    include("./Calvados2_test.jl")
+    include("./Calvados3_test.jl")
+    #include("RS_Prot.jl") not yet fully implemented
 end

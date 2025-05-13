@@ -61,9 +61,9 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
 end
 
 function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
-    max_iteration=1200 #default 800
-    max_force=1000.0 #default 50_000
-    grid_spacing= 0.1 #default 0.2nm
+    max_iteration=800 #default 800
+    max_force=50000.0 #default 50_000
+    grid_spacing= 0.2 #default 0.2nm
     run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -gs $grid_spacing -mf $(max_force) -mir $(max_iteration) -box $(Box)`)
 end
 
@@ -85,7 +85,6 @@ function readSimpleGRO(Filename, x,y,z)
     x .*= 10.0
     y .*= 10.0
     z .*= 10.0
-
 end
 
 function readPDB(Filename, x,y,z)
@@ -127,10 +126,10 @@ function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Do
         output_pdb = "$(Path)$(name).top"
         cg_pdb = "$(Path)$(name)_cg_protein.pdb"
 
-        force=500 ## default 700
+        force=4000 ## default 700; 4000 value of back bone bonds
 
 
-        run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -elastic -ef $force  -eunit $domains_str -name $(name)`)
+        run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -b /uni-mainz.de/homes/ywitzky/.julia/scratchspaces/f54fdea9-a25b-4801-be39-89e20f64ecdd/test/Setup/RS31/300K/RUN_001/InitFiles/build_file.bld -elastic -eu 0.9 -ef $force  -eunit $domains_str -name $(name)`)
 
         mv("$(Sim.BasePath)/$(name)_0.itp", "$(Sim.BasePath)/InitFiles/ITPS_Files/$(name).itp"; force=true)
     end

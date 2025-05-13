@@ -948,17 +948,17 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         if Regenerate
             mkpath("$(InitFiles)Elastic_Files/")
             ###Creat a pdb data from the AlphaFold cif data
-            HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
+            #HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
 
             itpPath="$(InitFiles)ITPS_Files/"
             mkpath(itpPath)
-            HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
+            #HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
 
             TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
    
-            #Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
-
-            HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,itpPath, Proteins, Data.SimulationName)
+            ######Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
+            
+            #HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,itpPath, Proteins, Data.SimulationName)
 
             ### generate coordinates
             HPSAnalysis.Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)

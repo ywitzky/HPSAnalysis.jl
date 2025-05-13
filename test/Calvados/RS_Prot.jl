@@ -65,7 +65,7 @@ for (protID, protein) in enumerate(ToCreate)
 
         #itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
 
-        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=100, ENM)
+        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 2_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=100, ENM)
 
         sim.run("$(Path)/")
     end

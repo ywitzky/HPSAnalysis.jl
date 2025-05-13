@@ -1005,16 +1005,6 @@ function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequ
 
     ConstraintDict = DetermineCalvados3ENMfromAlphaFold(Sim, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
 
-    #=
-    data = getindex.(ConstraintDict["RS31"],3)
-    data_ = round.(data.*20.0)./20.0
-    println(length(data))
-    println(length(Set(data_)))
-    println(Set(data_))
-    =#
-    ### @TODO potentially reduce number of bond types by rounding the distances
-    #println(getindex.(ConstraintDict["RS31"],3))
-    println(length(ConstraintDict["RS31"]))
     HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     return HOOMD_Indices
 end
@@ -1034,39 +1024,27 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 """
 function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     offsets = cumsum(length.(Sequences))
-    println(offsets)
 
-    #NBonds = sum(length(ConstraintDict[prot]) for prot in Proteins)
-    #println(NBonds)
-    #@error "Finish writing ComputeHOOMD_ENMIndices."
     NBonds = 0
     B_types = []
     B_typeid = Int[]
     B_groups = Vector{Tuple{Int32, Int32}}()
     harmonic = Dict{String, Dict{Symbol, Float64}}()
     binds = "ENM_bond_"
-    #index = 0
     off = 0
     
     for (i, Prot ) in enumerate(Proteins)
         for index in 1:length(Sequences[i])
-            #println(off)
-            #println(ConstraintDict[Prot][index])
             atom_1, atom_2, r0 = ConstraintDict[Prot][index]
             bondname = binds * "protein$(i)_" * string(atom_1) * "_" * string(atom_2)
             push!(B_types, bondname)
             push!(B_typeid, index+off)
             push!(B_groups, (atom_1+off, atom_2+off))
             harmonic[bondname] = Dict(:r => r0, :k => 700)
-            #index += 1
             NBonds+= 1
         end
-        #println(i)
         off = offsets[i]
     end
-    #println(length(B_types))
-    #println(length(B_typeid))
-    #println(length(B_groups))
     return (NBonds, B_types, B_typeid, B_groups, harmonic)
 end
 
