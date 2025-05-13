@@ -29,5 +29,5 @@ SetupTestPath="$(TestPath)/Setup/"
 
 sim = pyimport("Submit_HOOMD")
 mkpath("$SetupTestPath/HOOMD_Setup/")
-#include("./Calvados/Calvados2_test.jl")
-include("./Setup/Setup_test.jl")
+include("./Calvados/RS_Prot.jl")
+#include("./Setup/Setup_test.jl")

@@ -55,13 +55,16 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     write(f,"\n[ system ]\n; name\nProtein Sim\n\n[ molecules ]\n; name  number\n")
 
     for (ind, name) in enumerate(NameSet)
-        write(f, "$(name) $(Occurences[name])\n")
+        write(f, "$(name)_0 $(Occurences[name])\n")
     end
     close(f)
 end
 
 function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
-    run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -box $(Box)`)
+    max_iteration=1200 #default 800
+    max_force=1000.0 #default 50_000
+    grid_spacing= 0.1 #default 0.2nm
+    run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -gs $grid_spacing -mf $(max_force) -mir $(max_iteration) -box $(Box)`)
 end
 
 function readSimpleGRO(Filename, x,y,z)
@@ -107,6 +110,7 @@ end
 function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Domains::Dict{String,Vector{Tuple{I2,I2}}}) where {T<:Real, I<:Integer, I2<:Integer}
     Path = "$(Sim.BasePath)/InitFiles/Elastic_Files/"
     NameSet = Set(Names)
+    
     for name in (NameSet)
         input_pdb_File = "$(Sim.BasePath)/InitFiles/PDBFiles/$(name).pdb"
     
@@ -123,7 +127,12 @@ function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Do
         output_pdb = "$(Path)$(name).top"
         cg_pdb = "$(Path)$(name)_cg_protein.pdb"
 
-        run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -elastic -eunit $domains_str -name $(name)`)
+        force=500 ## default 700
+
+
+        run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -elastic -ef $force  -eunit $domains_str -name $(name)`)
+
+        mv("$(Sim.BasePath)/$(name)_0.itp", "$(Sim.BasePath)/InitFiles/ITPS_Files/$(name).itp"; force=true)
     end
 end
 
@@ -141,7 +150,7 @@ function RewriteCifToPDB(Sim::HPSAnalysis.SimData{T,I}, ProteinToCif,Proteins) w
             @error "There is no AlphaFold data for protein $(Prot) at $(CifPath)."
         end
 
-        cp(CifPath, "$(cifpath)/$(Prot).cif")
+        cp(CifPath, "$(cifpath)/$(Prot).cif"; force=true)
         pdb_file = open("$(subpath)/$(Prot).pdb", "w")
         for line in readlines(CifPath)
             fields = strip.(split(line))

@@ -93,9 +93,8 @@ def run(FolderPath, Restart=False):#, GPUNUM):
                 ## read the ENM_indice data
                 ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
                 
-                for i in range(B_N):
-                    print(ENMB_types[i], ENMharmonic[i]["k"], (ENMharmonic[i]["r"]))
-                    harmonic.params[ENMB_types[i]] = dict(k=ENMharmonic[i]["k"], r0=(ENMharmonic[i]["r"]))
+                for i in range(ENMB_N): 
+                    harmonic.params[ENMB_types[i]] = dict(k=ENMharmonic[i]["k"], r0=ENMharmonic[i]["r"]/10.0)
                     
                 forces.append(harmonic)
             

@@ -950,14 +950,15 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             ###Creat a pdb data from the AlphaFold cif data
             HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
 
-            HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
-
-            TopologyFile = "$(InitFiles)TestTopology.top"
             itpPath="$(InitFiles)ITPS_Files/"
             mkpath(itpPath)
-            Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
+            HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
 
-            HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,"$(itpPath)", Proteins, Data.SimulationName)
+            TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
+   
+            #Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
+
+            HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,itpPath, Proteins, Data.SimulationName)
 
             ### generate coordinates
             HPSAnalysis.Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
@@ -969,7 +970,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
 
             ### Generate Topology files
-            TopologyFile = "$(InitFiles)TestTopology.top"
+            TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
             Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
 
             ### generate coordinates
@@ -979,6 +980,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
         end
     end
+    println("$(InitFiles)$SimulationName.gro")
     ### read positons from gro
     Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
 

@@ -44,8 +44,7 @@ for (protID, protein) in enumerate(ToCreate)
         Proteins = [deepcopy(protein) for _ in 1:NChains]
 
         ###FoldedDomain -> NChains * FoldedDomain
-        #=
-        NewDomain = copy(FoldedDomain)
+        #=NewDomain = copy(FoldedDomain)
         for i in 1:NChains-1
             shift = i * length(Seq)
             for dom in FoldedDomain
@@ -60,13 +59,13 @@ for (protID, protein) in enumerate(ToCreate)
 
         SimulName = "$(protein)_$temp"
 
-        (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=false; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
+        (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
 
         ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
         #itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
 
-        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 30_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=10_000, ENM)
+        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=100, ENM)
 
         sim.run("$(Path)/")
     end

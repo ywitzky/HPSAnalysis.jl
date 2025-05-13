@@ -1179,19 +1179,12 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     # Create Bonds
     if SimulationType == "Calvados3"
         ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
-        #println("BN:$((B_N)), EBN:$((ENMB_N))")
-        #println("Btyp:$(length(B_types)), EBtyp:$(length(ENMB_types))")
-        #println(ENMB_types)
-        #println("BN:$(length(B_typeid)), EBN:$(length(ENMB_typeid))")
-        #### @TODO solve the DimensionMismatch
+
         B_N += ENMB_N
         B_types = vcat(B_types, ENMB_types)
         B_typeid = vcat(B_typeid, Int32.(ENMB_typeid))
-        flattened = [x for pair in ENMB_group_vector for x in pair]
-        ENMB_group_matrix = reshape(flattened, :, 2)
-        #println("BN:$(length(B_group_matrix)), EBN:$(length(ENMB_group_matrix))")
-        #println(B_group_matrix)
-        #println(ENMB_group_matrix)
+        ENMB_group_matrix = permutedims(hcat(collect.(ENMB_group_vector)...))
+
         B_group_matrix = vcat(B_group_matrix,ENMB_group_matrix)
     end
 
