@@ -4,12 +4,7 @@ module Setup
 
 export createDenseStartingPosition, writeCollectedSlurmScript
 
-<<<<<<< HEAD
-
-using GSDFormat, HPSAnalysis, JSON
-=======
-using GSDFormat, Printf
->>>>>>> main
+using GSDFormat, HPSAnalysis, JSON, Printf
 
 include("../data/BioData.jl")
 include("Setup/HOOMD_Setup.jl")
