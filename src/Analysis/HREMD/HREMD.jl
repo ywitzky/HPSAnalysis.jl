@@ -49,8 +49,6 @@ function initDataHREMD(Path::String, LmpName::String, ChargeFile::String; StepFr
     ### read replica information
 
     bla = Dict{String, Any}([(key, HSim.ReplicaVariables[key][1] ) for key in keys(HSim.ReplicaVariables)])
-    #println(bla)
-    #println(initData(Path, LmpName; StepFrequency=StepFrequency, Reparse=Reparse, LoadAll=LoadAll, Reduce=Reduce, EquilibrationTime=EquilibrationTime, LammpsVariables=bla))
     HSim.ReplicaData = [initData(Path, LmpName; StepFrequency=StepFrequency, Reparse=Reparse, LoadAll=LoadAll, Reduce=Reduce, EquilibrationTime=EquilibrationTime, LammpsVariables=Dict{String, Any}([(key, HSim.ReplicaVariables[key][id] ) for key in keys(HSim.ReplicaVariables)]), BasePathAdd="Replica_$(id)/")  for id in HSim.ReplicaVariables["id"] ]
     return HSim
 end
@@ -71,8 +69,6 @@ function ReweightingHREMD(ChargeFile::String, Sims::Vector{SimData{T, I}}, Start
         #StepWidth=1
         End= length(Charges[SimID, :])*StepWidth
         #StepWidth=1
-        println(Start+StepWidth:StepWidth:End)
-        println( length(Sim.Energies[Start+StepWidth:StepWidth:End,1]))
         minLength= min(minLength, length(Sim.Energies[Start+StepWidth:StepWidth:End,1]))
     end
 
@@ -87,7 +83,6 @@ function ReweightingHREMD(ChargeFile::String, Sims::Vector{SimData{T, I}}, Start
         End= length(Charges[SimID, :])*StepWidth
        # StepWidth=1
         Weight  =  BoltzmannWeight.(  Sim.Energies[Start+StepWidth:StepWidth:End,EtotalID] .+ Sim.Energies[Start+StepWidth:StepWidth:End,ECoulID].* (Charges[SimID,1:end-1].- ChargeFactor)./ChargeFactor, Temp)
-        #println( Sim.Energies[Start+StepWidth:StepWidth:End,EtotalID] .+ Sim.Energies[Start+StepWidth:StepWidth:End,ECoulID].* (Charges[SimID,1:end-1].- ChargeFactor)./ChargeFactor)
         push!(Weights, Weight)
 
         Energies[SimID, :] .= Sim.Energies[Start+StepWidth:StepWidth:End,EtotalID][1:minLength]
@@ -112,7 +107,6 @@ function ComputeWHAM(NSims::I, NSteps::I, IDs::Array{Int32}, Energies::Array{T},
     while(sum(abs.(f.-f_old))>1.0 && i<500)
         for t in 1:NSteps
             weight = NSteps*sum(exp.(f[IDs[:,t]].-β.*Energies[:,t]))
-            #println(weight)
             for n in 1:NSims
                 P[n,t] = exp(f[IDs[n,t]]-β*CorrectedEnergies[n,t])/weight
             end

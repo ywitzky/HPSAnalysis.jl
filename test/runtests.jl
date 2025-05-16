@@ -21,5 +21,5 @@ TestPath = Scratch.get_scratch!(HPSAnalysis, "test")
 end =#
 
 
-#include("./Analysis/Analysis_test.jl")
+include("./Analysis/Analysis_test.jl")
 include("./Setup/Setup_test.jl")

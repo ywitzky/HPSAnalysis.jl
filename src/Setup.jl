@@ -1,15 +1,19 @@
+include("./Setup/Polyply.jl")
+
 module Setup
 
 export createDenseStartingPosition, writeCollectedSlurmScript
 
+<<<<<<< HEAD
 
 using GSDFormat, HPSAnalysis, JSON
+=======
+using GSDFormat, Printf
+>>>>>>> main
 
-#include("ProteinSequences.jl")
-#using .ProteinSequences
-using Printf
-include("BioData.jl")
+include("../data/BioData.jl")
 include("Setup/HOOMD_Setup.jl")
+
 using .BioData
 
 

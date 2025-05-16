@@ -317,8 +317,6 @@ end
 function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
     axis = 0:length(Sim.RGAutocorr[1,:])-1
-    println(axis)
-    println(maximum(axes(Sim.RGAutocorr[1,:])))
     avg = sum(Sim.RGAutocorr, dims=1)[1,:]./Sim.NChains
 
     for chain in 1:Sim.NChains
@@ -368,7 +366,7 @@ function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real,
 
     xaxis = axes(Sim.SlabHistogramSeries)[1]
     ### newer iterations dont measure at every frame. Detect which frames actually contain data
-    NMeasurements= sum(Sim.SlabHistogramSeries[0,Sim.NSteps-Windowlength:Sim.NSteps,1].!=0.0)
+    NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
     fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 
@@ -393,7 +391,7 @@ Plots the average slab histogram in range n\*Windowlength:(n+1)\*Windowlength st
 **Create**:
 * A histogram of the average density.
 """
-function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
+function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100, dilute_pos=0, dense_pos=0) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
@@ -423,17 +421,37 @@ function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where 
         Plots.plot!(axes(AvgHist)[1][2:end-1], AvgHist[:,1,i][2:end-1],  label="",  line_z=i, marker_z=i, levels=tmp, c=:darktest)
     end
 
+    center = maximum(axes(Sim.SlabHistogramSeries,1))
+    if dilute_pos!=0
+        Plots.vline!([center-dilute_pos,center+dilute_pos], c=:black, label="")
+    end
+
+    if dense_pos!=0
+        Plots.vline!([center-dense_pos, center+dense_pos], c=:black, label="")
+    end
+
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.pdf")
     return fig
 end
 
-function plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 
-    x = collect(0:1999)
-    fig = Plots.plot(x, Sim.DensityHist, xlim=(10,1000), ylim=(0,maximum(Sim.DensityHist[10:end])), xlabel="m [kg/L]")
-    println("In Plotting.")
-    println(Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_DensityHist.png")
+@doc raw"""
+    plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+Plots the logarithmic density histrogram computed by [`computeDensityHistogram`](@ref).
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Create**:
+* A time averaged histogram of the average density per subcube of the simulation box.
+"""
+function plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    res = 80
+    x=10.0.^((collect(axes(Sim.DensityHist,1)).-(6*res))./res)#./NRes
+
+    fig = Plots.plot(x[2:end], Sim.DensityHist[2:end], label="", xlim=(10^-3,2), ylim=(0,maximum(Sim.DensityHist[10:end])), xscale=:log10, xlabel="m [kg/L]", ylabel="P(m) []", minorticks=true)
+
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_DensityHist.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_DensityHist.pdf")
 end

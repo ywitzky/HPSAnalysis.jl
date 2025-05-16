@@ -9,6 +9,8 @@ polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
 martinize2 = "$(HPSAnalysis.EnvironmentPath)/bin/martinize2"
 
 
+polyply="/localscratch/Python3.13Environments/OldPython/bin/polyply"
+
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
     run(`$GMX_Path editconf -f $(Path)$(Filename).gro -o $(Path)$(Filename).pdb`)
@@ -32,7 +34,7 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
                 push!(SeqString, "$(OneToThree[AA]):1")
             end
         end
-        run(`$polyply gen_params  -name $(name) -seq $SeqString -lib martini3  -o $(OutputPath)$(name).itp`) 
+       run(`$polyply gen_params -name $(name) -lib martini3 -seq $SeqString -o $(OutputPath)$(name).itp`)
     end
 end
 
