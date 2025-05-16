@@ -6,7 +6,7 @@ ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python"
 
 using PyCall
 
-#rm(SetupTestPath; force=true, recursive=true)
+rm(SetupTestPath; force=true, recursive=true)
 mkpath("$SetupTestPath/HOOMD_Setup/")
 BasePath=SetupTestPath
 

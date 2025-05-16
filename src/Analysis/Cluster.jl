@@ -12,7 +12,7 @@ Computes graph network for each frame in EquilibrationTime:RGMeasureStep:NSteps 
 **Returns**:
 - `Cluster::Vector{Vector{Vector{Int}}}`: List of Clusters of the chains.
 """
-function computeCOMClusters(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
+function computeClustersByChainCOM(Sim::HPSAnalysis.SimData{T,Int}; Cutoff=50.0) where{T<:Real, Int<:Integer}
     ### cutoff from dignon et al. Sequence determinants of protein phase behavior from a coarse-grained model
     Clusters = Vector{Vector{Vector{Int}}}()
 

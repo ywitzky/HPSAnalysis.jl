@@ -1,6 +1,8 @@
 filename_test="$(SetupTestPath)/GSD_write_test.gsd"
 filename="$(SetupTestPath)/GSD_write.gsd"
 
+using GSDFormat
+
 @testset "writeGSDStartFile" begin
     #Not testing UseAngles=true, because it is an artefact of a previous version.
     UseAngles=false

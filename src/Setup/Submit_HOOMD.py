@@ -88,7 +88,7 @@ def run(FolderPath, Restart=False):#, GPUNUM):
             if Params["SimulationType"]=="Calvados3":
                 ### Harmonic bonds
                 harmonic = hoomd.md.bond.Harmonic()
-                harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
+                harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ### calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
 
                 ## read the ENM_indice data
                 ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
@@ -96,12 +96,13 @@ def run(FolderPath, Restart=False):#, GPUNUM):
                 for i in range(ENMB_N): 
                     harmonic.params[ENMB_types[i]] = dict(k=ENMharmonic[i]["k"], r0=ENMharmonic[i]["r"]/10.0)
                     
+                B_N += ENMB_N
+                B_types += ENMB_types
+                B_typeid = np.append(B_typeid, ENMB_typeid)
+                B_group = np.append(B_group, ENMB_group)
+
                 forces.append(harmonic)
-            
-            B_N += ENMB_N
-            B_types += ENMB_types
-            B_typeid = np.append(B_typeid, ENMB_typeid)
-            B_group = np.append(B_group, ENMB_group)
+
 
             snapshot.bonds.N = B_N
             snapshot.bonds.types = B_types

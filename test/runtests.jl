@@ -18,16 +18,8 @@ TestPath = Scratch.get_scratch!(HPSAnalysis, "test")
     Aqua.test_all(HPSAnalysis; deps_compat=(ignore=[:Printf, :Mmap, :Libdl, :LinearAlgebra, :Statistics,:Test], ), project_extras=false, )
     ### ignore standard libraries, not sure how to deal with them im PackageCompatUI/add compats manually
     ### Test fails in project extras since they dont get excluded their normaly
-end
+end =#
 
 
-include("./Analysis/Analysis_test.jl")
+#include("./Analysis/Analysis_test.jl")
 include("./Setup/Setup_test.jl")
-include("./Calvados/C_test.jl")
-=#
-SetupTestPath="$(TestPath)/Setup/"
-
-sim = pyimport("Submit_HOOMD")
-mkpath("$SetupTestPath/HOOMD_Setup/")
-include("./Calvados/RS_Prot.jl")
-#include("./Setup/Setup_test.jl")
