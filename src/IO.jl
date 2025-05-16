@@ -1,9 +1,10 @@
-using HPSAnalysis.Polyply
+#using HPSAnalysis.Polyply
 using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat
 
 include("./IO/Xtc.jl")
 include("./IO/IO_HOOMD.jl")
 include("./IO/Sequence_IO.jl")
+include("./IO/Formats.jl")
 
 function parseXYZ!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     traj=open(Sim.TrajectoryFile, "r")
@@ -945,20 +946,18 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         if Regenerate
             mkpath("$(InitFiles)Elastic_Files/")
             ###Creat a pdb data from the AlphaFold cif data
-            #HPSAnalysis.Polyply.RewriteCifToPDB(Data,ProteinToCif, Proteins )
+            RewriteCifToPDB(Data,ProteinToCif, Proteins )
 
             itpPath="$(InitFiles)ITPS_Files/"
             mkpath(itpPath)
-            #HPSAnalysis.Polyply.GenerateENM_ITPFilesOfSequence(Data, Proteins,ProteinToDomain)
+            Polyply.GenerateENM_ITPFilesOfSequence(Data.BasePath, Proteins,ProteinToDomain)
 
             TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
-   
-            ######Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, itpPath)
             
-            #HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,itpPath, Proteins, Data.SimulationName)
+            Polyply.GenerateSlabTopologyFile(TopologyFile,itpPath, Proteins, Data.SimulationName)
 
             ### generate coordinates
-            HPSAnalysis.Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+            Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
         end
     elseif SimulationType=="Calvados2"
         if Regenerate

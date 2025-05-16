@@ -15,7 +15,7 @@ end
 end
 
 @testset "Calvados Tests" begin
-    #include("./Calvados/Calvados_Helper_test.jl")
+    include("./Calvados/Calvados_Helper_test.jl")
     include("./Calvados/Calvados2_test.jl")
     include("./Calvados/Calvados3_test.jl")
     #include("RS_Prot.jl") not yet fully implemented

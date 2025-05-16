@@ -1,15 +1,18 @@
 
+
+
+const polyply = "$(EnvironmentPath)/bin/polyply"
+const martinize2 = "$(EnvironmentPath)/bin/martinize2"
+
 module Polyply
-using HPSAnalysis
+import ..HPSAnalysis: EnvironmentPath, PkgPath
+
+const polyply = "$(EnvironmentPath)/bin/polyply"
+const martinize2 = "$(EnvironmentPath)/bin/martinize2"
 using ..BioData: OneToThree
 using Scratch, DataStructures,BioStructures,DSSP_jll, Printf
 
 
-polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
-martinize2 = "$(HPSAnalysis.EnvironmentPath)/bin/martinize2"
-
-
-polyply="/localscratch/Python3.13Environments/OldPython/bin/polyply"
 
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
@@ -41,7 +44,7 @@ end
 function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
-    write(f,"#include \"$(HPSAnalysis.PkgPath)/data/Polyply/martini_v3.0.0.itp\" \n")
+    write(f,"#include \"$(PkgPath)/data/Polyply/martini_v3.0.0.itp\" \n")
 
     write(f, "[ atomtypes ]\n")
     write(f, "VS 0.00 0.000 V 0.0 0.0\n\n")
@@ -107,13 +110,12 @@ function readPDB(Filename, x,y,z)
     end
 end
 
-### Generate ITP files with AlphaFold Based Elastic Network model - not the one taken for the final sim
-function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Domains::Dict{String,Vector{Tuple{I2,I2}}}) where {T<:Real, I<:Integer, I2<:Integer}
-    Path = "$(Sim.BasePath)/InitFiles/Elastic_Files/"
+function GenerateENM_ITPFilesOfSequence(BasePath::String,Names,  Domains::Dict{String,Vector{Tuple{I,I}}}) where {I<:Integer}
+    Path = "$(BasePath)/InitFiles/Elastic_Files/"
     NameSet = Set(Names)
     
     for name in (NameSet)
-        input_pdb_File = "$(Sim.BasePath)/InitFiles/PDBFiles/$(name).pdb"
+        input_pdb_File = "$(BasePath)/InitFiles/PDBFiles/$(name).pdb"
     
         ### compute secondary structure assigment according to DSSP
         struc = read(input_pdb_File, BioStructures.PDBFormat, run_dssp=true)
@@ -131,47 +133,11 @@ function GenerateENM_ITPFilesOfSequence(Sim::HPSAnalysis.SimData{T,I},Names,  Do
         force=4000 ## default 700; 4000 value of back bone bonds
 
 
-        run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -b /uni-mainz.de/homes/ywitzky/.julia/scratchspaces/f54fdea9-a25b-4801-be39-89e20f64ecdd/test/Setup/RS31/300K/RUN_001/InitFiles/build_file.bld -elastic -eu 0.9 -ef $force  -eunit $domains_str -name $(name)`)
+        run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -elastic -eu 0.9 -ef $force  -eunit $domains_str -name $(name)`)
 
-        mv("$(Sim.BasePath)/$(name)_0.itp", "$(Sim.BasePath)/InitFiles/ITPS_Files/$(name).itp"; force=true)
+        mv("$(BasePath)/$(name)_0.itp", "$(BasePath)/InitFiles/ITPS_Files/$(name).itp"; force=true)
     end
 end
 
-### Rewrite AlphaFold Cif InputFiles to PDB in Folder
-function RewriteCifToPDB(Sim::HPSAnalysis.SimData{T,I}, ProteinToCif,Proteins) where {T<:Real, I<:Integer}
-    subpath = "$(Sim.BasePath)/InitFiles/PDBFiles"
-    cifpath = "$(Sim.BasePath)/InitFiles/CifFiles"
-    mkpath(subpath)
-    mkpath(cifpath)
-    for Prot in Set(Proteins)
-        CifPath = ProteinToCif[Prot]
-        try
-            readlines(CifPath)
-        catch
-            @error "There is no AlphaFold data for protein $(Prot) at $(CifPath)."
-        end
-
-        cp(CifPath, "$(cifpath)/$(Prot).cif"; force=true)
-        pdb_file = open("$(subpath)/$(Prot).pdb", "w")
-        for line in readlines(CifPath)
-            fields = strip.(split(line))
-            if !isempty(fields) && fields[1] == "ATOM"
-                ID = parse(Int, fields[2])
-                symbole = fields[3]
-                label_atom = fields[4]
-                comp = fields[6]
-                asym = fields[7]
-                seq  = parse(Int, fields[9])
-                x = parse(Float64, fields[11])
-                y = parse(Float64, fields[12])
-                z = parse(Float64, fields[13])
-                iso_or_equiv= parse(Float64, fields[15])
-
-                println(pdb_file, @sprintf("ATOM  %5d %4s %-3s %s%4d    %8.3f%8.3f%8.3f  1.00  %1.2f %10s", ID, label_atom, comp, asym, seq, x, y, z, iso_or_equiv, symbole))
-            end
-        end
-        close(pdb_file)
-    end
-end
 
 end
