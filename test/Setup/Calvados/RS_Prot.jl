@@ -44,13 +44,6 @@ for (protID, protein) in enumerate(ToCreate)
         Proteins = [deepcopy(protein) for _ in 1:NChains]
 
         ###FoldedDomain -> NChains * FoldedDomain
-        #=NewDomain = copy(FoldedDomain)
-        for i in 1:NChains-1
-            shift = i * length(Seq)
-            for dom in FoldedDomain
-                push!(NewDomain, [dom[1]+shift, dom[2]+shift])
-            end
-        end=#
 
         Info ="SLAB Simulation script for $protein.\n\n"
         BoxLengthShort=Float32(350.0)
