@@ -1031,15 +1031,26 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     harmonic = Dict{String, Dict{Symbol, Float64}}()
     binds = "ENM_bond_"
     off = 0
-    
-    for (i, Prot ) in enumerate(Proteins)
-        for index in 1:length(Sequences[i])
-            atom_1, atom_2, r0 = ConstraintDict[Prot][index]
-            bondname = binds * "protein$(i)_" * string(atom_1) * "_" * string(atom_2)
-            push!(B_types, bondname)
-            push!(B_typeid, index+off)
-            push!(B_groups, (atom_1+off, atom_2+off))
+
+    type_cnt=1
+    MinimalTypes = Dict()
+    for Protein in Set(Proteins)
+        for (i,j, r0) in ConstraintDict[Protein]
+            MinimalTypes[(Protein, i,j)] = type_cnt 
+            bondname = "ENM_$(MinimalTypes[(Protein, i, j)])"
             harmonic[bondname] = Dict(:r => r0, :k => 700)
+            type_cnt+=1
+        end
+    end
+
+    for (i, Prot ) in enumerate(Proteins)
+        for (atom_1, atom_2, r0) in ConstraintDict[Prot]
+            #atom_1, atom_2, r0 = ConstraintDict[Prot][index]
+            #bondname = binds * "protein$(i)_" * string(atom_1) * "_" * string(atom_2)
+            bondname = "ENM_$(MinimalTypes[(Prot, atom_1, atom_2)])"
+            push!(B_types, bondname)
+            push!(B_typeid, MinimalTypes[(Prot, atom_1, atom_2)])
+            push!(B_groups, (atom_1+off, atom_2+off))
             NBonds+= 1
         end
         off = offsets[i]
@@ -1094,7 +1105,7 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                     if plDDT[i] < plDDTcut continue end
                     for j in i+3: Domain[2]
                         dist_sqr = (x[j]-x[i])^2+ (y[j]-y[i])^2+(z[j]-z[i])^2
-                        if dist_sqr < rcut^2 && plDDT[j] > plDDTcut  && pae[i][j]< pae_cut
+                        if dist_sqr < rcut^2 && plDDT[j] > plDDTcut  && pae[i][j]< pae_cut && pae[j][i]< pae_cut
                             push!(ConstraintDict[Prot], (i,j, sqrt(dist_sqr)))
                         end
                     end

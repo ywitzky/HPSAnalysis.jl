@@ -9,16 +9,13 @@ BasePath = "$SetupTestPath/ENM_Test/"
 rm(BasePath; force=true, recursive=true)
 mkpath(BasePath)
 
-
 DomainDict= Dict("RS31" => [[1,70], [90,150]], "RS31a" => [[1,75], [90,140]]) 
 Proteins = ["RS31", "RS31", "RS31a"]
-ProteinJSON= Dict("RS31" =>"/localscratch/test/fold_rs31/fold_rs31_full_data_0.json","RS31a" =>"/localscratch/test/Alpha_Fold_datas/fold_rs31a/fold_rs31a_full_data_0.json" )
-ProteinToCif= Dict("RS31" =>"/localscratch/test/fold_rs31/fold_rs31_model_0.cif","RS31a" =>"/localscratch/test/Alpha_Fold_datas/fold_rs31a/fold_rs31a_model_0.cif" )
+ProteinJSON= Dict("RS31" =>"$(PkgPath)/data/TestData/fold_rs31_full_data_0.json","RS31a" =>"$(PkgPath)/data/TestData/fold_rs31a_full_data_0.json" )
+ProteinToCif= Dict("RS31" =>"$(PkgPath)/data/TestData/fold_rs31_model_0.cif","RS31a" =>"$(PkgPath)/data/TestData/fold_rs31a_model_0.cif" )
 
 
 HPSAnalysis.RewriteCifToPDB(BasePath,ProteinToCif, Proteins )
-
-
 
 for rcut in [7.0,8.0,10.0]
     ConstraintDict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = rcut, plDDTcut=90.0)
@@ -82,6 +79,66 @@ for (plDDTcut, pae_cut) in zip([80.0,90.0,92.0], [1.7, 1.85,2.0])
 end
 
 
-###@TODO: Add manual test for full 
-##DomainDict= Dict("RS31" => [[1,20], [90,100]], "RS31a" => [[1,30], [90,105]]) 
+###test whether all bonds are found 
+DomainDict= Dict("RS31" => [[1,70], [90,130]], "RS31a" => [[1,60], [90,140]]) 
+ConstraintDict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA")
+
+
+valid_plDDT = [i for (i, val) in  enumerate(RS31_plDDT[1:70]) if val>90 ]
+RS31_dom1_pairs = [(i,j) for i in valid_plDDT for j in valid_plDDT if i<j-2 && RS31_pae[i][j]<1.85 && RS31_pae[j][i]<1.85 ]
+
+valid_plDDT = [i+89 for (i, val) in  enumerate(RS31_plDDT[90:130]) if val>90 ]
+RS31_dom2_pairs = [(i,j) for i in valid_plDDT for j in valid_plDDT if i<j-2 && RS31_pae[i][j]<1.85  && RS31_pae[j][i]<1.85]
+
+valid_plDDT = [i for (i, val) in  enumerate(RS31a_plDDT[1:60]) if val>90 ] 
+RS31a_dom1_pairs = [(i,j) for i in valid_plDDT for j in valid_plDDT if i<j-2 && RS31a_pae[i][j]<1.85 && RS31a_pae[j][i]<1.85]
+
+valid_plDDT = [i+89 for (i, val) in  enumerate(RS31a_plDDT[90:140]) if val>90 ]
+RS31a_dom2_pairs = [(i,j) for i in valid_plDDT for j in valid_plDDT if i<j-2 && RS31a_pae[i][j]<1.85  && RS31a_pae[j][i]<1.85]
+
+RS31_x  = [parse.(Float64,line[11]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
+RS31_y  = [parse.(Float64,line[12]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
+RS31_z  = [parse.(Float64,line[13]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
+
+RS31a_x  = [parse.(Float64,line[11]) for line in split.(strip.(readlines(ProteinToCif["RS31a"] ))) if line[1]=="ATOM" && line[4]=="CA"]
+RS31a_y  = [parse.(Float64,line[12]) for line in split.(strip.(readlines(ProteinToCif["RS31a"] ))) if line[1]=="ATOM" && line[4]=="CA"]
+RS31a_z  = [parse.(Float64,line[13]) for line in split.(strip.(readlines(ProteinToCif["RS31a"] ))) if line[1]=="ATOM" && line[4]=="CA"]
+
+RS31_dist  = [ (RS31_x[i]  -RS31_x[j])^2+(RS31_y[i]  -RS31_y[j])^2+(RS31_z[i]  -RS31_z[j])^2 for i in 1:150, j in 1:150 ]
+RS31a_dist = [ (RS31a_x[i]-RS31a_x[j])^2+(RS31a_y[i]-RS31a_y[j])^2+(RS31a_z[i]-RS31a_z[j])^2 for i in 1:150, j in 1:150 ]
+RS31_dist  .= sqrt.(RS31_dist)
+RS31a_dist .= sqrt.(RS31a_dist)
+
+RS31_pairs  = [(i,j,RS31_dist[i,j])  for (i,j) in vcat(RS31_dom1_pairs ,RS31_dom2_pairs ) if RS31_dist[i,j]<9.0 ]
+RS31a_pairs = [(i,j,RS31a_dist[i,j]) for (i,j) in vcat(RS31a_dom1_pairs,RS31a_dom2_pairs) if RS31a_dist[i,j]<9.0 ]
+
+@test RS31_pairs == ConstraintDict["RS31"]
+@test RS31a_pairs == ConstraintDict["RS31a"]
+
+
+
+### Test using Constraints multiple times
+ConstraintDict=Dict("Prot1"=> [(1,4,0.5), (10,12, 1.2), (14,15,0.2)], "Prot2"=> [(3,7,0.5), (3,9, 1.3), (6,9,0.33)])
+Seq_Dict = Dict("Prot1"=> "ABCABCABCABCABC", "Prot2"=> "ABABABABAB")
+Proteins = ["Prot1", "Prot1", "Prot2", "Prot1", "Prot2"]
+Sequences = [Seq_Dict[x] for x in Proteins]
+
+(NBonds, B_types, B_typeid, B_groups, harmonic) = HPSAnalysis.Setup.ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+
+@test NBonds == 15
+@test all(B_typeid .== [1,2,3,1,2,3,4,5,6,1,2,3,4,5,6])
+@test all(B_groups .== [(1,4), (10,12), (14,15),(16, 19), (25, 27), (29,30), (33, 37), (33,39), (36,39), (41,44), (50,52), (54,55), (58, 62), (58,64), (61, 64)])
+
+
+harmonic_test = Dict{String, Dict{Symbol, Float64}}()
+cnt = 1
+for Protein in Set(Proteins)
+for (i,j,r0) = ConstraintDict[Protein]
+    bondname = "ENM_$(cnt)"
+    harmonic_test[bondname] = Dict(:r => r0, :k => 700)
+    cnt+= 1
+end
+end
+
+@test harmonic_test == harmonic
 end
