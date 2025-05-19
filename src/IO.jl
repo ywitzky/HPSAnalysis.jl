@@ -946,7 +946,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         if Regenerate
             mkpath("$(InitFiles)Elastic_Files/")
             ###Creat a pdb data from the AlphaFold cif data
-            RewriteCifToPDB(Data,ProteinToCif, Proteins )
+            RewriteCifToPDB(Data.BasePath,ProteinToCif, Proteins )
 
             itpPath="$(InitFiles)ITPS_Files/"
             mkpath(itpPath)

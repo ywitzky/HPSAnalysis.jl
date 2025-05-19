@@ -1048,8 +1048,7 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
 end
 
 @doc raw"""
-    DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
-
+    DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
 Return a Dictionary of atoms and there distances that are nessesary for the Elastic Network Model.
     
 **Arguments**
@@ -1059,13 +1058,13 @@ Return a Dictionary of atoms and there distances that are nessesary for the Elas
 - `ProteinJSON`: Dictionary of AlphaFold data of the Proteins in JSON format.
 - `BBProtein`: The atom from which the AlphaFold datas are set for the aminoacid.
 - `rcut`: Cut of lenght for the ENM.
-- `plDDTcut`: Cut of plDDT for the ENM.
-- `pae_cut`: Cut of pae for the ENM.
+- `plDDTcut`: Cut of plDDT parameter of AlphaFold reference for the ENM.
+- `pae_cut`: Cut of pae parameter of AlphaFold reference for the ENM.
 
 **Return**:
 * A Dictionary of atoms and lenghts.
 """
-function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
+function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
     ciffolder = "$(BasePath)/InitFiles/CifFiles"
     ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
     for Prot in Set(Proteins)
@@ -1091,7 +1090,6 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
             ConstraintDict[Prot] = []
             pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
             for Domain in DomainDict[Prot]
-                println(Domain)
                 for i in Domain[1]:Domain[2]
                     if plDDT[i] < plDDTcut continue end
                     for j in i+3: Domain[2]

@@ -8,7 +8,7 @@ mkpath("$SetupTestPath/HOOMD_Setup/")
 function files_are_equal(file1::String, file2::String)::Bool
     return read(file1, String) == read(file2, String)
 end
-include("./Setup/Calvados/Calvados3_ENM_test.jl")
+include("./Calvados/Calvados3_ENM_test.jl")
 #=
 @testset "Setup Tests" begin
     include("./HOOMD_Setup_test.jl")
