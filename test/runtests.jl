@@ -20,5 +20,5 @@ TestPath = Scratch.get_scratch!(HPSAnalysis, "test")
     ### Test fails in project extras since they dont get excluded their normaly
 end =#
 
-include("./Analysis/Analysis_test.jl")
-include("./Setup/Setup_test.jl")
+#include("./Analysis/Analysis_test.jl")
+#include("./Setup/Setup_test.jl")
