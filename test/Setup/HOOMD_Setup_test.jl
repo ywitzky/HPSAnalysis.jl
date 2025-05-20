@@ -153,18 +153,19 @@ end
     harmonic["B4"] = Dict(:r => 0.5, :k => 700)
     ENM = (N, types, id, group, harmonic)
 
-    io = open(filename_test, "w")
-    write(io, "1 , 0-0 , 0 , (0, 1) , $(harmonic["B1"]) \n")
-    write(io, "2 , 0-0 , 0 , (1, 2) , $(harmonic["B2"]) \n")
-    write(io, "3 , 0-0 , 0 , (2, 3) , $(harmonic["B3"]) \n")
-    write(io, "4 , 0-0 , 0 , (3, 4) , $(harmonic["B4"]) \n")
+    open(filename_test, "w") do io
+        write(io, "1 , 0-0 , 0 , (0, 1) , $(harmonic["B1"]) \n")
+        write(io, "2 , 0-0 , 0 , (1, 2) , $(harmonic["B2"]) \n")
+        write(io, "3 , 0-0 , 0 , (2, 3) , $(harmonic["B3"]) \n")
+        write(io, "4 , 0-0 , 0 , (3, 4) , $(harmonic["B4"]) \n")
+    end
 
     HPSAnalysis.Setup.WriteENM_HOOMD_Indices(filename, ENM)
+    harmonic = [Dict("r" => 0.5, "k" => 700), Dict("r" => 0.5, "k" => 700), Dict("r" => 0.5, "k" => 700), Dict("r" => 0.5, "k" => 700)]
+    ENM = (N, types, id, group, harmonic)
 
     ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = sim.read_ENM_HOOD_indices(filename)
     read_ENM = (ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic)
 
-
-    #@test files_are_equal(filename, filename_test)
-    #@test ENM == read_ENM
+    @test ENM == read_ENM
 end
