@@ -455,3 +455,29 @@ function plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_DensityHist.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_DensityHist.pdf")
 end
+
+
+@doc raw"""
+    plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+
+Plots the square intra chain distance |r_i-r_j| on logatrithmis scales as computed by [`computeInterChainScalingNaiv`](@ref) and [`computeInterChainScalingSlidingWindow`](@ref).
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+"""
+function plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    fig = Plots.plot( xlim=(1, maximum(length.(Sim.IntraChainScalingSlidingWindow))), ylim=(1, maximum(maximum.(Sim.IntraChainScalingSlidingWindow))*1.2),  xlabel="i []", ylabel="|r_i-r_j|^2 [AA]", xscale=:log10, yscale=:log10, minorticks=true)
+    
+    for (S, Sequence) in enumerate(Sim.IntraChainScalingNaiv)
+        for i in 1:size(Sequence, 1)
+            Plots.plot!(Sequence[i,i+1:end], label= S==1 && i==1 ? "Naiv" : "", c=:gray)
+        end
+    end
+
+    for (S, Sequence) in enumerate(Sim.IntraChainScalingSlidingWindow)
+        Plots.plot!(Sequence, label= S==1 ? "Window" : "", c=:black)
+    end
+
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainScaling.png")
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainScaling.pdf")
+end
