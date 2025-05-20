@@ -168,6 +168,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     GofR::Vector{FloatType}
     DensityHist::Vector{FloatType}
 
+    IntraChainScalingNaiv::Vector{Matrix{FloatType}}
+    IntraChainScalingSlidingWindow::Vector{Vector{FloatType}}
+
 
     function SimData()
         return new{ChoosenFloatType, ChoosenIntType}(false,"",1,0, 0,0,0,0,0,0,0,0,0,0,0.0,2,zeros(3,2), zeros(3),[""],
@@ -201,7 +204,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
 
         1:1:1,  Vector{Vector{Vector{ChoosenIntType}}}(),
         
-        zeros(0), 0,0,zeros(0),zeros(0)) 
+        zeros(0), 0,0,zeros(0),zeros(0),
+        
+        [], []) 
     end
 end
 
