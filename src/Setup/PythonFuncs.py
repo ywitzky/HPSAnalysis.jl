@@ -119,7 +119,6 @@ def convertDict(Dict):
 
     Dict = Dict.replace("Dict(", "").replace(")", "")
     pairs = [pair.split(" => ") for pair in Dict.split(", ")]
-    print(pairs)
     return {pair[0].strip(":"): float(pair[1]) for pair in pairs}
 
 def read_ENM_HOOD_indices(filename):
@@ -139,7 +138,6 @@ def read_ENM_HOOD_indices(filename):
                 group2 = parts[4].strip(")")
                 group_tuple = tuple((int(group1), int(group2)))
                 B_group.append(group_tuple)
-                print(parts[5])
                 harmonic_Dict = convertDict(parts[5])
                 harmonic.append(harmonic_Dict)
             except ValueError as e:

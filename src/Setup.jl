@@ -577,7 +577,6 @@ function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
             OneToHPSDihedral1001[e] = OneToHPSDihedral1001[AA]
         end
     end
-
     return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
 

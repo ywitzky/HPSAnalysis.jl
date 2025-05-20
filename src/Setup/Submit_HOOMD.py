@@ -253,8 +253,8 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
-    print("REMOVE THIS LINE BEFORE USING")
-    sim.operations.writers.append(gsd_writer)
+    #print("REMOVE THIS LINE BEFORE USING")
+    #sim.operations.writers.append(gsd_writer)
 
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
@@ -267,7 +267,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
 
     ### start simulation
-    #sim.operations.writers.append(gsd_writer)
+    sim.operations.writers.append(gsd_writer)
 
     integrator.dt = Params["dt"]
     print(Params["NSteps"])

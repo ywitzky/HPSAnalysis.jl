@@ -35,6 +35,7 @@ PH_list=[7.5,8.0]
 
             LongAtomTypes_test=union(AtomTypes_test, Long)
             IdToAa_test=Dict((v=>k) for (k,v) in AaToId_test)
+            ResToLongAtomType_test = Dict{Any, Any}()
 
             (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)=HPSAnalysis.Setup.DetermineAtomTypes(Sequences,SimulationType,pH)
 
@@ -123,6 +124,7 @@ PH_list=[7.5,8.0]
         OneToHPSDihedral1001_test['d']=OneToHPSDihedral1001_test['P']
 
         IdToAa_test=Dict((v=>k) for (k,v) in AaToId_test)
+        ResToLongAtomType_test = Dict{Any, Any}(('F', false) => 'c', ('M', true) => 'a', ('V', false) => 'b', ('P', false) => 'd')
 
         (AtomTypes_C2, LongAtomTypes_C2, AaToId_C2, IdToAa_C2,ResToLongAtomType_C2, LongAtomTypesToRes_C2, OneToCharge_C2, OneToMass_C2, OneToSigma_C2, OneToLambda_C2, OneToHPSDihedral0110_C2, OneToHPSDihedral1001_C2)=HPSAnalysis.Setup.DetermineAtomTypes(Sequences,"Calvados2",pH)
         Sequences=["MRPVFV","MRPVF","MRPV","MRP"]
@@ -132,7 +134,8 @@ PH_list=[7.5,8.0]
         @test (LongAtomTypes_test==LongAtomTypes_C2&&LongAtomTypes_test==LongAtomTypes_C3)
         @test (AaToId_test==AaToId_C2&&AaToId_test==AaToId_C3)
         @test (IdToAa_test==IdToAa_C2&&IdToAa_test==IdToAa_C3)
-        #@test (ResToLongAtomType_test==ResToLongAtomType_C2)
+        @test (ResToLongAtomType_test==ResToLongAtomType_C2)
+        @test (ResToLongAtomType_test==ResToLongAtomType_C3)
         @test (LongAtomTypesToRes_test==LongAtomTypesToRes_C2&&LongAtomTypesToRes_test==LongAtomTypesToRes_C3)
         @test (OneToCharge_test==OneToCharge_C2&&OneToCharge_test==OneToCharge_C3)
         @test (OneToMass_test==OneToMass_C2&&OneToMass_test==OneToMass_C3)
