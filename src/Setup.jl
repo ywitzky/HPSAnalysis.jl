@@ -1025,7 +1025,7 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 """
 function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
 
-    ConstraintDict = DetermineCalvados3ENMfromAlphaFold(Sim, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
+    ConstraintDict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
 
     HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     return HOOMD_Indices
@@ -1054,15 +1054,26 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
     harmonic = Dict{String, Dict{Symbol, Float64}}()
     binds = "ENM_bond_"
     off = 0
-    
-    for (i, Prot ) in enumerate(Proteins)
-        for index in 1:length(Sequences[i])
-            atom_1, atom_2, r0 = ConstraintDict[Prot][index]
-            bondname = binds * "protein$(i)_" * string(atom_1) * "_" * string(atom_2)
-            push!(B_types, bondname)
-            push!(B_typeid, index+off)
-            push!(B_groups, (atom_1+off, atom_2+off))
+
+    type_cnt=1
+    MinimalTypes = Dict()
+    for Protein in Set(Proteins)
+        for (i,j, r0) in ConstraintDict[Protein]
+            MinimalTypes[(Protein, i,j)] = type_cnt 
+            bondname = "ENM_$(MinimalTypes[(Protein, i, j)])"
             harmonic[bondname] = Dict(:r => r0, :k => 700)
+            type_cnt+=1
+        end
+    end
+
+    for (i, Prot ) in enumerate(Proteins)
+        for (atom_1, atom_2, r0) in ConstraintDict[Prot]
+            #atom_1, atom_2, r0 = ConstraintDict[Prot][index]
+            #bondname = binds * "protein$(i)_" * string(atom_1) * "_" * string(atom_2)
+            bondname = "ENM_$(MinimalTypes[(Prot, atom_1, atom_2)])"
+            push!(B_types, bondname)
+            push!(B_typeid, MinimalTypes[(Prot, atom_1, atom_2)])
+            push!(B_groups, (atom_1+off, atom_2+off))
             NBonds+= 1
         end
         off = offsets[i]
@@ -1071,25 +1082,24 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
 end
 
 @doc raw"""
-    DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
-
+    DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
 Return a Dictionary of atoms and there distances that are nessesary for the Elastic Network Model.
     
 **Arguments**
-- `Sim::HPSAnalysis.SimData{T,I}`: The simulation datas.
-- `DomainDict`: The Domains in which the ENM is active.
+- `BasePath`: The base path of the simulation setup procedure.
+- `DomainDict`:: The Domains in which the ENM is active.
 - `Proteins`: List of Protein Names.
-- `ProteinJSON`: AlphaFold data of the Proteins.
+- `ProteinJSON`: Dictionary of AlphaFold data of the Proteins in JSON format.
 - `BBProtein`: The atom from which the AlphaFold datas are set for the aminoacid.
 - `rcut`: Cut of lenght for the ENM.
-- `plDDTcut`: Cut of plDDT for the ENM.
-- `pae_cut`: Cut of pae for the ENM.
+- `plDDTcut`: Cut of plDDT parameter of AlphaFold reference for the ENM.
+- `pae_cut`: Cut of pae parameter of AlphaFold reference for the ENM.
 
 **Return**:
 * A Dictionary of atoms and lenghts.
 """
-function DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer}
-    ciffolder = "$(Sim.BasePath)/InitFiles/CifFiles"
+function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
+    ciffolder = "$(BasePath)/InitFiles/CifFiles"
     ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
     for Prot in Set(Proteins)
         if length(DomainDict[Prot])>0
@@ -1118,7 +1128,7 @@ function DetermineCalvados3ENMfromAlphaFold(Sim::HPSAnalysis.SimData{T,I}, Domai
                     if plDDT[i] < plDDTcut continue end
                     for j in i+3: Domain[2]
                         dist_sqr = (x[j]-x[i])^2+ (y[j]-y[i])^2+(z[j]-z[i])^2
-                        if dist_sqr < rcut^2 && plDDT[j] > plDDTcut  && pae[i][j]< pae_cut
+                        if dist_sqr < rcut^2 && plDDT[j] > plDDTcut  && pae[i][j]< pae_cut && pae[j][i]< pae_cut
                             push!(ConstraintDict[Prot], (i,j, sqrt(dist_sqr)))
                         end
                     end
