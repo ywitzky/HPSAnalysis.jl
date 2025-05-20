@@ -839,7 +839,7 @@ end
 
 
 @doc raw"""
-    CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{R}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true)
+    CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{R}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true,SimulationType="Calvados2",ProteinToDomain=Dict(),ProteinToCif=Dict())
 
 Creates the file structure and initialises particle positions for the given parameters.
 
@@ -852,10 +852,13 @@ Creates the file structure and initialises particle positions for the given para
 **Optional Arguments**:
 - `Axis::String`: The axis along which the system is unfolded.
 - `Regenerate::Bool`: If true, regenerates initial positions using the Polyply package.
+- `SimulationType::String`: Type of Simulation (default is Calvados2).
+- `ProteinToDomain::Dict`: Dictionary of domains for the proteins.
+- `ProteinToCif::Dict`: Dictionary of the AlphaFold data files for each protein.
 
 **Returns**:
 * A tuple (pos, Data) containing the initial positions and the simulation data structure.
-    """
+"""
 function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true,SimulationType="Calvados2",ProteinToDomain=Dict(),ProteinToCif=Dict())
     #Definition of Paths for the parameters
     Data = SimData()
@@ -995,13 +998,10 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     Data.yio= open(Data.yFilePath,"r+")
     Data.zio= open(Data.zFilePath,"r+")
 
-    #print("b")
-
     Data.x =  Mmap.mmap(Data.xio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.y =  Mmap.mmap(Data.yio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.z =  Mmap.mmap(Data.zio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
 
-    #print("c")
     unfoldPositions(Data)
 
     Data.x_uw_io= open(Data.x_uw_FilePath,"r+")
@@ -1011,7 +1011,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     Data.x_uw =  Mmap.mmap(Data.x_uw_io, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.y_uw =  Mmap.mmap(Data.y_uw_io, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.z_uw =  Mmap.mmap(Data.z_uw_io, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
-    #print("d")
+
     ### periodically unwrap one Axis
     pos = zeros(eltype(Data.x), Data.NAtoms, 3)
     if Axis=="x"

@@ -55,8 +55,6 @@ bondid=UInt32[0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 InputPositions, InputTypes, InputCharges, InputMasses, Types, Diameter, InputImage = sim.readParticleData("$SetupTestPath/HOOMD_Setup/Particles.txt", N, [Seq])
 
-println(InputTypes)
-
 @testset "Calvados2" begin
     @test particle_N_test==10
     @test particle_position_test==coor

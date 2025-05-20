@@ -35,6 +35,8 @@ def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
     return id_list
     
 def readSequences(fileName):
+    """Read the Seqeuences.txt data file and return sequence, bond number, Chain number, nonds, angeles and dihedrals"""
+
     file  = open(fileName,'r')
     NBeads=0
     tmp = ""
@@ -73,6 +75,8 @@ def readSequences(fileName):
     return Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals
 
 def readParticleData(fileName, Nparticles, Sequences):
+    """Read the Particles.txt data file and return for each amino acid position, type, charge, mass, diameter and image"""
+
     InputPositions = np.zeros((Nparticles,3), dtype=np.float32)
     InputImage = np.zeros((Nparticles,3), dtype=np.int32)
 
@@ -98,6 +102,8 @@ def readParticleData(fileName, Nparticles, Sequences):
     return InputPositions, InputTypes, InputCharges, InputMasses, Types, Diameter, InputImage
 
 def readDictionaries(filename):
+    """Read the Dictionaries.txt data file and return dictionary amino acid to id, name, charge, mass, sigma, lambda"""
+
     ID,resname, q, mass, sigma, lamda_val = np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)#int, converters={0: lambda x: int(x), 1: lambda x: str(x).strip(), 2: lambda x: float(x), 3: lambda x: float(x), 4: lambda x: float(x), 5: lambda x: float(x) })
     ID=ID.astype(int)-1
     resname = np.array(resname)
@@ -110,13 +116,15 @@ def readDictionaries(filename):
 
 def convertDict(Dict):
     """Convert julia Dict in Python Dict"""
+
     Dict = Dict.replace("Dict(", "").replace(")", "")
     pairs = [pair.split(" => ") for pair in Dict.split(", ")]
-    #print(pairs)
+    print(pairs)
     return {pair[0].strip(":"): float(pair[1]) for pair in pairs}
 
 def read_ENM_HOOD_indices(filename):
-    #B_N, B_types, B_typeid, B_group, harmonic= np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)
+    """Read the ENM_indices.txt data file and return number, type, id, group (which amino acid with which) and leght, force of each bond"""
+
     B_N, B_types, B_typeid, B_group, harmonic = [], [], [], [], []
     with open(filename) as file:
         for line in file:
@@ -131,6 +139,7 @@ def read_ENM_HOOD_indices(filename):
                 group2 = parts[4].strip(")")
                 group_tuple = tuple((int(group1), int(group2)))
                 B_group.append(group_tuple)
+                print(parts[5])
                 harmonic_Dict = convertDict(parts[5])
                 harmonic.append(harmonic_Dict)
             except ValueError as e:
@@ -170,6 +179,8 @@ def parseKeywords(keyword, value):
     return value
 
 def readParam(filename):
+    """Read the Params.txt data file and return a dictionary of Parameters"""
+
     ParamDict = dict()
     ParamDict["Create_Start_Config"] = True
     file = open(filename, "r")

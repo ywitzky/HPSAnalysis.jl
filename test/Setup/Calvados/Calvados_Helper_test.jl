@@ -42,8 +42,6 @@ PH_list=[7.5,8.0]
             @test (LongAtomTypes_test==LongAtomTypes)
             @test (AaToId_test==AaToId)
             @test (IdToAa_test==IdToAa)
-            println(ResToLongAtomType_test)
-            println(ResToLongAtomType)
             @test (ResToLongAtomType_test==ResToLongAtomType)
             @test (LongAtomTypesToRes_test==LongAtomTypesToRes)
             @test (OneToCharge_test==OneToCharge)

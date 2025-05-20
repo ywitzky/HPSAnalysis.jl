@@ -114,7 +114,7 @@ end
 end
 
 
-@testset "WriteParams" begin
+@testset "Write/read-Params" begin
     filename_test="$SetupTestPath/params_test.csv"
     filename="$SetupTestPath/params.csv"
     sequences=["MRPVFV","MRPVF","MRPV","MRP"]
@@ -137,4 +137,34 @@ end
     Params["Domains"] = repr(Params["Domains"]) ### convert to String
 
     @test ParamDict == Params
+end
+
+@testset "Write/read-ENM_HOOMD_Indices" begin
+    filename_test = "$SetupTestPath/enmhoomd_test.csv"
+    filename = "$SetupTestPath/enmhoomd.csv"
+    N = 4
+    types = ["B1","B2","B3","B4"]
+    id = [0,0,0,0]
+    group = [(0, 1), (1, 2), (2, 3), (3, 4)]
+    harmonic = Dict{String, Dict{Symbol, Float64}}()
+    harmonic["B1"] = Dict(:r => 0.5, :k => 700)
+    harmonic["B2"] = Dict(:r => 0.5, :k => 700)
+    harmonic["B3"] = Dict(:r => 0.5, :k => 700)
+    harmonic["B4"] = Dict(:r => 0.5, :k => 700)
+    ENM = (N, types, id, group, harmonic)
+
+    io = open(filename_test, "w")
+    write(io, "1 , 0-0 , 0 , (0, 1) , $(harmonic["B1"]) \n")
+    write(io, "2 , 0-0 , 0 , (1, 2) , $(harmonic["B2"]) \n")
+    write(io, "3 , 0-0 , 0 , (2, 3) , $(harmonic["B3"]) \n")
+    write(io, "4 , 0-0 , 0 , (3, 4) , $(harmonic["B4"]) \n")
+
+    HPSAnalysis.Setup.WriteENM_HOOMD_Indices(filename, ENM)
+
+    ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = sim.read_ENM_HOOD_indices(filename)
+    read_ENM = (ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic)
+
+
+    #@test files_are_equal(filename, filename_test)
+    #@test ENM == read_ENM
 end

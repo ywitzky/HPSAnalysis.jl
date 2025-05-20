@@ -13,12 +13,36 @@ using ..BioData: OneToThree
 using Scratch, DataStructures,BioStructures,DSSP_jll, Printf
 
 
+@doc raw"""
+    ConvertGroToPDB(Path, Filename)
 
+A gro data file is converted to a pdb data file.
+    
+**Arguments**
+- `Path::String`: Path to the gro file.
+- `Filename::String`: Name of the gro file.
+
+**Creat**:
+* A pdb data file.
+"""
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
     run(`$GMX_Path editconf -f $(Path)$(Filename).gro -o $(Path)$(Filename).pdb`)
 end
 
+@doc raw"""
+    GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
+
+Generate a itp file for one protein with the given sequence, with datas like atoms, bonds, angels.
+    
+**Arguments**
+- `Names::Array(String)`: Names of the proteins.
+- `Sequences::Array(String)`: Sequences of the proteins.
+- `OutputPath::String`: Path for the itp file.
+
+**Creat**:
+* A itp file.
+"""
 function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
     NameSet = Set(Names)
     for name in (NameSet)
@@ -41,6 +65,20 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
     end
 end
 
+@doc raw"""
+    GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
+
+Generate a Topology file which include the number and name of the proteins that are simulated.
+    
+**Arguments**
+- `Filename::String`: Path for the topology file.
+- `ITPPath::String`: Pathe of the itp file.
+- `Names:Array(String):`: List of protein names.
+- `SimulationName::String`: Name of the simulation.
+
+**Creat**:
+* A topology data file.
+"""
 function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     f = open(Filename,"w+")
 
@@ -65,6 +103,20 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     close(f)
 end
 
+@doc raw"""
+    GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
+
+Generate a gro file from the TopologyFile which is used for the start coordinates.
+    
+**Arguments**
+- `SimulationPath::String`: Path where to save the gro data file.
+- `SimulationName::String`: Name of the simulation (save name).
+- `Box::Arry(Float)`: Diameters of the simulationbox.
+- `TopologyFile::String`: Topology data file.
+
+**Creat**:
+* A gro data file.
+"""
 function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
     max_iteration=800 #default 800
     max_force=50000.0 #default 50_000
@@ -72,6 +124,17 @@ function GenerateCoordinates(SimulationPath, SimulationName, Box, TopologyFile)
     run(`$polyply gen_coords -p $TopologyFile -o $(SimulationPath)$(SimulationName).gro -name $(SimulationName) -gs $grid_spacing -mf $(max_force) -mir $(max_iteration) -box $(Box)`)
 end
 
+@doc raw"""
+    readSimpleGRO(Filename, x,y,z)
+
+Read the coordinates of the atoms from a gro file.
+    
+**Arguments**
+- `Filename::`: Path of the pdb file.
+- `x::Array(Float)`: List of x-coordinates.
+- `y::Array(Float)`: List of y-coordinates.
+- `z::Array(Float)`: List of z-coordinates.
+"""
 function readSimpleGRO(Filename, x,y,z)
     f = open(Filename)
     readline(f) ### command that generate the file
@@ -92,6 +155,17 @@ function readSimpleGRO(Filename, x,y,z)
     z .*= 10.0
 end
 
+@doc raw"""
+    readPDB(Filename, x,y,z)
+
+Read the coordinates of the atoms from a pdb file.
+    
+**Arguments**
+- `Filename::`: Path of the pdb file.
+- `x::Array(Float)`: List of x-coordinates.
+- `y::Array(Float)`: List of y-coordinates.
+- `z::Array(Float)`: List of z-coordinates.
+"""
 function readPDB(Filename, x,y,z)
     f = open(Filename)
     ind =1
@@ -110,7 +184,20 @@ function readPDB(Filename, x,y,z)
     end
 end
 
-function GenerateENM_ITPFilesOfSequence(BasePath::String,Names,  Domains::Dict{String,Vector{Tuple{I,I}}}) where {I<:Integer}
+@doc raw"""
+    GenerateENM_ITPFilesOfSequence(BasePath::String, Names, Domains::Dict{String,Vector{Tuple{I,I}}})
+
+Generate pdb and itp data files for the ENM with martinize2 (only Calvados3).
+    
+**Arguments**
+- `BasePath::String`: Data path.
+- `Names::List(String)`: List of protein names.
+- `Domains::Dict{String,Vector{Tuple{I,I}}}`: Dictionary with domains for each protein.
+
+**Creat**:
+* Data files for the ENM.
+"""
+function GenerateENM_ITPFilesOfSequence(BasePath::String, Names, Domains::Dict{String,Vector{Tuple{I,I}}}) where {I<:Integer}
     Path = "$(BasePath)/InitFiles/Elastic_Files/"
     NameSet = Set(Names)
     
