@@ -18,7 +18,7 @@ ProteinToCif= Dict("RS31" =>"$(PkgPath)/data/TestData/fold_rs31_model_0.cif","RS
 HPSAnalysis.RewriteCifToPDB(BasePath,ProteinToCif, Proteins )
 
 for rcut in [7.0,8.0,10.0]
-    ConstraintDict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = rcut, plDDTcut=90.0)
+    ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = rcut, plDDTcut=90.0)
     RS31_r = getindex.(ConstraintDict["RS31"],3)
     RS31a_r = getindex.(ConstraintDict["RS31a"],3)
     @test all(RS31_r .<=rcut)
@@ -26,7 +26,7 @@ for rcut in [7.0,8.0,10.0]
 end
 
 
-ConstraintDict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
+ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
 RS31_i = getindex.(ConstraintDict["RS31"],1)
 RS31_j = getindex.(ConstraintDict["RS31"],2)
 dom1 = DomainDict["RS31"][1]
@@ -62,7 +62,7 @@ CifData = Dict()
 RS31_plDDT  = [parse.(Float64,line[15]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
 RS31a_plDDT = [parse.(Float64,line[15]) for line in split.(strip.(readlines(ProteinToCif["RS31a"]))) if line[1]=="ATOM" && line[4]=="CA"]
 for (plDDTcut, pae_cut) in zip([80.0,90.0,92.0], [1.7, 1.85,2.0])
-    local ConstraintDict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=plDDTcut, pae_cut=pae_cut)
+    local ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=plDDTcut, pae_cut=pae_cut)
 
     @test reduce(*, map(x->check(x..., RS31_pae,pae_cut),  ConstraintDict["RS31"]))
     @test reduce(*, map(x->check(x..., RS31a_pae,pae_cut),  ConstraintDict["RS31a"]))
@@ -81,7 +81,7 @@ end
 
 ###test whether all bonds are found 
 DomainDict= Dict("RS31" => [[1,70], [90,130]], "RS31a" => [[1,60], [90,140]]) 
-ConstraintDict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA")
+ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA")
 
 
 valid_plDDT = [i for (i, val) in  enumerate(RS31_plDDT[1:70]) if val>90 ]
@@ -118,20 +118,21 @@ RS31a_pairs = [(i,j,RS31a_dist[i,j]) for (i,j) in vcat(RS31a_dom1_pairs,RS31a_do
 
 
 ### Test using Constraints multiple times
-ConstraintDict=Dict("Prot1"=> [(1,4,0.5), (10,12, 1.2), (14,15,0.2)], "Prot2"=> [(3,7,0.5), (3,9, 1.3), (6,9,0.33)])
+ConstraintDict = Dict("Prot1"=> [(1,4,0.5), (10,12, 1.2), (14,15,0.2)], "Prot2"=> [(3,7,0.5), (3,9, 1.3), (6,9,0.33)])
+Backbone_correction_Dict = Dict("Prot1"=> [(2,3,0.37), (4,5,0.38)], "Prot2"=> [(5,6,0.5), (6,7,0.38)])
 Seq_Dict = Dict("Prot1"=> "ABCABCABCABCABC", "Prot2"=> "ABABABABAB")
 Proteins = ["Prot1", "Prot1", "Prot2", "Prot1", "Prot2"]
 Sequences = [Seq_Dict[x] for x in Proteins]
 
-(NBonds, B_types, B_typeid, B_groups, harmonic) = HPSAnalysis.Setup.ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+(NBonds, B_types, B_typeid, B_groups, harmonic) = HPSAnalysis.Setup.ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
 
 @test NBonds == 15
-@test all(B_typeid .== [1,2,3,1,2,3,4,5,6,1,2,3,4,5,6])
-@test all(B_groups .== [(1,4), (10,12), (14,15),(16, 19), (25, 27), (29,30), (33, 37), (33,39), (36,39), (41,44), (50,52), (54,55), (58, 62), (58,64), (61, 64)])
+@test all(B_typeid .== [1, 2, 1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 5, 6, 7, 8, 9, 10, 5, 6, 7, 8, 9, 10])
+@test all(B_groups .== [(2, 3), (4, 5), (2, 3), (4, 5), (5, 6), (6, 7), (2, 3), (4, 5), (5, 6), (6, 7), (1,4), (10,12), (14,15),(16, 19), (25, 27), (29,30), (33, 37), (33,39), (36,39), (41,44), (50,52), (54,55), (58, 62), (58,64), (61, 64)])
 
 
 harmonic_test = Dict{String, Dict{Symbol, Float64}}()
-cnt = 1
+cnt = 5
 for Protein in Set(Proteins)
 for (i,j,r0) = ConstraintDict[Protein]
     bondname = "ENM_$(cnt)"
@@ -139,6 +140,10 @@ for (i,j,r0) = ConstraintDict[Protein]
     cnt+= 1
 end
 end
+harmonic_test["BB_1"] = Dict(:k => 8033.0, :r => 0.37)
+harmonic_test["BB_2"] = Dict(:k => 8033.0, :r => 0.38)
+harmonic_test["BB_3"] = Dict(:k => 8033.0, :r => 0.5)
+harmonic_test["BB_4"] = Dict(:k => 8033.0, :r => 0.38)
 
 @test harmonic_test == harmonic
 end
