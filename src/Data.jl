@@ -170,6 +170,7 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
 
     IntraChainScalingNaiv::Vector{Matrix{FloatType}}
     IntraChainScalingSlidingWindow::Vector{Vector{FloatType}}
+    IntraChainContactMatrix::Vector{Matrix{FloatType}}
 
 
     function SimData()
@@ -206,7 +207,7 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
         
         zeros(0), 0,0,zeros(0),zeros(0),
         
-        [], []) 
+        [], [],[]) 
     end
 end
 

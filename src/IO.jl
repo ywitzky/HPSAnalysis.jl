@@ -49,9 +49,9 @@ function parseXYZ!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
     close(traj)
 
-    Sim.x = Sim.x[:,write_step-1 ]
-    Sim.y = Sim.y[:,write_step-1 ]
-    Sim.z = Sim.z[:,write_step-1 ]
+    Sim.x = Sim.x[:,1:write_step-1 ]
+    Sim.y = Sim.y[:,1:write_step-1 ]
+    Sim.z = Sim.z[:,1:write_step-1 ]
 
     return write_step-1
 end

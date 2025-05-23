@@ -16,7 +16,7 @@ function determineDihedrals(Sequences, Types, TypeToId, OneToHPSDihedral0110, On
     dihedral_short_map = Dict()
     dihedral_long_map = Dict()
 
-    dihedral_eps = zeros(400)
+    dihedral_eps = ones(400)*Inf
     dihedral_cnt=0
     eps=0.
     AA_ind = 1
@@ -73,7 +73,7 @@ function determineDihedrals(Sequences, Types, TypeToId, OneToHPSDihedral0110, On
                     eps = (OneToHPSDihedral0110[AA1]+OneToHPSDihedral0110[AA2])/2.
                     key = (min(AA_ind,AA2_ind), max(AA_ind,AA2_ind))
                 end
-                if ! haskey(dihedral_short_map, key)
+                if !haskey(dihedral_short_map, key)
                     eps_short = round(eps;digits=4)
                     same_eps_ind = findfirst(x->x==eps_short, dihedral_eps)
                     if same_eps_ind===nothing
@@ -701,7 +701,9 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
 
     #if AlphaAddition then determine the Dihedral
     dihedral_short_map=Dict()
+    dihedral_eps, dihedral_long_map = [] , []
     dihedral_list = zeros(Int32, (0,0))
+    NDihedralsTypes=0
     if AlphaAddition
         (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
         NDihedralsTypes = length(dihedral_eps)
@@ -796,16 +798,17 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         write(file,"\nBonds\n#\n")
         bonds = getBonds(Sequences;M=2)
         for bid in axes(bonds,1)
-            write(file, "\t $bid \t 1 \t  $(bonds[bid, 1]) \t  $(bonds[bid, 1]) \n")
+            write(file, "\t $bid \t 1 \t  $(bonds[bid, 1]) \t  $(bonds[bid, 2]) \n")
         end
         write(file, "\n\n")
 
+        if AlphaAddition
 
         write(file,"\nAngles\n#\n")
 
         angles = getBonds(Sequences;M=3)
-        for bid in axes(bonds,1)
-            write(file, "\t $bid \t 1 \t  $(angles[bid, 1]) \t  $(angles[bid, 1]) \t  $(angles[bid, 2])\n")
+        for bid in axes(angles,1)
+            write(file, "\t $bid \t 1 \t  $(angles[bid, 1]) \t  $(angles[bid, 2]) \t  $(angles[bid, 3])\n")
         end
         write(file, "\n\n")
 
@@ -833,6 +836,8 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
                     write(file, "\t $dihedralid \t $(dihedral_long_map[key]) \t  $atomid \t  $(atomid+1) \t $(atomid+2) \t $(atomid+3)\n")
                 end
             end
+        end
+
         end
 
         close(file)
