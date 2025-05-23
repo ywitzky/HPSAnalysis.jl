@@ -490,7 +490,6 @@ function plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integ
         Plots.heatmap!(Sim.IntraChainContactMatrix[C], subplot=C, zscale=:ln)
     end
     
-    println(Sim.PlotPath*Sim.SimulationName*"_IntraChainContactMatrix.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainContactMatrix.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainContactMatrix.pdf")
 end

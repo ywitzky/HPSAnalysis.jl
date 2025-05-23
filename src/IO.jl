@@ -82,7 +82,6 @@ function parseXYZ_CSV!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         if two_lines
             x = tryparse(eltype(Sim.x), line) ### avoid weights that are so small that they cant be parsed
             write_step+=1
-            println("step: $write_step")
             Sim.FrameWeights[write_step] = x!== nothing ? x : 0.0
             if write_step!=1
                 Sim.x[:, write_step-1] .= xnew

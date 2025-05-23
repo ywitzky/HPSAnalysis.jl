@@ -116,7 +116,6 @@ function computeLocalPersistance(Sim::SimData{R,I}, r_0=1.0, MaxVariants = 5) wh
                 dot_product[i] = vec[1,i]*vec[1,i+1] + vec[2,i]*vec[2,i+1] + vec[3,i]*vec[3,i+1]
                 CosBondAngles[i,step]= dot_product[i]/(length_vec[i]*length_vec[i+1])
                 if abs(CosBondAngles[i,step])>1
-                    #println("step: $(step),  i: $(i), $(dot_product[i])  $(length_vec[i]) $(length_vec[i+1]), $(Sim.CosBondAngles[i,step])")
                     if CosBondAngles[i,step]<1.0001 && CosBondAngles[i,step]>1.0
                         CosBondAngles[i,step]=0.99999
                     end
@@ -214,9 +213,6 @@ function computeDihedralHist(Sim::SimData{R,I}; N = 500) where {R<:Real, I<:Inte
         for chain in 1:Sim.NChains
             for atom in Sim.ChainStart[chain]:Sim.ChainStop[chain]-3
                 index =  ceil(I, Sim.TorsionAngles[atom, step]*InvAngleResolution)
-                #if index==0 
-                #    println("$step, $chain, $atom, $(Sim.TorsionAngles[atom, step])")
-                #end
                 if index>180
                     index=180
                 end

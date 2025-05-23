@@ -37,7 +37,6 @@ function GenerateSequenceTables(Sequences, Names, Outpath;  LineMax=46)
     NSeq= length(Sequences)
     for Seq in Sequences
         cont, lines= GenerateSequenceByLine(Seq)
-        println(cont)
         append!(TableContents, cont)
         append!(LinesPerTable, lines)
     end
