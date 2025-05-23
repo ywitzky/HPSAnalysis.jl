@@ -34,7 +34,6 @@ function computeRGSeries!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
  
 end
 
-
 function computeREESeries!(Sim::SimData{R,I}, StartStops=[[]]) where{R<:Real, I<:Integer}
     #Array{Array{Tuple{I,I}}}()
     diff=0.
@@ -347,7 +346,7 @@ end
 @doc raw"""
     computeIntraChainScalingSlidingWindow(Sim::SimData{R,I})
 
-Computes the square intra chain distance |r_i-r_j| and averages in a sliding window approach.
+Computes the square intra chain distance |r_i-r_j|^2 and averages in a sliding window approach.
 
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
