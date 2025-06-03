@@ -5,8 +5,9 @@ EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python"
 
 using PyCall
-
-rm(SetupTestPath; force=true, recursive=true)
+if isdir(SetupTestPath)
+    rm(SetupTestPath; force=true, recursive=true)
+end
 mkpath("$SetupTestPath/HOOMD_Setup/")
 BasePath=SetupTestPath
 
@@ -36,14 +37,14 @@ for (protID, protein) in enumerate(ToCreate)
         Path = BasePath*"$(protein)/$(temp)K/RUN_$(pad)/"
         cd(Path)
 
-        Seq = HPSAnalysis.ProteinSequences.NameToSeq[protein]
-        NChains=4
+        Seque = HPSAnalysis.ProteinSequences.NameToSeq[protein]
+        NChain=1
 
-        Seq = HPSAnalysis.ProteinSequences.NameToSeq[protein]
-        Sequences= [deepcopy(Seq) for _ in 1:NChains]
-        Proteins = [deepcopy(protein) for _ in 1:NChains]
+        Seque = HPSAnalysis.ProteinSequences.NameToSeq[protein]
+        Sequences= [deepcopy(Seque) for _ in 1:NChain]
+        Proteins = [deepcopy(protein) for _ in 1:NChain]
 
-        ###FoldedDomain -> NChains * FoldedDomain
+        ###FoldedDomain -> NChain * FoldedDomain
 
         Info ="SLAB Simulation script for $protein.\n\n"
         BoxLengthShort=Float32(350.0)
@@ -56,9 +57,7 @@ for (protID, protein) in enumerate(ToCreate)
 
         ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
-        #itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
-
-        HPSAnalysis.Setup.writeStartConfiguration("./$(protein)_slab","./$(SimulName)_Start_slab.txt", Info, Sequences, BoxSize , 2_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=100, ENM)
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 2_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",ChargeTemperSwapSteps=10_000,WriteOutFreq=100, ENM)
 
         sim.run("$(Path)/")
     end

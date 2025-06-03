@@ -979,7 +979,6 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
         end
     end
-    println("$(InitFiles)$SimulationName.gro")
     ### read positons from gro
     Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
 

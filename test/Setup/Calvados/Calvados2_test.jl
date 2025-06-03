@@ -29,10 +29,8 @@ HPSAnalysis.Setup.WriteDictionaries("$SetupTestPath/HOOMD_Setup/Dictionaries.txt
 HPSAnalysis.Setup.WriteParams("$SetupTestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,Device="CPU", UseCharge=false, Create_Start_Config=true)
 HPSAnalysis.Setup.WriteDihedrals("$SetupTestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 
-#cd(SetupTestPath)
-
 sim.run("$SetupTestPath")
-data=GSDFormat.open("$(SetupTestPath)$(SimName)_StartConfiguration.gsd","r")
+data=GSDFormat.open("$(SetupTestPath)$(SimName)_300.0_Start_slab.gsd","r")
 
 frame = data[1]
 particle_N_test = frame.particles.N
@@ -66,8 +64,6 @@ InputPositions, InputTypes, InputCharges, InputMasses, Types, Diameter, InputIma
     @test bond_types_test==["O-O"]
     @test bond_typid_test==bondid
     @test bond_group_test==bond_group
-
-    #@test InputTypes == 
 end
 
-
+close(data)

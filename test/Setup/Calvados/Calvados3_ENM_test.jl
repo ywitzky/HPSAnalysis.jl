@@ -5,8 +5,9 @@ using JSON
 @testset "Calvados3 ENM" begin 
 
 BasePath = "$SetupTestPath/ENM_Test/"
-
-rm(BasePath; force=true, recursive=true)
+if isdir(BasePath)
+    rm(BasePath; force=true, recursive=true)
+end
 mkpath(BasePath)
 
 DomainDict= Dict("RS31" => [[1,70], [90,150]], "RS31a" => [[1,75], [90,140]]) 
@@ -126,9 +127,10 @@ Sequences = [Seq_Dict[x] for x in Proteins]
 
 (NBonds, B_types, B_typeid, B_groups, harmonic) = HPSAnalysis.Setup.ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
 
-@test NBonds == 15
-@test all(B_typeid .== [1, 2, 1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 5, 6, 7, 8, 9, 10, 5, 6, 7, 8, 9, 10])
-@test all(B_groups .== [(2, 3), (4, 5), (2, 3), (4, 5), (5, 6), (6, 7), (2, 3), (4, 5), (5, 6), (6, 7), (1,4), (10,12), (14,15),(16, 19), (25, 27), (29,30), (33, 37), (33,39), (36,39), (41,44), (50,52), (54,55), (58, 62), (58,64), (61, 64)])
+@test NBonds == 25
+@test all(B_types .== ["O-O", "BB_1", "BB_2", "BB_1", "BB_2", "BB_3", "BB_4", "BB_1", "BB_2", "BB_3", "BB_4", "ENM_5", "ENM_6", "ENM_7", "ENM_5", "ENM_6", "ENM_7", "ENM_8", "ENM_9", "ENM_10", "ENM_5", "ENM_6", "ENM_7", "ENM_8", "ENM_9", "ENM_10"])
+@test all(B_typeid .== [2, 3, 2, 3, 4, 5, 2, 3, 4, 5, 6, 7, 8, 6, 7, 8, 9, 10, 11, 6, 7, 8, 9, 10, 11]) # has a shift because default BB is 1
+@test all(B_groups .== [(1, 2), (3, 4), (1, 2), (3, 4), (4, 5), (5, 6), (1, 2), (3, 4), (4, 5), (5, 6), (0, 3), (9, 11), (13, 14), (15, 18), (24, 26), (28, 29), (32, 36), (32, 38), (35, 38), (40, 43), (49, 51), (53, 54), (57, 61), (57, 63), (60, 63)]) # shift from 1 -> 0, becasue of julia -> python
 
 
 harmonic_test = Dict{String, Dict{Symbol, Float64}}()
@@ -144,6 +146,7 @@ harmonic_test["BB_1"] = Dict(:k => 8033.0, :r => 0.37)
 harmonic_test["BB_2"] = Dict(:k => 8033.0, :r => 0.38)
 harmonic_test["BB_3"] = Dict(:k => 8033.0, :r => 0.5)
 harmonic_test["BB_4"] = Dict(:k => 8033.0, :r => 0.38)
+harmonic_test["O-O"] = Dict(:k => 700.0, :r => 3.8)
 
 @test harmonic_test == harmonic
 end

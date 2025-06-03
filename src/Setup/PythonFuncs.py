@@ -124,7 +124,7 @@ def convertDict(Dict):
 def read_ENM_HOOD_indices(filename):
     """Read the ENM_indices.txt data file and return number, type, id, group (which amino acid with which) and leght, force of each bond"""
 
-    B_N, B_types, B_typeid, B_group, harmonic = [], [], [], [], []
+    B_N, B_types, B_typeid, B_group, harmonic = [], [], [], [], dict()
     with open(filename) as file:
         for line in file:
             if line.startswith("//"):
@@ -133,13 +133,13 @@ def read_ENM_HOOD_indices(filename):
             try:
                 B_N.append(int(parts[0]))
                 B_types.append(str(parts[1]))
-                B_typeid.append(int(parts[2]))
+                B_typeid.append(int(parts[2])-1) # because of julia -> python, list start 1 -> 0
                 group1 = parts[3].strip("(")
                 group2 = parts[4].strip(")")
                 group_tuple = tuple((int(group1), int(group2)))
                 B_group.append(group_tuple)
                 harmonic_Dict = convertDict(parts[5])
-                harmonic.append(harmonic_Dict)
+                harmonic[str(parts[1])] = harmonic_Dict
             except ValueError as e:
                 print("Error by reading HOOMD indices")
                 continue

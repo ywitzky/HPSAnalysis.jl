@@ -12,6 +12,7 @@ import hoomd.md
 import sys
 from PythonFuncs import *
 from hoomd import ashbaugh_plugin
+import copy
 #from hoomd import plugin_HPS_SS
 #import ashbaugh_plugin as aplugin
 
@@ -101,14 +102,15 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
                 ## read the ENM_indice data
                 ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
+                filtered = [typ for typ in ENMB_types if typ!="O-O"]
+                B_types = ["O-O"] + filtered
                 
-                for i in range(ENMB_N): 
-                    harmonic.params[ENMB_types[i]] = dict(k=ENMharmonic[i]["k"], r0=ENMharmonic[i]["r"]/10.0)
+                for typ in B_types: 
+                    harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"]/10.0)
                     
-                B_N += ENMB_N
-                B_types += ENMB_types
-                B_typeid = np.append(B_typeid, ENMB_typeid)
-                B_group = np.append(B_group, ENMB_group)
+                B_N = ENMB_N
+                B_typeid = ENMB_typeid
+                B_group = ENMB_group
 
                 forces.append(harmonic)
 
@@ -121,7 +123,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             ## Create Angles
             snapshot.angles.N = NBeads-2*NChains
             snapshot.angles.types = ['O-O-O']
-            snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
+            snapshot.angles.typeid = np.zeros(snapshot.angles.N, dtype=int)
             snapshot.angles.group = InputAngles
 
             ## Create Dihedrals
@@ -130,10 +132,10 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             #snapshot.dihedrals.typeid =  dihedral_AllIDs
             #snapshot.dihedrals.group = InputDihedrals
 
-            with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
+            with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd", mode='w') as f:
                 f.append(snapshot)
 
-            sim.create_state_from_gsd(filename=FolderPath+Params['Simname']+"_StartConfiguration.gsd")
+            sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd")
         else:
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
