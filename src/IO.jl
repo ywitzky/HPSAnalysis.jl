@@ -211,7 +211,7 @@ function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String,
     ### Sim.StepFrequency is for data that will be reduceed, Sim.reduce sets discrepancy between energy data and .xyz created by presorting
     if Sim.TrajectoryFile[end-2:end] =="xyz"
         traj=open(TrajectoryFile, "r")
-        Sim.NAtoms= parse(I,readline(traj))#
+        Sim.NAtoms= parse(I,readline(traj))
     elseif Sim.TrajectoryFile[end-2:end] =="xtc"
         (_, xtc) = xtc_init(TrajectoryFile)
         Sim.NAtoms = xtc.natoms

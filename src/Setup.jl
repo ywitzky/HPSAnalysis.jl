@@ -257,7 +257,9 @@ function writeHPSLammpsScript(fileName, StartFileName, AtomTypes, LongAtomTypes,
 
     write(file, "run_style verlet\n")
 
-    if OutFormat=="xtc"
+    if OutFormat=="xyz"
+        write(file, "dump trajectory all xyz $WriteOutFreq ./Trajectory$(ChargeTemperSim ?  "_\${id}" : "").xyz")
+    elseif OutFormat=="xtc"
         write(file,"dump trajectory all xtc $WriteOutFreq ./Trajectory$(ChargeTemperSim ?  "_\${id}" : "").xtc\n")
     elseif OutFormat=="h5md"
         write(file,"dump trajectory all h5md $WriteOutFreq ./Trajectory$(ChargeTemperSim ?  "_\${id}" : "").h5 position image create_group yes\n")
@@ -758,8 +760,8 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
         writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition)
     else
-        writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
-        writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
+        writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq, OutFormat="xyz")
+        writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq, OutFormat="xyz")
 
         file = open(StartFileName*".txt", "w");
         write(file, Info)

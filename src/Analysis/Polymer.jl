@@ -227,7 +227,6 @@ function computeRGCorrelationTime(Sim::SimData{R,I}, NLags=5000) where{R<:Real, 
             end
         end
     end
-    println(half_time)
     Sim.RGMeasureStep = max(1,ceil(I,Statistics.mean(half_time)))
 end
 
