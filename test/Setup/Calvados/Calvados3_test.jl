@@ -3,6 +3,10 @@ SimName="test"
 import HPSAnalysis.BioData as BioData
 using GSDFormat 
 
+rm("$SetupTestPath/HOOMD_Setup/"; force=true, recursive=true)
+mkpath("$SetupTestPath/HOOMD_Setup/")
+
+
 Seq=["DEGHKDEGHK"]
 HPSAnalysis.Setup.WriteHOOMDSequences("$SetupTestPath/HOOMD_Setup/Sequences.txt", Seq)
 
@@ -19,9 +23,10 @@ end
 
 
 position=[0.0 0.0 1.0 0.5 0.0 0.0 -0.5 -1.0 0.0 0.0;;;-4.0 -3.0 -2.0 -1.0 0.0 0.0 1.0 2.0 3.0 4.0;;;0.0 0.0 -1.0 -0.5 -1.0 1.0 0.5 1.0 0.0 0.0]
-#Array([[[0.0,-4.0,0.0],[0.0,-3.0,0.0],[1.0,-2.0,-1.0],[0.5,-1.0,-0.5],[0.0,0.0,-1.0],[0.0,0.0,1.0],[-0.5,1.0,0.5],[-1.0,-2.0,1.0],[0.0,3.0,0.0],[0.0,4.0,0.0]]])
+
 
 coor=fill(0.0,1,maximum(length(seq) for seq in Seq),3)
+
 
 
 HPSAnalysis.Setup.WriteHOOMDParticlesInput("$SetupTestPath/HOOMD_Setup/Particles.txt",position,BioData.OneToHPSCharge,AaToId,Seq,BioData.AaToWeight,BioData.OneToHPSCalvadosSigma,coor)
@@ -29,7 +34,15 @@ HPSAnalysis.Setup.WriteDictionaries("$SetupTestPath/HOOMD_Setup/Dictionaries.txt
 HPSAnalysis.Setup.WriteParams("$SetupTestPath/HOOMD_Setup/Params.txt",SimName,300, 10, 1, 0.01, Array([10,101,10]), rand(1:65535), UseAngles=false,domain=Array([[3,8]]),Device="CPU", UseCharge=false, Create_Start_Config=true,SimType="Calvados3")
 HPSAnalysis.Setup.WriteDihedrals("$SetupTestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 
-sim.run("$SetupTestPath")
+#@error "ENM are not properly tested!"
+harmonic = Dict{String, Dict{Symbol, Float64}}()
+r0 = 0.5
+harmonic["ENM_3_5"] = Dict(:r => r0, :k => 700)
+harmonic["ENM_3_6"] = Dict(:r => r0, :k => 700)
+harmonic["ENM_4_6"] = Dict(:r => r0, :k => 700)
+HPSAnalysis.Setup.WriteENM_HOOMD_Indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt", (3, ["ENM_3_5","ENM_3_6","ENM_4_6"], [1, 2, 3], [(3, 5), (3, 6), (4, 6)], harmonic))
+
+sim.run(SetupTestPath)
 data=GSDFormat.open("$(SetupTestPath)$(SimName)_StartConfiguration.gsd","r")
 
 
@@ -47,13 +60,12 @@ bond_group_test=frame.bonds.group
 
 typesid=UInt32[1, 3, 4, 2, 0, 1, 3, 4, 2, 0]
 coor=Float32[0.0 -0.4 0.0; 0.0 -0.3 0.0; 0.1 -0.2 -0.1; 0.05 -0.1 -0.05; 0.0 0.0 -0.1; 0.0 0.0 0.1; -0.05 0.1 0.05; -0.1 0.2 0.1; 0.0 0.3 0.0; 0.0 0.4 0.0]
-bond_group=Int32[0 1; 1 2; 2 3; 3 4; 4 5; 5 6; 6 7; 7 8; 8 9; 3 5; 3 6; 3 7; 4 6; 4 7; 5 7]
+bond_group=Int32[0 1; 1 2; 2 3; 3 4; 4 5; 5 6; 6 7; 7 8; 8 9; 3 5; 3 6; 4 6]
 image=Int32[0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0]
 types=["K", "D", "H", "E", "G"]
 
-bondid=UInt32[0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-bondtypes=["O-O\0\0\0\0", "O-O_D1\0", "O-O_D2\0", "O-O_D3\0", "O-O_D4\0", "O-O_D5\0", "O-O_D6\0", "O-O_D7\0", "bond_8\0", "bond_9\0", "bond_10", "bond_11", "bond_12", "bond_13"]
-#["O-O", "O-O_D1", "O-O_D2", "O-O_D3", "O-O_D4", "O-O_D5", "O-O_D6", "O-O_D7", "bond_8", "bond_9", "bond_10", "bond_11", "bond_12", "bond_13"]
+bondid=UInt32[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3]
+bondtypes=["O-O\0\0\0\0", "ENM_3_5", "ENM_3_6", "ENM_4_6"]
 
 @testset "Calvados3" begin
     @test particle_N_test==10
@@ -62,8 +74,11 @@ bondtypes=["O-O\0\0\0\0", "O-O_D1\0", "O-O_D2\0", "O-O_D3\0", "O-O_D4\0", "O-O_D
     @test particle_typeid_test==typesid
     @test particle_image_test==image
     
-    @test bond_N_test==UInt32(15)
+    @test bond_N_test==UInt32(12)
     @test bond_types_test==bondtypes
     @test bond_typid_test==bondid
     @test bond_group_test==bond_group
 end
+
+
+

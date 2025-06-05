@@ -19,7 +19,7 @@ end
 
 
 position=[0.0 0.0 1.0 0.5 0.0 0.0 -0.5 -1.0 0.0 0.0;;;-4.0 -3.0 -2.0 -1.0 0.0 0.0 1.0 2.0 3.0 4.0;;;0.0 0.0 -1.0 -0.5 -1.0 1.0 0.5 1.0 0.0 0.0]
-#Array([[[0.0,-4.0,0.0],[0.0,-3.0,0.0],[1.0,-2.0,-1.0],[0.5,-1.0,-0.5],[0.0,0.0,-1.0],[0.0,0.0,1.0],[-0.5,1.0,0.5],[-1.0,-2.0,1.0],[0.0,3.0,0.0],[0.0,4.0,0.0]]])
+
 
 coor=fill(0.0,1,maximum(length(seq) for seq in Seq),3)
 
@@ -30,7 +30,6 @@ HPSAnalysis.Setup.WriteParams("$SetupTestPath/HOOMD_Setup/Params.txt",SimName,30
 HPSAnalysis.Setup.WriteDihedrals("$SetupTestPath/HOOMD_Setup/DihedralMap.txt",[],0)
 
 #cd(SetupTestPath)
-#run(`$(ENV["PYCALL_JL_RUNTIME_PYTHON"]) $(PkgSourcePath)/Setup/Submit_HOOMD.py`)
 
 sim.run("$SetupTestPath")
 data=GSDFormat.open("$(SetupTestPath)$(SimName)_StartConfiguration.gsd","r")
@@ -54,6 +53,8 @@ image=Int32[0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0; 0 0 0
 types=["K", "D", "H", "E", "G"]
 bondid=UInt32[0, 0, 0, 0, 0, 0, 0, 0, 0]
 
+InputPositions, InputTypes, InputCharges, InputMasses, Types, Diameter, InputImage = sim.readParticleData("$SetupTestPath/HOOMD_Setup/Particles.txt", N, [Seq])
+
 @testset "Calvados2" begin
     @test particle_N_test==10
     @test particle_position_test==coor
@@ -65,4 +66,8 @@ bondid=UInt32[0, 0, 0, 0, 0, 0, 0, 0, 0]
     @test bond_types_test==["O-O"]
     @test bond_typid_test==bondid
     @test bond_group_test==bond_group
+
+    #@test InputTypes == 
 end
+
+

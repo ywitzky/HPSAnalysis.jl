@@ -1,11 +1,9 @@
 const ChoosenFloatType=Float32
 const ChoosenIntType=Int32
-#import StructDispatch
 using Revise, OffsetArrays
 using StaticArrays
 
 
-#@StructDispatch.GetType 
 mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     HOOMD::Bool
     SimulationName::String
@@ -157,8 +155,6 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     HydropathyDecoration::Array{FloatType}
     MeanHydropathy::Array{FloatType}
 
-    #REEHistsAxes::Vector{Array{UnitRange{Int64}}}
-    #REEHists::Vector{Array{Vector{FloatType}}}
     REEHistsAxes::Array{UnitRange{Int32}}
     REEHists::Array{FloatType}
     FrameWeights::Array{FloatType}

@@ -87,11 +87,11 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
             bla = sigmoid_profile.(xaxis, width[i]).*values[step].+0.05
             Sim.SlabHistogramSeries[:, step,1] = bla
         end
-
-        ρ_dense, ρ_dilute, ind_dense, ind_dilute = HPSAnalysis.computeSlabDensities(Sim;Width=5,MaxVal=MaxVal, Surface_fac=Surface_fac)
+        safety_ =25
+        ρ_dense, ρ_dilute, ind_dense, ind_dilute = HPSAnalysis.computeSlabDensities(Sim;Width=5,MaxVal=MaxVal, Surface_fac=Surface_fac, safety=safety_)
 
         @test all(ρ_dense .≈ (values.+0.05))
-        @test all(ρ_dilute .≈ 0.05)
+        @test all(ρ_dilute.≈ 0.05)
 
         ### analytical solution to sigmoid = MaxVal; index_dense is negavtive
         index_dense = -width .- log.(values ./((ρ_dense).*MaxVal.-0.05).-1) 
@@ -102,7 +102,11 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
         index_dense = round.(Int32, (index_dense.-1).*Surface_fac).+1 
 
         index_dilute = -width .- log.(values./((1.0.-MaxVal).*(ρ_dense.-0.05)).-1) 
-        index_dilute = floor.(Int32, floor.(Int32, index_dilute) -abs.(diff))
+        index_dilute = floor.(Int32, floor.(Int32, index_dilute) ) #-abs.(diff))
+
+        index_dense .= minimum(abs.(index_dense))
+        safety=ceil(Int32, safety_/Sim.Resolution)
+        index_dilute .= maximum(abs.(index_dilute)) + safety
 
         @test all(abs.(index_dense) .== ind_dense)
         @test all(abs.(index_dilute) .== ind_dilute)

@@ -317,8 +317,6 @@ end
 function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
     axis = 0:length(Sim.RGAutocorr[1,:])-1
-    println(axis)
-    println(maximum(axes(Sim.RGAutocorr[1,:])))
     avg = sum(Sim.RGAutocorr, dims=1)[1,:]./Sim.NChains
 
     for chain in 1:Sim.NChains
@@ -393,7 +391,7 @@ Plots the average slab histogram in range n\*Windowlength:(n+1)\*Windowlength st
 **Create**:
 * A histogram of the average density.
 """
-function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
+function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100, dilute_pos=0, dense_pos=0) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
@@ -421,6 +419,15 @@ function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100) where 
     for i in 1:tmp
         if (i)*Windowlength < Sim.EquilibrationTime continue end
         Plots.plot!(axes(AvgHist)[1][2:end-1], AvgHist[:,1,i][2:end-1],  label="",  line_z=i, marker_z=i, levels=tmp, c=:darktest)
+    end
+
+    center = maximum(axes(Sim.SlabHistogramSeries,1))
+    if dilute_pos!=0
+        Plots.vline!([center-dilute_pos,center+dilute_pos], c=:black, label="")
+    end
+
+    if dense_pos!=0
+        Plots.vline!([center-dense_pos, center+dense_pos], c=:black, label="")
     end
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.png")

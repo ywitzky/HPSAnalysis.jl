@@ -1,12 +1,10 @@
+#using HPSAnalysis.Polyply
+using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat
 
-using JLD2, Mmap, LoopVectorization ,  Printf, HDF5, GSDFormat#, gsd # ProfileView,
-
-### preliminary GSD_wrapper include
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/GSD/src/gsd.jl")
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/GSD/src/HOOMDTrajectory.jl")
-
+include("./IO/Xtc.jl")
 include("./IO/IO_HOOMD.jl")
 include("./IO/Sequence_IO.jl")
+include("./IO/Formats.jl")
 
 function parseXYZ!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     traj=open(Sim.TrajectoryFile, "r")
@@ -850,7 +848,7 @@ end
 
 
 @doc raw"""
-    CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{R}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true)
+    CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{R}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true,SimulationType="Calvados2",ProteinToDomain=Dict(),ProteinToCif=Dict())
 
 Creates the file structure and initialises particle positions for the given parameters.
 
@@ -863,11 +861,14 @@ Creates the file structure and initialises particle positions for the given para
 **Optional Arguments**:
 - `Axis::String`: The axis along which the system is unfolded.
 - `Regenerate::Bool`: If true, regenerates initial positions using the Polyply package.
+- `SimulationType::String`: Type of Simulation (default is Calvados2).
+- `ProteinToDomain::Dict`: Dictionary of domains for the proteins.
+- `ProteinToCif::Dict`: Dictionary of the AlphaFold data files for each protein.
 
 **Returns**:
 * A tuple (pos, Data) containing the initial positions and the simulation data structure.
-    """
-function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true)
+"""
+function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{ChoosenFloatType}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis="y", Regenerate=true,SimulationType="Calvados2",ProteinToDomain=Dict(),ProteinToCif=Dict())
     #Definition of Paths for the parameters
     Data = SimData()
     Data.BasePath= Path
@@ -937,8 +938,6 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         Data.ChainStop[i] = Data.ChainStop[i-1]+length(Seq)
     end
 
-
-
     ### allocate disk space for X
     #creat path for the coordinates
     Data.xio= open(Data.xFilePath,"w+")
@@ -950,27 +949,47 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     Data.y =  Mmap.mmap(Data.yio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
     Data.z =  Mmap.mmap(Data.zio, Matrix{eltype(Data.x)}, (Data.NAtoms,Data.NSteps))
 
+
     ######## Start Generation of Initial positions with Polyply
     InitFiles= "$(Data.BasePath)/InitFiles/"
     mkpath(InitFiles)
 
-    if Regenerate
-        ### generate Martini ITP Files
-        mkpath("$(InitFiles)ITPS_Files/")
-        Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
+    if SimulationType=="Calvados3"
+        if Regenerate
+            mkpath("$(InitFiles)Elastic_Files/")
+            ###Creat a pdb data from the AlphaFold cif data
+            RewriteCifToPDB(Data.BasePath,ProteinToCif, Proteins )
 
-        ### Generate Topology files
-        TopologyFile = "$(InitFiles)TestTopology.top"
-        Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
+            itpPath="$(InitFiles)ITPS_Files/"
+            mkpath(itpPath)
+            Polyply.GenerateENM_ITPFilesOfSequence(Data.BasePath, Proteins,ProteinToDomain)
 
-        ### generate coordinates
-        Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+            TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
+            
+            Polyply.GenerateSlabTopologyFile(TopologyFile,itpPath, Proteins, Data.SimulationName)
 
-        ### convert to PDB
-        #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
+            ### generate coordinates
+            Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+        end
+    elseif SimulationType=="Calvados2"
+        if Regenerate
+            ### generate Martini ITP Files
+            mkpath("$(InitFiles)ITPS_Files/")
+            Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
+
+            ### Generate Topology files
+            TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
+            Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
+
+            ### generate coordinates
+            Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+
+            ### convert to PDB
+            #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
+        end
     end
-    ### read positons from pdb
-    #Polyply.readPDB("$(InitFiles)$SimulationName.pdb", Data.x,Data.y,Data.z)
+    println("$(InitFiles)$SimulationName.gro")
+    ### read positons from gro
     Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
 
     ### sync RAM to disk before closing,

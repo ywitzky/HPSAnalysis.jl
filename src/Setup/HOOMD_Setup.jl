@@ -87,7 +87,7 @@ function WriteDihedrals(filename, dihedral_map, dihedral_eps)
 end
 
 @doc raw"""
-    WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0)
+    WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]))
 
 Write a data file that contains all Parameters of the Simulation.
     
@@ -113,6 +113,8 @@ Write a data file that contains all Parameters of the Simulation.
 - `ah_cut::Float`: Cutoff for the Ashbaugh potential.
 - `ionic::Float`: Ionic strength used for Yukawa potential.
 - `pH::Float`: PH value of the simulation.
+- `SimType::String`: Type of the simulation (like Calvados2, Calvados3).
+- `domain::Array`: Area in with the ENM is active (only for Calvados3).
 
 **Creat**:
 * Write a file with all parameters of the simulation that are given from the arguments.
@@ -148,3 +150,24 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     close(io);
 end
 
+@doc raw"""
+    WriteENM_HOOMD_Indices(filename::String, ENM)
+
+Write a data file with all necessary datas for the ENM in HOOMD.
+    
+**Arguments**
+- `filename::String`: Path where the data will be saved.
+- `ENM::Tuple`: The necessary datas.
+
+**Creat**:
+* Write a file with all datas for the ENM.
+"""
+function WriteENM_HOOMD_Indices(filename::String, ENM)
+    ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
+    io = open(filename, "w")
+    write(io, "// N, ENMB_type, ENMB_typeid, ENMB_group_vector, harmonic\n")
+    for i in 1:ENMB_N
+        write(io, "$(i) , $(ENMB_types[i]) , $(ENMB_typeid[i]) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[i]]) \n")
+    end
+    close(io);
+end

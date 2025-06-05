@@ -41,6 +41,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
     kb = 0.00831446262
     kT = kb*Params["Temp"]
+    forces = []
 
     ### Prepare HOOMD 
     tmp = []
@@ -84,22 +85,29 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
 
+            B_N = NBeads-NChains
+            B_types = ['O-O']
+            B_typeid = np.zeros(B_N, dtype=np.int32)
+            B_group = InputBonds#.astype(np.uint32)
 
             if Params["SimulationType"]=="Calvados3":
-                forces = []
                 ### Harmonic bonds
                 harmonic = hoomd.md.bond.Harmonic()
-                harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
-                forces.append(harmonic)
-                #print(Params["Domain_begin"])
+                harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ### calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
 
-                B_N,B_types,B_typeid,B_group=BondC3(NBeads, Params["Domains"],harmonic, InputPositions.astype(np.float32))
-            
-            else:#also Calvados2
-                B_N = NBeads-NChains
-                B_types = ['O-O']
-                B_typeid = np.zeros(B_N, dtype=np.int32)
-                B_group = InputBonds#.astype(np.uint32)
+                ## read the ENM_indice data
+                ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
+                
+                for i in range(ENMB_N): 
+                    harmonic.params[ENMB_types[i]] = dict(k=ENMharmonic[i]["k"], r0=ENMharmonic[i]["r"]/10.0)
+                    
+                B_N += ENMB_N
+                B_types += ENMB_types
+                B_typeid = np.append(B_typeid, ENMB_typeid)
+                B_group = np.append(B_group, ENMB_group)
+
+                forces.append(harmonic)
+
 
             snapshot.bonds.N = B_N
             snapshot.bonds.types = B_types
@@ -131,7 +139,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         return -1
 
     if Params["SimulationType"]!="Calvados3":
-        forces = []
         ### Harmonic bonds
         harmonic = hoomd.md.bond.Harmonic()
         harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
@@ -236,7 +243,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
-
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
     if not Restart:

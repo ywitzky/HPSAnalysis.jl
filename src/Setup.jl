@@ -1,17 +1,14 @@
+include("./Setup/Polyply.jl")
+
 module Setup
 
 export createDenseStartingPosition, writeCollectedSlurmScript
 
-### preliminary GSD_wrapper include
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/gsd.jl")
-#include("/uni-mainz.de/homes/ywitzky/Code_Projects/gsd/src/HOOMDTrajectory.jl")
-using GSDFormat
+using GSDFormat, HPSAnalysis, JSON, Printf
 
-#include("ProteinSequences.jl")
-#using .ProteinSequences
-using Printf
-include("BioData.jl")
+include("../data/BioData.jl")
 include("Setup/HOOMD_Setup.jl")
+
 using .BioData
 
 
@@ -580,7 +577,6 @@ function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
             OneToHPSDihedral1001[e] = OneToHPSDihedral1001[AA]
         end
     end
-
     return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
 
@@ -702,7 +698,7 @@ function startConfigurationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneT
     end
 
     (AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001) =  DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=OneToChargeDef, OneToLambdaDef=OneToLambdaDef, OneToSigmaDef=OneToSigmaDef)
-    #Define lenght of all chains
+    #Define length of all chains
     NAtomTypes = length(LongAtomTypes)
 
     #if AlphaAddition then determine the Dihedral
@@ -714,10 +710,20 @@ function startConfigurationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneT
         (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
         NDihedralsTypes = length(dihedral_eps)
     end
-    return NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list
+    return NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list
 end
+@doc raw"""
+    writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
 
-function writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list)
+Writes the datas for the simulation in different files with HOOMD.
+    
+**Arguments**
+- from writeStartConfiguration()
+
+**Creates**:
+* Writes the datas for the simulation.
+"""
+function writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
         mkpath("./HOOMD_Setup")
         WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)
         WriteHOOMDParticlesInput("./HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
@@ -727,13 +733,25 @@ function writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,
         (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain) ### BoxLength has to be convert to nm
+        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true) ### BoxLength has to be convert to nm
         WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
+        WriteENM_HOOMD_Indices("./HOOMD_Setup/ENM_indices.txt", ENM)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
-        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition)    
+        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, domain, ENM)    
 end
 
+@doc raw"""
+    writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
+
+Writes the datas for the simulation in different files.
+    
+**Arguments**
+- from writeStartConfiguration()
+
+**Creates**:
+* Writes the datas for the simulation.
+"""
 function writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
     writeHPSLammpsScript( fileName*".lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, false, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
     writeHPSLammpsScript( fileName*"_restart.lmp",StartFileName, AtomTypes, LongAtomTypes, AaToId, LongAtomTypesToRes, OneToCharge, OneToSigma, OneToLambda, dihedral_eps, InitStyle, SimulationType, Temperature, AlphaAddition, true, NSteps; SaltConcentration=SaltConcentration, pH=pH, ChargeTemperSteps=ChargeTemperSteps, ChargeTemperSwapSteps=ChargeTemperSwapSteps,WriteOutFreq=WriteOutFreq)
@@ -844,15 +862,17 @@ Writes the start configuration for a molecular dynamics simulation.
 - `Device::String`: Computational device, "CPU"/"GPU" (default: "GPU").
 - `yk_cut::Float`: Cutoff distances for yukawa potential.
 - `ah_cut::Float`: Cutoff distances for ashbaugh hatch potential.
+- `domain::List(Int)`: Domains in which the ENM is active.
+- `ENM::Tuple`: Data that are nessesary for ENM (bond name, id, group).
 
 **Creates**:
 * Writes data files with the start configuration.
 """
-function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0)
+function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
-    NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list=startConfigurationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneToLambdaDef,OneToSigmaDef,MixingRule)
+    NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list = startConfigurationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneToLambdaDef,OneToSigmaDef,MixingRule)
 
 
     #Set start coordinates for the AA, with different variations
@@ -890,7 +910,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     domain = []
     #Write all Inputs, Parameters (Yukawa Interaction with Debye-Hückle), Dictionaries and the Start-File
     if HOOMD
-        writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list)
+        writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
     else
         writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
     end
@@ -988,7 +1008,179 @@ function writeCollectedSlurmScript(Path, Proteins, RelPaths,MPICores,OMPCores; P
 end
 
 @doc raw"""
-    writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
+    BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer}
+
+Calculate the Indices, that are nessesary to creat a start file im HOOMD.
+    
+**Arguments**
+- `Sim::HPSAnalysis.SimData{T,I}`: The simulation datas.
+- `DomainDict`: The Domains in which the ENM is active.
+- `Proteins`: List of Protein Names.
+- `Sequences`: The Sequences of the Proteins.
+- `ProteinJSON`: AlphaFold data of the Proteins.
+
+**Return**:
+* The nessesary Indices for HOOMD.
+"""
+function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
+
+    ConstraintDict, Backbone_correction_Dict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
+
+    HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
+    return HOOMD_Indices
+end
+
+@doc raw"""
+    ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+
+Calculate the Indices, that are nessesary to creat a start file im HOOMD.
+    
+**Arguments**
+- `ConstraintDict::Dictionary with atoms and length which will be connected via ENM.
+- `Sequences`: The Sequences of the Proteins.
+- `Proteins`: List of Protein Names.
+
+**Return**:
+* The nessesary Indices for HOOMD.
+"""
+function ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
+    offsets = cumsum(length.(Sequences))
+
+    NBonds = 0
+    B_types = []
+    B_typeid = Int[]
+    B_groups = Vector{Tuple{Int32, Int32}}()
+    harmonic = Dict{String, Dict{Symbol, Float64}}()
+    binds = "ENM_bond_"
+    off = 0
+    bondLength = 3.8
+
+    type_cnt=1
+    MinimalTypes = Dict()
+    for Protein in Set(Proteins)
+        for (i,j, r0) in Backbone_correction_Dict[Protein]
+            if r0 != bondLength
+                MinimalTypes[(Protein, i,j)] = type_cnt 
+                BB_bondname = "BB_$(MinimalTypes[(Protein, i, j)])"
+                harmonic[BB_bondname] = Dict(:r => r0, :k => 8033)
+                type_cnt+=1
+            end
+        end
+    end
+
+    for Protein in Set(Proteins)
+        for (i,j, r0) in ConstraintDict[Protein]
+            MinimalTypes[(Protein, i,j)] = type_cnt 
+            bondname = "ENM_$(MinimalTypes[(Protein, i, j)])"
+            harmonic[bondname] = Dict(:r => r0, :k => 700)
+            type_cnt+=1
+        end
+    end
+
+    for (i, Prot ) in enumerate(Proteins)
+        for (atom_1, atom_2, r0) in Backbone_correction_Dict[Prot]
+            if r0 != bondLength
+                bondname = "BB_$(MinimalTypes[(Prot, atom_1, atom_2)])"
+                push!(B_types, bondname)
+                push!(B_typeid, MinimalTypes[(Prot, atom_1, atom_2)])
+                push!(B_groups, (atom_1+off, atom_2+off))
+                #NBonds+= 1 # do not increase NBond, because N_BB is added later in writeGSDStartFile to check rigth bond number
+            elseif r0 == bondLength
+                push!(B_typeid, 0)
+                push!(B_groups, (atom_1+off, atom_2+off))
+            end
+        end
+    end
+
+    for (i, Prot ) in enumerate(Proteins)
+        for (atom_1, atom_2, r0) in ConstraintDict[Prot]
+            bondname = "ENM_$(MinimalTypes[(Prot, atom_1, atom_2)])"
+            push!(B_types, bondname)
+            push!(B_typeid, MinimalTypes[(Prot, atom_1, atom_2)])
+            push!(B_groups, (atom_1+off, atom_2+off))
+            NBonds+= 1
+        end
+        off = offsets[i]
+    end
+    return (NBonds, B_types, B_typeid, B_groups, harmonic)
+end
+
+@doc raw"""
+    DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
+Return a Dictionary of atoms and there distances that are nessesary for the Elastic Network Model.
+    
+**Arguments**
+- `BasePath`: The base path of the simulation setup procedure.
+- `DomainDict`:: The Domains in which the ENM is active.
+- `Proteins`: List of Protein Names.
+- `ProteinJSON`: Dictionary of AlphaFold data of the Proteins in JSON format.
+- `BBProtein`: The atom from which the AlphaFold datas are set for the aminoacid.
+- `rcut`: Cut of length for the ENM.
+- `plDDTcut`: Cut of plDDT parameter of AlphaFold reference for the ENM.
+- `pae_cut`: Cut of pae parameter of AlphaFold reference for the ENM.
+
+**Return**:
+* A Dictionary of atoms and lengths.
+"""
+function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
+    ciffolder = "$(BasePath)/InitFiles/CifFiles"
+    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
+    Backbone_correction_Dict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
+    bondLength = 3.8  ## coordinates are in nm
+    for Prot in Set(Proteins)
+        if length(DomainDict[Prot])>0
+            CifPath = "$(ciffolder)/$(Prot).cif"
+            lines = readlines(CifPath)
+            x = zeros(length(lines))
+            y = zeros(length(lines))
+            z = zeros(length(lines))
+            plDDT = zeros(length(lines))
+
+            step = 1
+            for line in readlines(CifPath)
+                fields = strip.(split(line))
+                if !isempty(fields) && fields[1] == "ATOM" && fields[4] == BBProtein
+                    x[step] = parse(Float64, fields[11])
+                    y[step] = parse(Float64, fields[12])
+                    z[step] = parse(Float64, fields[13])
+                    plDDT[step]= parse(Float64, fields[15])
+                    step += 1
+                end
+            end
+            ConstraintDict[Prot] = []
+            Backbone_correction_Dict[Prot] = []
+            pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
+            for i in 1:step-2
+                in_any_domain = false
+                for Domain in DomainDict[Prot]
+                    if Domain[1] ≤ i ≤ Domain[2] && i + 1 ≤ Domain[2]
+                        dist_sqr = (x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2
+                        push!(Backbone_correction_Dict[Prot], (i, i+1, sqrt(dist_sqr)))
+                        in_any_domain = true
+            
+                        if plDDT[i] ≥ plDDTcut
+                            for j in i+3:Domain[2]
+                                dist_sqr = (x[j]-x[i])^2 + (y[j]-y[i])^2 + (z[j]-z[i])^2
+                                if dist_sqr < rcut^2 && plDDT[j] ≥ plDDTcut && pae[i][j] < pae_cut && pae[j][i] < pae_cut
+                                    push!(ConstraintDict[Prot], (i, j, sqrt(dist_sqr)))
+                                end
+                            end
+                        end
+                        break
+                    end
+                end
+            
+                if !in_any_domain
+                    push!(Backbone_correction_Dict[Prot], (i, i+1, bondLength))
+                end
+            end
+        end
+    end
+    return ConstraintDict, Backbone_correction_Dict
+end
+
+@doc raw"""
+    writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool, SimulationType::String, Domains, ENM) where {I<:Integer, R<:Real, I2<:Integer}
 
 A GSD data file is written, that include the parameters for the Simulation witch are given as Arguments.
     
@@ -1009,11 +1201,14 @@ A GSD data file is written, that include the parameters for the Simulation witch
 - `DihedralList::Matrix{Int}`: A matrix where each row defines a specific dihedral angle using atom indices.
 - `AaToSigma::Dict{Char, <:Real}`: A dictionary mapping amino acid types to their Lennard-Jones σ-parameter (used in force field calculations).
 - `UseAngles::Bool`: If `true`, angle and dihedral interactions are included in the GSD file.
+- `SimulationType::String`: Type of simulation.
+- `Domains::List(Int)`: Domains in which the ENM is active.
+- `ENM::Tuple`: Data that are nessesary for ENM (bond name, id, group).
 
 **Creates**:
 * Writes the GSD data files.
 """
-function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool) where {I<:Integer, R<:Real, I2<:Integer}
+function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool, SimulationType::String, Domains, ENM) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSDFormat.Frame()    
     snapshot.configuration.step = 1 
@@ -1032,11 +1227,23 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     snapshot.particles.diameter =  [Float32(AaToSigma[AA])/10.0  for AA in join(Sequences)]
 
     ### Bond_data.group = (self.N, getM(data)
+    B_N, B_types, B_typeid, B_group_matrix = NBonds, ["O-O"], zeros(Int32, NBonds), getBonds(Sequences, M=2)
     # Create Bonds
-    snapshot.bonds.N = NBonds
-    snapshot.bonds.types = ["O-O"]
-    snapshot.bonds.typeid = zeros(Int32, NBonds)
-    snapshot.bonds.group = getBonds(Sequences, M=2)
+    if SimulationType == "Calvados3"
+        ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
+
+        B_N += ENMB_N
+        B_types = ENMB_types#vcat(B_types, ENMB_types)
+        B_typeid = ENMB_typeid#vcat(B_typeid, Int32.(ENMB_typeid))
+        ENMB_group_matrix = permutedims(hcat(collect.(ENMB_group_vector)...))
+
+        B_group_matrix = ENMB_group_matrix#vcat(B_group_matrix,ENMB_group_matrix)
+    end
+
+    snapshot.bonds.N = B_N
+    snapshot.bonds.types = B_types
+    snapshot.bonds.typeid = B_typeid
+    snapshot.bonds.group = B_group_matrix
 
     if UseAngles
         # Create Angles

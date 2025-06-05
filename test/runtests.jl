@@ -1,14 +1,19 @@
 using HPSAnalysis
 PkgSourcePath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
+PkgPath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-2])
 
 EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
-
-ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)bin/python3"
+ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python3"
+# might need to run the following lines once
+#ENV["PYTHON"]="$(EnvironmentPath)/bin/python3"
+# using Pkg
+# Pkg.build("PyCall")
 
 using PyCall, Test, Scratch, Aqua
 pushfirst!(pyimport("sys")."path", "$(PkgSourcePath)/Setup/")
 
 TestPath = Scratch.get_scratch!(HPSAnalysis, "test") 
+
 
 
 @testset "Aqua" begin
@@ -19,4 +24,3 @@ end
 
 include("./Analysis/Analysis_test.jl")
 include("./Setup/Setup_test.jl")
-include("./Calvados/C_test.jl")

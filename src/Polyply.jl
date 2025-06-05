@@ -6,9 +6,6 @@ using Scratch
 
 polyply = "$(HPSAnalysis.EnvironmentPath)/bin/polyply"
 
-
-polyply="/localscratch/Python3.13Environments/HPSAnalysis/bin/polyply"
-
 function ConvertGroToPDB(Path, Filename)
     GMX_Path="/localscratch/Programs/gromacs-2022.2/bin/gmx"
     run(`$GMX_Path editconf -f $(Path)$(Filename).gro -o $(Path)$(Filename).pdb`)

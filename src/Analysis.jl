@@ -8,6 +8,8 @@ include("./Analysis/Polymer.jl")
 include("./Analysis/Slab.jl")
 include("./Analysis/BondedAnalysis.jl")
 include("./Analysis/SequenceAnalysis.jl")
+include("./Analysis/HREMD/Unify.jl")
+include("./Analysis/HREMD/HREMD.jl")
 
 
 function symmetriesMatrix(A::Matrix{T}) where {T<:Number}

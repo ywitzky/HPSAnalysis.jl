@@ -5,10 +5,9 @@ import copy
 import gsd.hoomd
 from hoomd import ashbaugh_plugin
 import ast
+from CifFile import ReadCif
 import re
 import os
-
-
 
 def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
     IDs = IDs.astype(int)+1
@@ -36,6 +35,8 @@ def determineDihedrals( Sequences,IDs, dihedral_dict, MixingRule="1-1001-1"):
     return id_list
     
 def readSequences(fileName):
+    """Read the Seqeuences.txt data file and return sequence, bond number, Chain number, nonds, angeles and dihedrals"""
+
     file  = open(fileName,'r')
     NBeads=0
     tmp = ""
@@ -59,7 +60,6 @@ def readSequences(fileName):
     cnt = 0
     for Seq in Seqs:
         for (i,aa) in enumerate(Seq[:-1]):
-            #InputBonds[cb+i,:] = [cnt+i,cnt+i+1]
             InputBonds.append([cnt+i, cnt+i+1])#[[0,1],[1,2],...,[N-1,N]]
 
         for (i,aa) in enumerate(Seq[:-2]):
@@ -75,6 +75,8 @@ def readSequences(fileName):
     return Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals
 
 def readParticleData(fileName, Nparticles, Sequences):
+    """Read the Particles.txt data file and return for each amino acid position, type, charge, mass, diameter and image"""
+
     InputPositions = np.zeros((Nparticles,3), dtype=np.float32)
     InputImage = np.zeros((Nparticles,3), dtype=np.int32)
 
@@ -100,6 +102,8 @@ def readParticleData(fileName, Nparticles, Sequences):
     return InputPositions, InputTypes, InputCharges, InputMasses, Types, Diameter, InputImage
 
 def readDictionaries(filename):
+    """Read the Dictionaries.txt data file and return dictionary amino acid to id, name, charge, mass, sigma, lambda"""
+
     ID,resname, q, mass, sigma, lamda_val = np.genfromtxt(filename, delimiter=", ", comments="//", unpack=True, dtype=str)#int, converters={0: lambda x: int(x), 1: lambda x: str(x).strip(), 2: lambda x: float(x), 3: lambda x: float(x), 4: lambda x: float(x), 5: lambda x: float(x) })
     ID=ID.astype(int)-1
     resname = np.array(resname)
@@ -109,6 +113,39 @@ def readDictionaries(filename):
     IDToSigma   = dict(zip(ID, sigma.astype(float)))
     IDToLambda  = dict(zip(ID, lamda_val.astype(float)))
     return ID, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda
+
+def convertDict(Dict):
+    """Convert julia Dict in Python Dict"""
+
+    Dict = Dict.replace("Dict(", "").replace(")", "")
+    pairs = [pair.split(" => ") for pair in Dict.split(", ")]
+    return {pair[0].strip(":"): float(pair[1]) for pair in pairs}
+
+def read_ENM_HOOD_indices(filename):
+    """Read the ENM_indices.txt data file and return number, type, id, group (which amino acid with which) and leght, force of each bond"""
+
+    B_N, B_types, B_typeid, B_group, harmonic = [], [], [], [], []
+    with open(filename) as file:
+        for line in file:
+            if line.startswith("//"):
+                continue
+            parts = [part.strip() for part in line.split(",", 5)]
+            try:
+                B_N.append(int(parts[0]))
+                B_types.append(str(parts[1]))
+                B_typeid.append(int(parts[2]))
+                group1 = parts[3].strip("(")
+                group2 = parts[4].strip(")")
+                group_tuple = tuple((int(group1), int(group2)))
+                B_group.append(group_tuple)
+                harmonic_Dict = convertDict(parts[5])
+                harmonic.append(harmonic_Dict)
+            except ValueError as e:
+                print("Error by reading HOOMD indices")
+                continue
+    B_N = len(B_N)
+    return B_N, B_types, B_typeid, B_group, harmonic
+
 
 def readDihedrals(fileName, Sequences, IDs):
     file  = open(fileName,'r')
@@ -133,13 +170,15 @@ def parseKeywords(keyword, value):
         return value
     if keyword in ["Seed", "NSteps", "NOut"]:
         return int(value)
-    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor", "AHCutoff", "YukawaCutoff"]:
+    if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor", "AHCutoff", "YukawaCutoff", "ionic", "pH"]:
         return float(value)
     if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config"]:
         return value=="True" or value=="true"
     return value
 
 def readParam(filename):
+    """Read the Params.txt data file and return a dictionary of Parameters"""
+
     ParamDict = dict()
     ParamDict["Create_Start_Config"] = True
     file = open(filename, "r")
@@ -377,12 +416,6 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
         with gsd.hoomd.open(RestartPath, mode='w') as f2:
             f2.append(snapshot)
 
-def check_fold(folded_domain,i,j):
-    check=False
-    for dom in folded_domain:
-        if (i in range(dom[0],dom[1])) and (j in range(dom[0],dom[1])):
-            check=True
-    return check
 
 def BondC3(NBeads, Domains, harmonic, coordinates):
     Domains=ast.literal_eval(Domains)
