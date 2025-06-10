@@ -1025,9 +1025,31 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
 
     ConstraintDict, Backbone_correction_Dict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
-
     HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
-    return HOOMD_Indices
+    UnfoldedRegions =  GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+    All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions)
+
+    return All_Indices
+end
+
+function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions)
+    offsets = vcat([0],cumsum(length.(Sequences)))
+
+    N_Bonds = sum([sum([b-a for (a,b) in UnfoldedRegions[prot]]) for prot in Proteins])
+    BB_ID = ones(Int32, N_Bonds)
+    BB_groups = Vector{Tuple{Int32, Int32}}()
+
+    (ENM_Bonds, ENM_types, ENM_typeid, ENM_groups, harmonic) = HOOMD_Indices
+    ### ENM_types, harmonic contains [O-O] already
+
+    for (I, prot) in enumerate(Proteins)
+        for Domain in UnfoldedRegions[prot]
+            for i in range(Domain[1], Domain[2]-1)
+                push!(BB_groups, (offsets[I]+i,offsets[I]+i+1))
+            end
+        end
+    end
+    return (N_Bonds+ENM_Bonds, ENM_types, vcat(BB_ID, ENM_typeid), vcat(BB_groups, ENM_groups), harmonic )
 end
 
 @doc raw"""
@@ -1043,7 +1065,7 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD, .
 **Return**:
 * The nessesary Indices for HOOMD.
 """
-function ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
+function ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict , Sequences, Proteins)
     offsets = cumsum(length.(Sequences))
 
     bondLength = 3.8 # in nm
@@ -1122,13 +1144,14 @@ Return a dictionary of atoms and there distances that are nessesary for the Elas
 - `pae_cut`: Cut of pae parameter of AlphaFold reference for the ENM.
 
 **Return**:
-* Two dictionaries of atoms and lengths.
+* `ConstraintDict`: Dictionary that maps Protein names to a Vector containing Tuples of Indices of i,j and distance r which define additional bonds necessary for ENM.
+* `BackboneCorrectionDict`: Dictionary that maps Protein names to a Vector containing Tuples of Indices of i,j and distance r which define the backbone bonds that may have different lengths in ENM regions.
 """
 function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
     ## distances in nm
     ciffolder = "$(BasePath)/InitFiles/CifFiles"
-    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
-    Backbone_correction_Dict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
+    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}() ### Contains the bonds from ENM
+    BackboneCorrectionDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}() ### Contains the bonds from backbone with different lengths in folded regions
     bondLength = 3.8  ## coordinates are in nm
     for Prot in Set(Proteins)
         if length(DomainDict[Prot])>0
@@ -1151,14 +1174,14 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                 end
             end
             ConstraintDict[Prot] = []
-            Backbone_correction_Dict[Prot] = []
+            BackboneCorrectionDict[Prot] = []
             pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
             for i in 1:step-2 # up to NAtom-1
                 in_any_domain = false
                 for Domain in DomainDict[Prot]
                     if Domain[1] ≤ i ≤ Domain[2] && i + 1 ≤ Domain[2]
                         dist_sqr = (x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2
-                        push!(Backbone_correction_Dict[Prot], (i, i+1, sqrt(dist_sqr)))
+                        push!(BackboneCorrectionDict[Prot], (i, i+1, sqrt(dist_sqr)))
                         in_any_domain = true
             
                         if plDDT[i] ≥ plDDTcut
@@ -1174,12 +1197,37 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                 end
             
                 if !in_any_domain
-                    push!(Backbone_correction_Dict[Prot], (i, i+1, bondLength))
+                    push!(BackboneCorrectionDict[Prot], (i, i+1, bondLength))
                 end
             end
         end
     end
-    return ConstraintDict, Backbone_correction_Dict
+    return ConstraintDict, BackboneCorrectionDict
+end
+
+function GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+    ProtLength = Dict([prot=>length(seq) for (seq, prot) in zip(Sequences, Proteins)])
+    UnfoldedDict= Dict{String, Vector{Tuple{Int64, Int64}}}()
+
+    for Prot in Set(Proteins)
+        if length(DomainDict[Prot])>0
+            N = ProtLength[Prot]
+
+            FoldedDomains = sort(DomainDict[Prot])
+            UnfoldedDomains = []
+            if FoldedDomains[1][1]!=1
+                push!(UnfoldedDomains, (1, FoldedDomains[1][1]))
+            end
+            for (i, val) in enumerate(FoldedDomains[1:end-1])
+                push!(UnfoldedDomains, (val[2], FoldedDomains[i+1][1]))
+            end
+            if FoldedDomains[end][2]!=N
+                push!(UnfoldedDomains, (FoldedDomains[end][2], N))
+            end
+            UnfoldedDict[Prot] = UnfoldedDomains
+        end
+    end
+    return UnfoldedDict
 end
 
 @doc raw"""
