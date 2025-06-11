@@ -12,6 +12,7 @@ include("../data/ProteinSequences.jl")
 include("./Data.jl")
 
 include("./Setup.jl")
+include("./Setup_barostat.jl")
 
  
 include("./IO.jl")
