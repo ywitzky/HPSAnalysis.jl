@@ -1020,32 +1020,60 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 - `ProteinJSON`: AlphaFold data of the Proteins.
 
 **Return**:
-* The nessesary Indices for HOOMD.
+- Number of bonds
+- Vector of bond type names 
+- ID connecting bond tuple to bond type
+- Vector of tuples defining all bonds
+- Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
 """
 function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
 
     ConstraintDict, Backbone_correction_Dict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
     HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
     UnfoldedRegions =  GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
-    All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions)
+    All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, Backbone_correction_Dict)
 
     return All_Indices
 end
 
-function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions)
+
+@doc raw"""
+    CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)
+
+Combines the bond length potential of backbone and ENM.
+    
+**Arguments**
+- `Proteins`: List of Protein Names.
+- `Sequences`: The Sequences of the Proteins.
+- `HOOMD_Indices`: Tuple containing the info of ENM as defined by this functions return.
+- `UnfoldedRegions`: Dictionary defining the unfolded regions.
+- `BackboneCorrectionDict`::Dictionary with atoms, bond length and id which will be connected via backbone.
+
+**Return**:
+- Number of bonds
+- Vector of bond type names 
+- ID connecting bond tuple to bond type
+- Vector of tuples defining all bonds
+- Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
+"""
+function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)
     offsets = vcat([0],cumsum(length.(Sequences)))
 
+    BackboneDiffLengths = Dict([prot=> [(i,j) for (i,j,_) in BackboneCorrectionDict[prot]] for prot in Set(Proteins)]) 
+
     N_Bonds = sum([sum([b-a for (a,b) in UnfoldedRegions[prot]]) for prot in Proteins])
-    BB_ID = ones(Int32, N_Bonds)
+    BB_ID = zeros(Int32, N_Bonds)
     BB_groups = Vector{Tuple{Int32, Int32}}()
+
 
     (ENM_Bonds, ENM_types, ENM_typeid, ENM_groups, harmonic) = HOOMD_Indices
     ### ENM_types, harmonic contains [O-O] already
-
     for (I, prot) in enumerate(Proteins)
         for Domain in UnfoldedRegions[prot]
             for i in range(Domain[1], Domain[2]-1)
-                push!(BB_groups, (offsets[I]+i,offsets[I]+i+1))
+                if !( (i,i+1) in BackboneDiffLengths[prot])
+                    push!(BB_groups, (offsets[I]+i-1,offsets[I]+i)) ## shift from 1 -> 0, because of julia -> python
+                end
             end
         end
     end
@@ -1053,80 +1081,74 @@ function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegio
 end
 
 @doc raw"""
-    ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+    ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict, Sequences, Proteins)
 
 Calculate the Indices, that are nessesary to creat a start file im HOOMD, .
     
 **Arguments**
-- `ConstraintDict::Dictionary with atoms and length which will be connected via ENM.
+- `ConstraintDict::Dictionary with atoms, bond length and id which will be connected via ENM.
+- `BackboneCorrectionDict`::Dictionary with atoms, bond length and id which will be connected via backbone.
 - `Sequences`: The Sequences of the Proteins.
 - `Proteins`: List of Protein Names.
 
 **Return**:
-* The nessesary Indices for HOOMD.
+- Number of bonds
+- Vector of bond type names 
+- ID connecting bond tuple to bond type
+- Vector of tuples defining all bonds
+- Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
 """
-function ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict , Sequences, Proteins)
+function ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict , Sequences, Proteins)
     offsets = cumsum(length.(Sequences))
 
-    bondLength = 3.8 # in nm
+    bondLength = 0.38 # in nm
     BB_N = 0
     ENM_N = 0
-    BB_types = ["O-O"] # default backbone bond type
-    ENM_types = []
     BB_ID = Int[]
     ENM_ID = Int[]
     BB_groups = Vector{Tuple{Int32, Int32}}()
     ENM_groups = Vector{Tuple{Int32, Int32}}()
     harmonic = Dict{String, Dict{Symbol, Float64}}()
-    harmonic["O-O"] = Dict(:r => bondLength, :k => 700) # default backbone bond values
+    harmonic["O-O"] = Dict(:r => bondLength, :k => 8033.0) # default backbone bond values
     off = 0
 
-    type_cnt=1
-    MinimalTypes = Dict()
-    for Protein in Set(Proteins)
-        for (i,j, r0) in Backbone_correction_Dict[Protein]
-            if r0 != bondLength
-                MinimalTypes[(Protein, i,j)] = type_cnt 
-                BB_bondname = "BB_$(MinimalTypes[(Protein, i, j)])"
-                harmonic[BB_bondname] = Dict(:r => r0, :k => 8033)
-                type_cnt+=1
-            end
-        end
-    end
-
-    for Protein in Set(Proteins)
-        for (i,j, r0) in ConstraintDict[Protein]
-            MinimalTypes[(Protein, i,j)] = type_cnt 
-            bondname = "ENM_$(MinimalTypes[(Protein, i, j)])"
-            harmonic[bondname] = Dict(:r => r0, :k => 700)
-            type_cnt+=1
-        end
-    end
     for (i, Prot) in enumerate(Proteins)
-        for (atom_1, atom_2, r0) in Backbone_correction_Dict[Prot]
+        for (atom_1, atom_2, r0, ind) in BackboneCorrectionDict[Prot]
             if r0 != bondLength
-                bondname = "BB_$(MinimalTypes[(Prot, atom_1, atom_2)])"
-                push!(BB_types, bondname)
-                push!(BB_ID, MinimalTypes[(Prot, atom_1, atom_2)]+1) # shift because default BB is 1
-                push!(BB_groups, (atom_1 -1 + off, atom_2 -1 + off)) ## shift from 1 -> 0, becasue of julia -> python
+                push!(BB_ID, ind) 
             elseif r0 == bondLength
-                push!(BB_ID, 1)
-                push!(BB_groups, (atom_1 -1 + off, atom_2 -1 +off))
+                push!(BB_ID, 0)
             end
+            push!(BB_groups, (atom_1 -1 + off, atom_2 -1 + off)) ## shift from 1 -> 0, because of julia -> python
             BB_N+= 1
         end
+        off = offsets[i]
     end
+    off = 0
     for (i, Prot) in enumerate(Proteins)
-        for (atom_1, atom_2, r0) in ConstraintDict[Prot]
-            bondname = "ENM_$(MinimalTypes[(Prot, atom_1, atom_2)])"
-            push!(ENM_types, bondname)
-            push!(ENM_ID, MinimalTypes[(Prot, atom_1, atom_2)]+1) # shift because default BB is 1
+        for (atom_1, atom_2, r0, ind) in ConstraintDict[Prot]
+            push!(ENM_ID, ind) 
             push!(ENM_groups, (atom_1 -1 + off, atom_2 -1 + off))
             ENM_N+= 1
         end
         off = offsets[i]
     end
-    return (BB_N + ENM_N, vcat(BB_types, ENM_types), vcat(BB_ID, ENM_ID), vcat(BB_groups, ENM_groups), harmonic)
+    BB_tmp  = vcat([Backbone_correction_Dict[prot] for prot in Set(Proteins)]...)
+    ENM_tmp = vcat([ConstraintDict[prot]           for prot in Set(Proteins)]...)
+
+    BB_types  = ["BB_$(ind)"  for ind in sort(collect(Set(getindex.(BB_tmp ,4)))) if ind != 0]
+    ENM_types = ["ENM_$(ind)" for ind in sort(collect(Set(getindex.(ENM_tmp,4))))]
+
+    for (r,ind) in zip(getindex.(BB_tmp,3) , getindex.(BB_tmp,4))
+        if ind!=0 ### "BB_0" is the same as "O-O"
+            harmonic["BB_$(ind)" ] = Dict(:r => r, :k => 8033)
+        end
+    end
+    for (r,ind) in zip(getindex.(ENM_tmp,3), getindex.(ENM_tmp,4))
+        harmonic["ENM_$(ind)" ] = Dict(:r => r, :k => 700)
+    end
+    
+    return (BB_N + ENM_N, vcat(["O-O"], BB_types, ENM_types), vcat(BB_ID, ENM_ID), vcat(BB_groups, ENM_groups), harmonic)
 end
 
 @doc raw"""
@@ -1147,12 +1169,16 @@ Return a dictionary of atoms and there distances that are nessesary for the Elas
 * `ConstraintDict`: Dictionary that maps Protein names to a Vector containing Tuples of Indices of i,j and distance r which define additional bonds necessary for ENM.
 * `BackboneCorrectionDict`: Dictionary that maps Protein names to a Vector containing Tuples of Indices of i,j and distance r which define the backbone bonds that may have different lengths in ENM regions.
 """
-function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
+function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85, precision=1000)
     ## distances in nm
     ciffolder = "$(BasePath)/InitFiles/CifFiles"
-    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}() ### Contains the bonds from ENM
-    BackboneCorrectionDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}() ### Contains the bonds from backbone with different lengths in folded regions
-    bondLength = 3.8  ## coordinates are in nm
+    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64, Int32}}}() ### Contains the bonds from ENM
+    BackboneCorrectionDict = Dict{String, Vector{Tuple{Int,Int, Float64, Int32}}}() ### Contains the bonds from backbone with different lengths in folded regions
+    bondLength = 0.38  ## coordinates are in nm
+
+    ExistingConstraints=Dict{Float64, Int32}(bondLength=>1) ### maps existing constraint determined by distance onto integer
+    ExistingBackbone   =Dict{Float64, Int32}(bondLength=>1) ### maps existing backbone   determined by distance onto integer
+    cnt=1
     for Prot in Set(Proteins)
         if length(DomainDict[Prot])>0
             CifPath = "$(ciffolder)/$(Prot).cif"
@@ -1176,19 +1202,32 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
             ConstraintDict[Prot] = []
             BackboneCorrectionDict[Prot] = []
             pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
-            for i in 1:step-2 # up to NAtom-1
-                in_any_domain = false
+            for i in 1:step-1 # up to NAtom-1
+                #in_any_domain = false
                 for Domain in DomainDict[Prot]
                     if Domain[1] ≤ i ≤ Domain[2] && i + 1 ≤ Domain[2]
-                        dist_sqr = (x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2
-                        push!(BackboneCorrectionDict[Prot], (i, i+1, sqrt(dist_sqr)))
-                        in_any_domain = true
-            
+                        dist = sqrt((x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2)
+                        dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
+                        dist /= 10.0 ### convert to nm
+                        if !(dist in keys(ExistingBackbone))
+                            ExistingBackbone[dist]=cnt
+                            cnt+=1
+                        end
+                        push!(BackboneCorrectionDict[Prot], (i, i+1,dist, ExistingBackbone[dist]))
+
+                        #in_any_domain = true
                         if plDDT[i] ≥ plDDTcut
                             for j in i+3:Domain[2]
                                 dist_sqr = (x[j]-x[i])^2 + (y[j]-y[i])^2 + (z[j]-z[i])^2
                                 if dist_sqr < rcut^2 && plDDT[j] ≥ plDDTcut && pae[i][j] < pae_cut && pae[j][i] < pae_cut
-                                    push!(ConstraintDict[Prot], (i, j, sqrt(dist_sqr)))
+                                    dist=sqrt(dist_sqr)
+                                    dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
+                                    dist /= 10.0 ### convert to nm
+                                    if !(dist in keys(ExistingConstraints))
+                                        ExistingConstraints[dist]=cnt
+                                        cnt+=1
+                                    end
+                                    push!(ConstraintDict[Prot], (i, j, dist, ExistingConstraints[dist]))
                                 end
                             end
                         end
@@ -1196,15 +1235,28 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                     end
                 end
             
-                if !in_any_domain
-                    push!(BackboneCorrectionDict[Prot], (i, i+1, bondLength))
-                end
+                #if !in_any_domain
+                #    push!(BackboneCorrectionDict[Prot], (i, i+1, bondLength))
+                #end
             end
         end
     end
     return ConstraintDict, BackboneCorrectionDict
 end
 
+@doc raw"""
+    GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+
+Generates a dictionary that defines the unfolded regions of proteins based on the definition of folded regions.
+    
+**Arguments**
+- `Proteins`: List of Protein Names.
+- `DomainDict`:: The Domains in which the ENM is active.
+- `Sequences`: The Sequences of the Proteins.
+
+**Return**:
+- UnfoldedDict:: Dict{String, Vector{Tuple{Int64, Int64}}}(): Maps Protein names onto vectors of tuples that define the regions of unfolded regions.
+"""
 function GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
     ProtLength = Dict([prot=>length(seq) for (seq, prot) in zip(Sequences, Proteins)])
     UnfoldedDict= Dict{String, Vector{Tuple{Int64, Int64}}}()

@@ -36,6 +36,7 @@ Temperatures = 300.0
         mkpath(BasePath*"$(protein)/$(temp)K/RUN_$(pad)/Restart/")
         Path = BasePath*"$(protein)/$(temp)K/RUN_$(pad)/"
         
+        println(BasePath*"$(protein)/$(temp)K/RUN_$(pad)/")
         Seq = HPSAnalysis.ProteinSequences.NameToSeq[protein]
         NChains = 1
         Sequences= [deepcopy(Seq) for _ in 1:NChains]
