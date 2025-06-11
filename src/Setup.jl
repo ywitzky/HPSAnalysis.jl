@@ -1133,7 +1133,7 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict , Sequen
         end
         off = offsets[i]
     end
-    BB_tmp  = vcat([Backbone_correction_Dict[prot] for prot in Set(Proteins)]...)
+    BB_tmp  = vcat([BackboneCorrectionDict[prot] for prot in Set(Proteins)]...)
     ENM_tmp = vcat([ConstraintDict[prot]           for prot in Set(Proteins)]...)
 
     BB_types  = ["BB_$(ind)"  for ind in sort(collect(Set(getindex.(BB_tmp ,4)))) if ind != 0]
@@ -1161,7 +1161,7 @@ Return a dictionary of atoms and there distances that are nessesary for the Elas
 - `Proteins`: List of Protein Names.
 - `ProteinJSON`: Dictionary of AlphaFold data of the Proteins in JSON format.
 - `BBProtein`: The atom from which the AlphaFold datas are set for the aminoacid.
-- `rcut`: Cut of length for the ENM.
+- `rcut`: Cut of length for the ENM in Angstroem.
 - `plDDTcut`: Cut of plDDT parameter of AlphaFold reference for the ENM.
 - `pae_cut`: Cut of pae parameter of AlphaFold reference for the ENM.
 

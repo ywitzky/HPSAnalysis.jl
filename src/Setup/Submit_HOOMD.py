@@ -99,23 +99,17 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
                 ### Harmonic bonds
                 harmonic = hoomd.md.bond.Harmonic()
 
-                ## read the ENM_indice data
-                ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
-                filtered = [typ for typ in ENMB_types if typ!="O-O"]
-                B_types = ["O-O"] + filtered
+                ## read the ENM_indice and backbone data
+                B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
                 
                 for typ in B_types: 
                     harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"])
-                    
-                B_N = ENMB_N
-                B_typeid = ENMB_typeid
-                B_group = ENMB_group
 
                 forces.append(harmonic)
 
 
             snapshot.bonds.N = B_N
-            snapshot.bonds.types = B_types
+            snapshot.bonds.types = list(B_types)
             snapshot.bonds.typeid = B_typeid
             snapshot.bonds.group = B_group
 

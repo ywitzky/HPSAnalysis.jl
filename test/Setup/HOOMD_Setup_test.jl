@@ -144,7 +144,7 @@ end
     filename = "$SetupTestPath/enmhoomd.csv"
     N = 4
     types = ["B1","B2","B3","B4"]
-    id = [1,2,3,4]
+    id = [0,1,2,3] ### use c indexing
     group = [(0, 1), (1, 2), (2, 3), (3, 4)]
     harmonic = Dict{String, Dict{Symbol, Float64}}()
     harmonic["B1"] = Dict(:r => 0.5, :k => 700)
@@ -154,10 +154,10 @@ end
     ENM = (N, types, id, group, harmonic)
 
     open(filename_test, "w") do io
-        write(io, "1 , B1 , 1 , (0, 1) , $(harmonic["B1"]) \n")
-        write(io, "2 , B2 , 2 , (1, 2) , $(harmonic["B2"]) \n")
-        write(io, "3 , B3 , 3 , (2, 3) , $(harmonic["B3"]) \n")
-        write(io, "4 , B4 , 4 , (3, 4) , $(harmonic["B4"]) \n")
+        write(io, "1 , B1 , 0 , (0, 1) , $(harmonic["B1"]) \n")
+        write(io, "2 , B2 , 1 , (1, 2) , $(harmonic["B2"]) \n")
+        write(io, "3 , B3 , 2 , (2, 3) , $(harmonic["B3"]) \n")
+        write(io, "4 , B4 , 3 , (3, 4) , $(harmonic["B4"]) \n")
     end
 
     HPSAnalysis.Setup.WriteENM_HOOMD_Indices(filename, ENM)
@@ -165,5 +165,15 @@ end
     read_ENM = sim.read_ENM_HOOD_indices(filename)
     read_ENM_test = sim.read_ENM_HOOD_indices(filename_test)
 
-    @test read_ENM == read_ENM_test
+    @test N == read_ENM[1]
+    @test all(types == read_ENM[2])
+    @test id == read_ENM[3]
+    @test group == read_ENM[4]
+    @test all(map(key-> (harmonic[key][:k]== read_ENM[5][key]["k"])&& (harmonic[key][:r]≈read_ENM[5][key]["r"]), collect(keys(harmonic))))
+
+    @test all(read_ENM[1] == read_ENM_test[1])
+    @test all(read_ENM[2] == read_ENM_test[2])
+    @test all(read_ENM[3] == read_ENM_test[3])
+    @test all(read_ENM[4] == read_ENM_test[4])
+    @test all(read_ENM[5] == read_ENM_test[5])
 end
