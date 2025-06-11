@@ -430,3 +430,9 @@ def CountNumberOfTrajectoryFiles(FolderPath):
         with gsd.hoomd.open(f"{FolderPath}{file}") as f:
            sum_val += len(f)
     return len(trajectoryfiles), sum_val
+
+def compute_Mass_List(IDs, IDToMass):
+    Masses = []
+    for ID in IDs:
+        Masses.append(IDToMass[ID])
+    return Masses
