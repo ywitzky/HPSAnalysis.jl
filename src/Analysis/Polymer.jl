@@ -34,7 +34,6 @@ function computeRGSeries!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
  
 end
 
-
 function computeREESeries!(Sim::SimData{R,I}, StartStops=[[]]) where{R<:Real, I<:Integer}
     #Array{Array{Tuple{I,I}}}()
     diff=0.
@@ -228,7 +227,6 @@ function computeRGCorrelationTime(Sim::SimData{R,I}, NLags=5000) where{R<:Real, 
             end
         end
     end
-    println(half_time)
     Sim.RGMeasureStep = max(1,ceil(I,Statistics.mean(half_time)))
 end
 
@@ -301,5 +299,80 @@ function computeRG(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
     Sim.RGMean/=Sim.NChains
     Sim.RGErr/=Sim.NChains
+end
+
+
+@doc raw"""
+    computeIntraChainScalingSlidingWindow(Sim::SimData{R,I})
+
+Computes the square intra chain distance |r_i-r_j| for all combinations and averages over the trajectory.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Create**:
+* Sim.IntraChainScalingNaiv
+"""
+function computeIntraChainScalingNaiv(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+
+    Results = [zeros(R, Sim.ChainLength[I],Sim.ChainLength[I] ) for I in 1:Sim.NChains]
+    for step in Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps
+        for C in 1:Sim.NChains
+            for (i_rel,i) in enumerate(Sim.ChainStart[C]:Sim.ChainStop[C])
+                for j in i+1:Sim.ChainStop[C]
+                    j_rel = j - Sim.ChainStart[C]+1
+                    dist_sqr = (Sim.x_uw[i,step]-Sim.x_uw[j,step])^2+(Sim.y_uw[i,step]-Sim.y_uw[j,step])^2+(Sim.z_uw[i,step]-Sim.z_uw[j,step])^2
+                    Results[C][i_rel,j_rel] += dist_sqr
+                end
+            end
+        end
+    end
+    
+    N =  length(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)
+    for C in 1:Sim.NChains
+        for (i_rel,i) in enumerate(Sim.ChainStart[C]:Sim.ChainStop[C])
+            for j in i+1:Sim.ChainStop[C]
+                j_rel = j - Sim.ChainStart[C]+1
+                Results[C][i_rel,j_rel] /= N
+            end
+        end
+    end
+    
+    Sim.IntraChainScalingNaiv=Results
+end
+
+
+@doc raw"""
+    computeIntraChainScalingSlidingWindow(Sim::SimData{R,I})
+
+Computes the square intra chain distance |r_i-r_j|^2 and averages in a sliding window approach.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+
+**Create**:
+* Sim.IntraChainScalingSlidingWindow
+"""
+function computeIntraChainScalingSlidingWindow(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    Results = [zeros(R, Sim.ChainLength[C]-1 ) for C in 1:Sim.NChains]
+    for step in Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps
+        for C in 1:Sim.NChains
+            for (i_rel,i) in enumerate(Sim.ChainStart[C]:Sim.ChainStop[C])
+                for j in i+1:Sim.ChainStop[C]
+                    τ = j-i
+                    dist_sqr = (Sim.x_uw[i,step]-Sim.x_uw[j,step])^2+(Sim.y_uw[i,step]-Sim.y_uw[j,step])^2+(Sim.z_uw[i,step]-Sim.z_uw[j,step])^2
+                    Results[C][τ] += dist_sqr
+                end
+            end
+        end
+    end
+
+    N =  length(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)
+    for C in 1:Sim.NChains
+        for (i, _) in enumerate( Results[C])
+             Results[C][i] /= (length(Results[C]) -i+1)*N
+        end
+    end
+    Sim.IntraChainScalingSlidingWindow=Results
 end
 

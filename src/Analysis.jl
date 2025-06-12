@@ -8,8 +8,10 @@ include("./Analysis/Polymer.jl")
 include("./Analysis/Slab.jl")
 include("./Analysis/BondedAnalysis.jl")
 include("./Analysis/SequenceAnalysis.jl")
+include("./Analysis/ContactMatrix.jl")
 include("./Analysis/HREMD/Unify.jl")
 include("./Analysis/HREMD/HREMD.jl")
+
 
 
 function symmetriesMatrix(A::Matrix{T}) where {T<:Number}
@@ -85,7 +87,6 @@ end
     for (cnt, step) in enumerate(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)
         for chain in 1:Sim.NChains
             for id in 1:length(StartStops[chain])
-                println(id," ",chain," ", cnt," ",Int(round(Sim.REESeries[cnt,chain,id])))
                 Sim.REEHists[chain][id][Int(round(Sim.REESeries[cnt,chain,id]))] += 1
             end
         end
@@ -235,13 +236,10 @@ function computeMSDofChains!(Sim::HPSAnalysis.SimData{R,I}; MaxDelta=100_000) wh
     ydiff =zeros(R, Sim.NChains)
     zdiff =zeros(R, Sim.NChains)
 
-    #println(Sim.EquilibrationTime:Sim.NSteps)
-    #println(Sim.EquilibrationTime:min(Sim.NSteps, Sim.EquilibrationTime+MaxDelta))
-    
+
     step = Sim.EquilibrationTime
 
     for step in Sim.EquilibrationTime:Sim.NSteps
-        #if step %10==0  println("step $step") end
         for step2 in step+1:min(Sim.NSteps, step+MaxDelta)
             Δt = step2 - step
             xdiff .= (Sim.COM_uw[:,1,step2].- Sim.COM_uw[:,1,step]).^2
@@ -255,7 +253,6 @@ function computeMSDofChains!(Sim::HPSAnalysis.SimData{R,I}; MaxDelta=100_000) wh
     end
     ### old technique
     #=for step in Sim.EquilibrationTime:Sim.NSteps
-        println("step $step")
         for step2 in step+1:min(Sim.NSteps, step+MaxDelta)
             Δt = step2 - step
             for chain in 1:Sim.NChains
@@ -287,7 +284,6 @@ function computeMSDofChains!(Sim::HPSAnalysis.SimData{R,I}; MaxDelta=100_000) wh
 end
 
 function unfoldPositions(Sim::SimData{R,I}; CheckFiles=true) where {R<:Real, I<:Integer}
-    println("I am unfolding Positions again!")
 
     if CheckFiles && length(Sim.TrajectoryFile)>=3 
         if Sim.TrajectoryFile[end-2:end] ==".h5" || Sim.TrajectoryFile[end-2:end] =="gsd"
@@ -312,7 +308,6 @@ function unfoldPositions(Sim::SimData{R,I}; CheckFiles=true) where {R<:Real, I<:
     ### do the actual work
     Sim.CellStep = zeros(1)
     for step in 1:Sim.NSteps ### changed that one to 1 .... was 2 before
-        #println(step)
         Sim.CellStep[1]=step
         checkCIPositions(Sim)
     end
@@ -353,19 +348,6 @@ function checkCIPositions(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 
             diff2.= diff
 
-            #=if( (step==bla_step || step==bla_step+1) && atom==1)
-                println("1. Diff: $(diff2)")
-                println(Sim.x_uw[1, step])
-                println(Sim.y_uw[1, step])
-                println(Sim.z_uw[1, step])
-                println(Sim.x[1, step])
-                println(Sim.y[1, step])
-                println(Sim.z[1, step])
-                println(Sim.x[2, step])
-                println(Sim.y[2, step])
-                println(Sim.z[2, step])
-            end=#
-
             if abs(diff[1]-Sim.BoxLength[1])<abs(diff[1]) || abs(diff[1]+Sim.BoxLength[1])<abs(diff[1])
                 Sim.x_uw[atom+1, step] = Sim.x[atom+1, step] - Sim.BoxLength[1]*(convert(eltype(Sim.NChains),(round((diff[1]/(Sim.BoxLength[1]/2.)))/2.)))
                 diff2[1] = Sim.x_uw[atom+1, step]- Sim.x_uw[atom, step]
@@ -390,17 +372,12 @@ function checkCIPositions(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
             dist = sqrt(diff2[1]^2+diff2[2]^2+diff2[3]^2)
             if dist >too_large
                 printstyled("CI Positions didnt work!!!!\n"; color=:red)
-               # println((diff[1]/(Sim.BoxLength[1]/2.), " ",round((diff[1]/(Sim.BoxLength[1]/2.))/2.), " ",  Int32(round((diff[1]/(Sim.BoxLength[1]/2.))/2.))))
                 println(Sim.BoxLength)
                 println("Atom: $atom, Step: $step,  Diff: $diff,Diff2: $diff2, Dist: $dist ")
                 println("x $(Sim.x_uw[atom, step]), $(Sim.x_uw[atom+1, step]) ")
                 println("y $(Sim.y_uw[atom, step]), $(Sim.y_uw[atom+1, step]) ")
-                println("z $(Sim.z_uw[atom, step]), $(Sim.z_uw[atom+1, step]) ")
-                println()
-                #println("x $(Sim.x_uw[atom, step-1]), $(Sim.x_uw[atom+1, step-1]) ")
-                #println("y $(Sim.y_uw[atom, step-1]), $(Sim.y_uw[atom+1, step-1]) ")
-                #println("z $(Sim.z_uw[atom, step-1]), $(Sim.z_uw[atom+1, step-1]) ")
-                println()
+                println("z $(Sim.z_uw[atom, step]), $(Sim.z_uw[atom+1, step]) \n")
+
                 println("x $(Sim.x[atom, step]), $(Sim.x[atom+1, step]) ")
                 println("y $(Sim.y[atom, step]), $(Sim.y[atom+1, step]) ")
                 println("z $(Sim.z[atom, step]), $(Sim.z[atom+1, step]) ")
@@ -420,27 +397,6 @@ function checkCIPositions(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         COM_new ./=(Sim.ChainStop[chain]-Sim.ChainStart[chain])
 
         diff .= COM_new.-COM_old
-        #=if abs(COM_old[1])>1000
-            println("Step:  $(step)")
-        end=#
-        #=if(step==bla_step || step==bla_step+1)
-            println("COM step: $(step)")
-            println(COM_old)
-            println(COM_new)
-            println(diff)
-            println(diff[1]/(Sim.BoxLength[1]/2.0))
-            println(round(diff[1]/(Sim.BoxLength[1]/2.0)))
-            println(round( (diff[1]/(Sim.BoxLength[1]/2.)) /2.))
-            println("asfgh")
-            println(round(diff[1]/(Sim.BoxLength[1]/2.0))÷2)
-
-            println(convert(eltype(Sim.NChains),(round( (diff[1]/(Sim.BoxLength[1]/2.)) /2.))))
-            println(COM_new[1]- Sim.BoxLength[1]*(convert(eltype(Sim.NChains),(round( (diff[1]/(Sim.BoxLength[1]/2.)) /2.)))))
-            println(COM_old)
-            println("end1")
-            #Sim.y_uw[atom+1, step] = Sim.y[atom+1, step]- Sim.BoxLength[2]*(convert(eltype(Sim.NChains),(round((diff[2]/(Sim.BoxLength[2]/2.)))/2.)))
-        end=#
-
         if abs(diff[1]-Sim.BoxLength[1])<abs(diff[1]) || abs(diff[1]+Sim.BoxLength[1])<abs(diff[1]) 
             #Sim.x_uw[start:stop, step] .-=  Sim.BoxLength[1]*(convert(eltype(Sim.NChains),(round( (diff[1]/(Sim.BoxLength[1]/2.)) /2.))))
             Sim.x_uw[start:stop, step] .-=  Sim.BoxLength[1]*(round(diff[1]/(Sim.BoxLength[1]/2.0))÷2)
@@ -462,19 +418,7 @@ function checkCIPositions(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         COM_new ./=(Sim.ChainStop[chain]-Sim.ChainStart[chain])
         
         diff .= COM_new.-COM_old
-        #=if(step==bla_step || step==bla_step+1)
-            println("Diff2 : $(diff)")
-            println(COM_old)
-            println(COM_new)
-            println(COM_new[1]+134.0)
-            println(Sim.x_uw[1, step])
-            println(Sim.y_uw[1, step])
-            println(Sim.z_uw[1, step])
-            println(diff[1])
-            println((diff[1]/(Sim.BoxLength[1]/2.)) /2.)
-            println(Sim.BoxLength[1]*(convert(eltype(Sim.NChains),(round( (diff[1]/(Sim.BoxLength[1]/2.)) /2.)))))
-            println("end")
-        end=#
+
         dist = sqrt(diff[1]^2+diff[2]^2+diff[3]^2)
         end
     end
@@ -493,7 +437,6 @@ function computeBondsHists(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.BondHist = zeros(eltype(Sim.x), 1000)
     diff= 0.
     ind = Int(0)
-    #println("BLA $(Sim.NSteps), $(Sim.NChains)")
     for step in 1:Sim.NSteps
         for chain in 1:Sim.NChains
             for atom in Sim.ChainStart[chain]:(Sim.ChainStop[chain]-1)
@@ -502,16 +445,7 @@ function computeBondsHists(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
                 diff+=(Sim.z_uw[atom+1, step]- Sim.z_uw[atom, step])^2
 
                 ind = Int32(ceil(sqrt(diff)*Resolution))
-                #=if ind <1 || ind >1000
-                    println("Atom: $atom, Step: $step, Index: $ind, Diff: $diff, Dist: $(sqrt(diff))")
-                    println("x $(Sim.x_uw[atom, step]), $(Sim.x_uw[atom+1, step]) ")
-                    println("y $(Sim.y_uw[atom, step]), $(Sim.y_uw[atom+1, step]) ")
-                    println("z $(Sim.z_uw[atom, step]), $(Sim.z_uw[atom+1, step]) ")
-                    println("x $(Sim.x_uw[atom, step-1]), $(Sim.x_uw[atom+1, step-1]) ")
-                    println("y $(Sim.y_uw[atom, step-1]), $(Sim.y_uw[atom+1, step-1]) ")
-                    println("z $(Sim.z_uw[atom, step-1]), $(Sim.z_uw[atom+1, step-1]) ")
-                    return 
-                end=#
+
                 if ind==0
                     println("$step, $chain, $atom, $diff")
                     println("$(Sim.x[atom, step]) $(Sim.x_uw[atom, step])")
