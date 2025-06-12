@@ -20,9 +20,9 @@ end
     include("./Calvados/Calvados2_test.jl")
     include("./Calvados/Calvados3_test.jl")
     include("./Calvados/Calvados3_ENM_test.jl")
+    include("./Calvados/RS_Prot.jl") 
 
     #include("./Calvados/Implementation/Calvados3_implementation_test.jl")
     #include("./Calvados/Implementation/Calvados3_implementation_analysis.jl")
 
-    #include("RS_Prot.jl") not yet fully implemented
 end

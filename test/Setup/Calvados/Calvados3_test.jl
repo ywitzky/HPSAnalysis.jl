@@ -32,7 +32,7 @@ coor=fill(0.0,1,maximum(length(seq) for seq in Seq),3)
 ChargeDict= BioData.OneToHPSCharge
 WeightDict = BioData.AaToWeight
 SigmaDict = BioData.OneToHPSCalvadosSigma
-LambdaDict = BioData.OneToCalvados2Lambda
+LambdaDict = BioData.OneToCalvados3Lambda
 
 
 HPSAnalysis.Setup.WriteHOOMDParticlesInput("$SetupTestPath/HOOMD_Setup/Particles.txt",position,ChargeDict,AaToId,Seq,WeightDict,SigmaDict,coor)
@@ -52,7 +52,7 @@ bondid=UInt32[0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 3, 4]
 
 HPSAnalysis.Setup.WriteENM_HOOMD_Indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt", (12, ["O-O", "BB_1", "ENM_2", "ENM_3", "ENM_4"], bondid, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (3, 5), (3, 6), (4, 6)], harmonic))
 
-sim.run(SetupTestPath)
+sim.run(SetupTestPath) ### generates the following file that is the input of the simulation.
 
 data=GSDFormat.open("$(SetupTestPath)$(SimName)_300.0_Start_slab.gsd","r")
 frame = data[1]
@@ -78,3 +78,4 @@ bondtypes=["O-O\0\0", "BB_1\0", "ENM_2", "ENM_3", "ENM_4"]
 end
 
 close(data)
+
