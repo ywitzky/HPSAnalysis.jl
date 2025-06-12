@@ -16,7 +16,7 @@ end
     return (1,a.size)
 end
 
-function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{String}}, Fields::Vector{String}, Start::Integer; StepWidth::Integer=typemax(Int32), Weights=[], BasePathAdd="")
+function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{String}}, Fields::Vector{String}, Start::Integer; StepWidth::Integer=typemax(Int32), Weights=[], BasePathAdd="", HOOMD=false)
 
     if length(Weights)==0
         Weights = fill(FakeArray(1,1), length(Paths))
@@ -32,7 +32,7 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
 
     ### Initialise Data Structure
     for (ProtID, PathVec) in enumerate(Paths)
-        Data = initData(PathVec[1]; LmpName=LmpFiles[ProtID][1], Reparse=false, LoadAll=false,BasePathAdd=BasePathAdd[ProtID][1])
+        Data = initData(PathVec[1]; LmpName=LmpFiles[ProtID][1], Reparse=false, LoadAll=false,BasePathAdd=BasePathAdd[ProtID][1], HOOMD=HOOMD)
         (RGMeasureStep, End) = GetFieldsFromData(Data, ["RGMeasureStep", "NSteps"])
         LocStep = RGMeasureStep < StepWidth ? RGMeasureStep : StepWidth
         for (ID, field) in enumerate(Fields)
@@ -63,7 +63,7 @@ function AverageFields(Paths::Vector{Vector{String}}, LmpFiles::Vector{Vector{St
     for (ProtID, PathVec) in enumerate(Paths)
          ### Add other simulation runs
         for (SimRun,Path) in enumerate(PathVec[2:end])
-            Data = initData(Path; LmpName=LmpFiles[ProtID][SimRun], Reparse=false, LoadAll=false,BasePathAdd=BasePathAdd[ProtID][SimRun])
+            Data = initData(PathVec[1]; LmpName=LmpFiles[ProtID][1], Reparse=false, LoadAll=false,BasePathAdd=BasePathAdd[ProtID][1], HOOMD=HOOMD)
             (RGMeasureStep, End) = GetFieldsFromData(Data, ["RGMeasureStep", "NSteps"])
             LocStep = RGMeasureStep < StepWidth ? RGMeasureStep : StepWidth
             for (ID, field) in enumerate(Fields)

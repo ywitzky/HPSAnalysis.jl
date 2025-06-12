@@ -64,17 +64,17 @@ end
     ### pyCall doesnt autoconvert numpy ints if part of a dictionary
     ### additionally switch from 0 index to 1 indexing
     IDToResName = Dict((py"castToInt"(key)+1, Char(value[1])) for (key,value) in IDToResName)
-    IDToCharge = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToCharge)
-    IDToMass = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToMass)
-    IDToSigma = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToSigma)
-    IDToLambda = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToLambda)
+    IDToCharge  = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToCharge)
+    IDToMass    = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToMass)
+    IDToSigma   = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToSigma)
+    IDToLambda  = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToLambda)
 
     @test [ToID_test[key] for key in keys] == ID.+1 ### python routine uses C indices
-    @test Dict(ToID_test[key]=>key for key in keys) == Dict{Int64, Char}(IDToResName)
-    @test Dict(ToID_test[key]=>ToCharge_test[key] for key in keys) == Dict{Int64, Float64}(IDToCharge)  
-    @test Dict(ToID_test[key]=>ToMass_test[key] for key in keys) == IDToMass 
+    @test Dict(ToID_test[key]=>key                  for key in keys) == Dict{Int64, Char}(IDToResName)
+    @test Dict(ToID_test[key]=>ToCharge_test[key]   for key in keys) == Dict{Int64, Float64}(IDToCharge)  
+    @test Dict(ToID_test[key]=>ToMass_test[key]     for key in keys) == IDToMass 
     @test Dict(ToID_test[key]=>ToDiameter_test[key] for key in keys) == IDToSigma 
-    @test Dict(ToID_test[key]=>ToLambda_test[key] for key in keys) == IDToLambda 
+    @test Dict(ToID_test[key]=>ToLambda_test[key]   for key in keys) == IDToLambda 
 end
 
 @testset "WriteHOOMDParticlesInput" begin
@@ -144,7 +144,7 @@ end
     filename = "$SetupTestPath/enmhoomd.csv"
     N = 4
     types = ["B1","B2","B3","B4"]
-    id = [1,2,3,4]
+    id = [0,1,2,3] ### use c indexing
     group = [(0, 1), (1, 2), (2, 3), (3, 4)]
     harmonic = Dict{String, Dict{Symbol, Float64}}()
     harmonic["B1"] = Dict(:r => 0.5, :k => 700)
@@ -154,17 +154,26 @@ end
     ENM = (N, types, id, group, harmonic)
 
     open(filename_test, "w") do io
-        write(io, "1 , B1 , 1 , (0, 1) , $(harmonic["B1"]) \n")
-        write(io, "2 , B2 , 2 , (1, 2) , $(harmonic["B2"]) \n")
-        write(io, "3 , B3 , 3 , (2, 3) , $(harmonic["B3"]) \n")
-        write(io, "4 , B4 , 4 , (3, 4) , $(harmonic["B4"]) \n")
+        write(io, "1 , B1 , 0 , (0, 1) , $(harmonic["B1"]) \n")
+        write(io, "2 , B2 , 1 , (1, 2) , $(harmonic["B2"]) \n")
+        write(io, "3 , B3 , 2 , (2, 3) , $(harmonic["B3"]) \n")
+        write(io, "4 , B4 , 3 , (3, 4) , $(harmonic["B4"]) \n")
     end
 
     HPSAnalysis.Setup.WriteENM_HOOMD_Indices(filename, ENM)
-    ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = sim.read_ENM_HOOD_indices(filename)
-    read_ENM = (ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic)
-    ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic = sim.read_ENM_HOOD_indices(filename_test)
-    read_ENM_test = (ENMB_N, ENMB_types, ENMB_typeid, ENMB_group, ENMharmonic)
 
-    @test read_ENM == read_ENM_test
+    read_ENM = sim.read_ENM_HOOD_indices(filename)
+    read_ENM_test = sim.read_ENM_HOOD_indices(filename_test)
+
+    @test N == read_ENM[1]
+    @test all(types == read_ENM[2])
+    @test id == read_ENM[3]
+    @test group == read_ENM[4]
+    @test all(map(key-> (harmonic[key][:k]== read_ENM[5][key]["k"])&& (harmonic[key][:r]≈read_ENM[5][key]["r"]), collect(keys(harmonic))))
+
+    @test all(read_ENM[1] == read_ENM_test[1])
+    @test all(read_ENM[2] == read_ENM_test[2])
+    @test all(read_ENM[3] == read_ENM_test[3])
+    @test all(read_ENM[4] == read_ENM_test[4])
+    @test all(read_ENM[5] == read_ENM_test[5])
 end

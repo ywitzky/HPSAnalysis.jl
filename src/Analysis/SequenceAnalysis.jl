@@ -256,7 +256,6 @@ function computeKappa(charges::Vector{R}, charge_asym) where {R<: Real}
 
         kappa_norm = kappa#/kappa_max#(kappa .-kappa_min)./(kappa_max-kappa_min) 
 
-        #println("kappa_min: $kappa_min, kappa, $kappa kappa_norm: $kappa_norm, kappa_max: $kappa_max")
         value += kappa_norm
     end
     return value/2.0
