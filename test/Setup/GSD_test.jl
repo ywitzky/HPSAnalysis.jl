@@ -1,6 +1,8 @@
 filename_test="$(SetupTestPath)/GSD_write_test.gsd"
 filename="$(SetupTestPath)/GSD_write.gsd"
 
+using GSDFormat
+
 @testset "writeGSDStartFile" begin
     #Not testing UseAngles=true, because it is an artefact of a previous version.
     UseAngles=false
@@ -48,7 +50,7 @@ filename="$(SetupTestPath)/GSD_write.gsd"
     GSDFormat.append(file, snapshot)
     GSDFormat.close(file)
 
-    HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,BoxSize,coor_notreshaped,AAToID,sequences,image_notreshaped,mass_charge,mass_charge,DiMap,DiList,AAToID,false)
+    HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,BoxSize,coor_notreshaped,AAToID,sequences,image_notreshaped,mass_charge,mass_charge,DiMap,DiList,AAToID,false, "test", [],[])
 
     @test files_are_equal(filename_test,filename)
 end
