@@ -7,11 +7,12 @@ import numpy as np
 import gsd.hoomd
 import hoomd
 import hoomd.md
-import h5py
+#import h5py
 
 import sys
 from PythonFuncs import *
 from hoomd import ashbaugh_plugin
+import copy
 #from hoomd import plugin_HPS_SS
 #import ashbaugh_plugin as aplugin
 
@@ -20,16 +21,19 @@ PWD = os.getcwd()
 def run(FolderPath, Restart=False, ExtendedSteps=0):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
+    #new Parameter SimType Calvados3 default C2
+    #new Parameter Domain
     Params = readParam(f"{FolderPath}/HOOMD_Setup/Params.txt")
 
     Seqs, NBeads, NChains, InputBonds, InputAngles, InputDihedrals = readSequences(f"{FolderPath}/HOOMD_Setup/Sequences.txt")
 
     InputPositions, InputTypes, InputCharges, InputMasses, _, Diameter, InputImage = readParticleData(f"{FolderPath}/HOOMD_Setup/Particles.txt", NBeads, Seqs)
-
     if Params["UseAngles"]:
         dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs = readDihedrals(f"{FolderPath}/HOOMD_Setup/DihedralMap.txt", Seqs, InputTypes)
+    else:
+        dihedral_eps, dihedral_dict, dihedral_list, dihedral_IDs, dihedral_AllIDs=[],[],[],[],[]
 
-
+    #Other LambdaDict for C2/C3
     IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}/HOOMD_Setup/Dictionaries.txt")
 
 
@@ -39,6 +43,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
     kb = 0.00831446262
     kT = kb*Params["Temp"]
+    forces = []
 
     ### Prepare HOOMD 
     
@@ -85,28 +90,45 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
 
-            # Connect particles with bonds.
-            snapshot.bonds.N = NBeads-NChains
-            snapshot.bonds.types = ['O-O']
-            snapshot.bonds.typeid = np.zeros(snapshot.bonds.N, dtype=np.uint32)
-            snapshot.bonds.group = InputBonds
+            B_N = NBeads-NChains
+            B_types = ['O-O']
+            B_typeid = np.zeros(B_N, dtype=np.int32)
+            B_group = InputBonds#.astype(np.uint32)
+
+            if Params["SimulationType"]=="Calvados3":
+                ### Harmonic bonds
+                harmonic = hoomd.md.bond.Harmonic()
+
+                ## read the ENM_indice and backbone data
+                B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
+                
+                for typ in B_types: 
+                    harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"])
+
+                forces.append(harmonic)
+
+
+            snapshot.bonds.N = B_N
+            snapshot.bonds.types = list(B_types)
+            snapshot.bonds.typeid = B_typeid
+            snapshot.bonds.group = B_group
 
             ## Create Angles
             snapshot.angles.N = NBeads-2*NChains
             snapshot.angles.types = ['O-O-O']
-            snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
+            snapshot.angles.typeid = np.zeros(snapshot.angles.N, dtype=int)
             snapshot.angles.group = InputAngles
 
-            # Create Angles
-            snapshot.dihedrals.N =  NBeads-3*NChains 
-            snapshot.dihedrals.types = list(dihedral_list)
-            snapshot.dihedrals.typeid =  dihedral_AllIDs
-            snapshot.dihedrals.group = InputDihedrals
+            ## Create Dihedrals
+            #snapshot.dihedrals.N =  NBeads-3*NChains 
+            #snapshot.dihedrals.types = []#list(dihedral_list)
+            #snapshot.dihedrals.typeid =  dihedral_AllIDs
+            #snapshot.dihedrals.group = InputDihedrals
 
-            with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
+            with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd", mode='w') as f:
                 f.append(snapshot)
 
-            sim.create_state_from_gsd(filename=FolderPath+Params['Simname']+"_StartConfiguration.gsd")
+            sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd")
         else:
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
@@ -114,12 +136,12 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         print("The number of necessary steps is zero. No simulation will be run.")
         return -1
 
-    forces = []
 
-    ### Harmonic bonds
-    harmonic = hoomd.md.bond.Harmonic()
-    harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
-    forces.append(harmonic)
+    if Params["SimulationType"]!="Calvados3":
+        ### Harmonic bonds
+        harmonic = hoomd.md.bond.Harmonic()
+        harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
+        forces.append(harmonic)
 
     if Params["UseAngles"]:
         cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
@@ -193,10 +215,10 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
         logger_pres.add(sim, quantities=["timestep"])
         logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
-        hdf5_writer = hoomd.write.HDF5Log(
-            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
-        )
-        sim.operations.writers.append(hdf5_writer)
+        #hdf5_writer = hoomd.write.HDF5Log(
+        #    trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
+        #)
+        #sim.operations.writers.append(hdf5_writer)
     else:
         print("Thermodynamic Quantities are not tracked!")
 
@@ -215,8 +237,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
     sim.operations.integrator=integrator
 
-	#
-
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
@@ -228,6 +248,9 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
+    #print("REMOVE THIS LINE BEFORE USING")
+    #sim.operations.writers.append(gsd_writer)
+
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
     if not Restart:
@@ -235,7 +258,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             print(f"fac {fac}")
             for i in range(10):
                 integrator.dt = Params["dt"]/fac
-                sim.run(100)#Params["NSteps"])
+                sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
 
     ### start simulation

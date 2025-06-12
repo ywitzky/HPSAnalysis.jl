@@ -19,6 +19,8 @@ makedocs(
         "Setup" => "setup.md",
         "Slab Analysis" => "SlabAnalysis.md",
         "List of functions" => "listfunctions.md",
+        "Installation" => "Requirements.md",
+        "Deprecated" => "Deprecated.md"
     ],
 )
 
