@@ -16,7 +16,7 @@ function determineDihedrals(Sequences, Types, TypeToId, OneToHPSDihedral0110, On
     dihedral_short_map = Dict()
     dihedral_long_map = Dict()
 
-    dihedral_eps = zeros(400)
+    dihedral_eps = ones(400)*Inf
     dihedral_cnt=0
     eps=0.
     AA_ind = 1
@@ -73,7 +73,7 @@ function determineDihedrals(Sequences, Types, TypeToId, OneToHPSDihedral0110, On
                     eps = (OneToHPSDihedral0110[AA1]+OneToHPSDihedral0110[AA2])/2.
                     key = (min(AA_ind,AA2_ind), max(AA_ind,AA2_ind))
                 end
-                if ! haskey(dihedral_short_map, key)
+                if !haskey(dihedral_short_map, key)
                     eps_short = round(eps;digits=4)
                     same_eps_ind = findfirst(x->x==eps_short, dihedral_eps)
                     if same_eps_ind===nothing
@@ -257,7 +257,9 @@ function writeHPSLammpsScript(fileName, StartFileName, AtomTypes, LongAtomTypes,
 
     write(file, "run_style verlet\n")
 
-    if OutFormat=="xtc"
+    if OutFormat=="xyz"
+        write(file, "dump trajectory all xyz $WriteOutFreq ./Trajectory$(ChargeTemperSim ?  "_\${id}" : "").xyz")
+    elseif OutFormat=="xtc"
         write(file,"dump trajectory all xtc $WriteOutFreq ./Trajectory$(ChargeTemperSim ?  "_\${id}" : "").xtc\n")
     elseif OutFormat=="h5md"
         write(file,"dump trajectory all h5md $WriteOutFreq ./Trajectory$(ChargeTemperSim ?  "_\${id}" : "").h5 position image create_group yes\n")
@@ -874,6 +876,15 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
 
     NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list = startConfigurationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneToLambdaDef,OneToSigmaDef,MixingRule)
 
+    #if AlphaAddition then determine the Dihedral
+    dihedral_short_map=Dict()
+    dihedral_eps, dihedral_long_map = [] , []
+    dihedral_list = zeros(Int32, (0,0))
+    NDihedralsTypes=0
+    if AlphaAddition
+        (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
+        NDihedralsTypes = length(dihedral_eps)
+    end
 
     #Set start coordinates for the AA, with different variations
     if InitStyle=="Slab"

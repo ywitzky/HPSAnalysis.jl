@@ -5,10 +5,12 @@ EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python"
 
 using PyCall
+BasePath="$SetupTestPath/RS_Prot/"
 
-rm(SetupTestPath; force=true, recursive=true)
-mkpath("$SetupTestPath/HOOMD_Setup/")
-BasePath=SetupTestPath
+
+rm(BasePath; force=true, recursive=true)
+mkpath(BasePath)
+mkpath("$BasePath/HOOMD_Setup/")
 
 
 ToCreate =  ["RS31"]
@@ -54,7 +56,7 @@ for (protID, protein) in enumerate(ToCreate)
 
         (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
 
-        ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
+        local ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
         #itp_Path = "$(Data.BasePath)/InitFiles/ITPS_Files/$(protein).itp"
 

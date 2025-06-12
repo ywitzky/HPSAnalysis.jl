@@ -309,7 +309,6 @@ function computeHREMDChargeAnalysis(Sims::Vector{SimData{T,I}}, ID::Matrix{I2};M
             end
             computeCellLists(Sim) ### compute CellLists  for step
 
-            #println(argmax(length.(Sim.PositiveCellList)), " ", maximum(length.(Sim.PositiveCellList)))
             #if maximum(length.(Sim.PositiveCellList))> 329 continue  end
 
             iterateThroughCellList(Sim, computeChargeBonds  ) ### compute ChargeContacts for all cells with func computeChargeBonds

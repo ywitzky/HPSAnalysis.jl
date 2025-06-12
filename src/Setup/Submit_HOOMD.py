@@ -114,18 +114,18 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             snapshot.bonds.typeid = B_typeid
             snapshot.bonds.group = B_group
 
-            ## Create Angles
-            snapshot.angles.N = NBeads-2*NChains
-            snapshot.angles.types = ['O-O-O']
-            snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
-            snapshot.angles.group = InputAngles
+            if Params["UseAngles"]:
+                ## Create Angles
+                snapshot.angles.N = NBeads-2*NChains
+                snapshot.angles.types = ['O-O-O']
+                snapshot.angles.typeid = np.zeros( snapshot.angles.N, dtype=int)
+                snapshot.angles.group = InputAngles
 
-            # Create Angles
-            print(InputDihedrals)
-            snapshot.dihedrals.N =  NBeads-3*NChains 
-            snapshot.dihedrals.types = list(dihedral_list)
-            snapshot.dihedrals.typeid =  dihedral_AllIDs
-            snapshot.dihedrals.group = InputDihedrals
+                # Create Angles
+                snapshot.dihedrals.N =  NBeads-3*NChains 
+                snapshot.dihedrals.types = list(dihedral_list)
+                snapshot.dihedrals.typeid =  dihedral_AllIDs
+                snapshot.dihedrals.group = InputDihedrals
 
             with gsd.hoomd.open(name=FolderPath+Params["Simname"] + "_StartConfiguration.gsd", mode='w') as f:
                 f.append(snapshot)

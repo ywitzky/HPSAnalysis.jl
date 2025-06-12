@@ -22,8 +22,9 @@ pos = zeros(Float32, 10, 3)
 pos[1:5, 2] .= collect(1:5)*3.8
 pos[6:10, 2] .= collect(1:5)*3.8.+25
 
+ENM = (0,[],[],[], Dict())
 cd(SetupTestPath)
-HPSAnalysis.Setup.writeStartConfiguration("./Test_slab","./Test_Start_slab.txt", Info, Sequences, BoxSize , 10_000, HOOMD=true, ; SimulationType="Calvados2" , Temperature=300,  InitStyle="Pos", Pos=pos , pH=pH, SaltConcentration=0.2, Device="CPU", WriteOutFreq=1_000)
+HPSAnalysis.Setup.writeStartConfiguration("./Test_slab","./Test_Start_slab.txt", Info, Sequences, BoxSize , 10_000, HOOMD=true, ; SimulationType="Calvados2" , Temperature=300,  InitStyle="Pos", Pos=pos , pH=pH, SaltConcentration=0.2, Device="CPU", WriteOutFreq=1_000, ENM=ENM)
 
 sim.run(SetupTestPath)
 sim.restart(SetupTestPath; ExtendedSteps=20_000)

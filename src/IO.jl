@@ -50,9 +50,9 @@ function parseXYZ!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
     close(traj)
 
-    Sim.x = Sim.x[:,write_step-1 ]
-    Sim.y = Sim.y[:,write_step-1 ]
-    Sim.z = Sim.z[:,write_step-1 ]
+    Sim.x = Sim.x[:,1:write_step-1 ]
+    Sim.y = Sim.y[:,1:write_step-1 ]
+    Sim.z = Sim.z[:,1:write_step-1 ]
 
     return write_step-1
 end
@@ -83,7 +83,6 @@ function parseXYZ_CSV!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         if two_lines
             x = tryparse(eltype(Sim.x), line) ### avoid weights that are so small that they cant be parsed
             write_step+=1
-            println("step: $write_step")
             Sim.FrameWeights[write_step] = x!== nothing ? x : 0.0
             if write_step!=1
                 Sim.x[:, write_step-1] .= xnew
@@ -223,7 +222,7 @@ function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String,
     ### Sim.StepFrequency is for data that will be reduceed, Sim.reduce sets discrepancy between energy data and .xyz created by presorting
     if Sim.TrajectoryFile[end-2:end] =="xyz"
         traj=open(TrajectoryFile, "r")
-        Sim.NAtoms= parse(I,readline(traj))#
+        Sim.NAtoms= parse(I,readline(traj))
     elseif Sim.TrajectoryFile[end-2:end] =="xtc"
         (_, xtc) = xtc_init(TrajectoryFile)
         Sim.NAtoms = xtc.natoms
