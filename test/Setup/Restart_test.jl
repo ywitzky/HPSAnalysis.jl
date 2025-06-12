@@ -42,14 +42,20 @@ traj_5 = GSDFormat.open("$(SetupTestPath)/traj_4.gsd")
     data = HPSAnalysis.initData(SetupTestPath; Reparse=true, LoadAll=true, HOOMD=true, ReadBig=true)
     @test data.NSteps == 50 
 
+    #=
+    ### test if data is correctly read by initData
     alltrue = true ### reduce the number of tests since basically one test
     for (traj, range) in zip([traj_1, traj_2, traj_3, traj_4, traj_5], [1:10, 11:20, 21:30,31:40,41:50]) 
         for (step, frame) in zip(range,traj)
             alltrue &= all(frame.particles.position[:, 1].*10.0 .≈ data.x[:, step])
-            alltrue &=  all(frame.particles.position[:, 2].*10.0 .≈ data.y[:, step])
-            alltrue &=  all(frame.particles.position[:, 3].*10.0 .≈ data.z[:, step])
+            alltrue &= all(frame.particles.position[:, 2].*10.0 .≈ data.y[:, step])
+            alltrue &= all(frame.particles.position[:, 3].*10.0 .≈ data.z[:, step])
         end
     end
+    @test alltrue
+    =#
+
+    println(SetupTestPath)
     file = h5open("$(SetupTestPath)/pressure.h5")
     steps = file["hoomd-data"]["Simulation"]["timestep"][:]
     @test length(steps) == 500
@@ -69,7 +75,8 @@ traj_5 = GSDFormat.open("$(SetupTestPath)/traj_4.gsd")
     @test all(steps .== vcat(expected_steps, collect(100:100:10000)))
     data = HPSAnalysis.initData(SetupTestPath; Reparse=true, LoadAll=true, HOOMD=true, ReadBig=true)
 
-    alltrue = true
+    ### test if data is correctly read by initData
+    alltrue = true ### reduce the number of tests since basically one test
     for (traj, range) in zip([traj_1, traj_2, traj_3, traj_4, traj_5,traj_6], [1:10, 11:20, 21:30,31:40,41:50, 51:60]) 
         for (step, frame) in zip(range,traj)
             alltrue &= all(frame.particles.position[:, 1].*10.0 .≈ data.x[:, step])

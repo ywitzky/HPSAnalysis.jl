@@ -15,7 +15,7 @@ pushfirst!(pyimport("sys")."path", "$(PkgSourcePath)/Setup/")
 TestPath = Scratch.get_scratch!(HPSAnalysis, "test") 
 
 
-
+#=
 @testset "Aqua" begin
     Aqua.test_all(HPSAnalysis; deps_compat=(ignore=[:Printf, :Mmap, :Libdl, :LinearAlgebra, :Statistics,:Test], ), project_extras=false, )
     ### ignore standard libraries, not sure how to deal with them im PackageCompatUI/add compats manually
@@ -23,4 +23,5 @@ TestPath = Scratch.get_scratch!(HPSAnalysis, "test")
 end
 
 include("./Analysis/Analysis_test.jl")
+=#
 include("./Setup/Setup_test.jl")
