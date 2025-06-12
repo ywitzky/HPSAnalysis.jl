@@ -64,14 +64,6 @@ InputPositions, InputTypes, InputCharges, InputMasses, Types, Diameter, InputIma
     @test bond_types_test==["O-O"]
     @test bond_typid_test==bondid
     @test bond_group_test==bond_group
-<<<<<<< HEAD
-
-    #@test InputTypes == 
-end
-
-
-=======
 end
 
 close(data)
->>>>>>> origin/main

@@ -64,19 +64,6 @@ end
     ### pyCall doesnt autoconvert numpy ints if part of a dictionary
     ### additionally switch from 0 index to 1 indexing
     IDToResName = Dict((py"castToInt"(key)+1, Char(value[1])) for (key,value) in IDToResName)
-<<<<<<< HEAD
-    IDToCharge = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToCharge)
-    IDToMass = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToMass)
-    IDToSigma = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToSigma)
-    IDToLambda = Dict((py"castToInt"(key)+1, value) for (key,value) in IDToLambda)
-
-    @test [ToID_test[key] for key in keys] == ID.+1 ### python routine uses C indices
-    @test Dict(ToID_test[key]=>key for key in keys) == Dict{Int64, Char}(IDToResName)
-    @test Dict(ToID_test[key]=>ToCharge_test[key] for key in keys) == Dict{Int64, Float64}(IDToCharge)  
-    @test Dict(ToID_test[key]=>ToMass_test[key] for key in keys) == IDToMass 
-    @test Dict(ToID_test[key]=>ToDiameter_test[key] for key in keys) == IDToSigma 
-    @test Dict(ToID_test[key]=>ToLambda_test[key] for key in keys) == IDToLambda 
-=======
     IDToCharge  = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToCharge)
     IDToMass    = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToMass)
     IDToSigma   = Dict((py"castToInt"(key)+1, value         ) for (key,value) in IDToSigma)
@@ -88,7 +75,6 @@ end
     @test Dict(ToID_test[key]=>ToMass_test[key]     for key in keys) == IDToMass 
     @test Dict(ToID_test[key]=>ToDiameter_test[key] for key in keys) == IDToSigma 
     @test Dict(ToID_test[key]=>ToLambda_test[key]   for key in keys) == IDToLambda 
->>>>>>> origin/main
 end
 
 @testset "WriteHOOMDParticlesInput" begin

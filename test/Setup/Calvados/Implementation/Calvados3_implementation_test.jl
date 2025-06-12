@@ -1,28 +1,14 @@
-<<<<<<< HEAD
-### Run diferent proteins for which we know the R_g from the Calvados3 paper, to verify our implementation. As multi domain proteins we use Tia1, Ubq3, Ubq2, Ubq4 and Gal3.
-=======
 ### Run different proteins for which there are reverense values for the R_g in the Calvados3 paper, to verify our implementation. As multi domain proteins we use Tia1, Ubq3, Ubq2, Ubq4 and Gal3.
->>>>>>> origin/main
 using Distributed
 addprocs(5)
 
 @everywhere using HPSAnalysis
-<<<<<<< HEAD
-
-PkgSourcePath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
-EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
-ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python"
-
-BasePath = "$(SetupTestPath)/implementation_test/"
-rm(BasePath; force=true, recursive=true)
-=======
 @everywhere using PyCall
 
 BasePath = "$(SetupTestPath)/implementation_test/"
 if isdir(BasePath)
     rm(BasePath; force=true, recursive=true)
 end
->>>>>>> origin/main
 mkpath(BasePath)
 
 Proteins = ["tia1", "ubq2", "ubq3", "ubq4", "gal3"]
