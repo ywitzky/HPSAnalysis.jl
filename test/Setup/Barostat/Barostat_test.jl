@@ -50,14 +50,15 @@ function run_sim_prot(protein, BasePath, DomainDict, ProteinJSON, ProteinCif, pH
         SimulName = "$(protein)_$temp"
 
         (pos, Data) = HPSAnalysis.CreateStartConfiguration_barostat(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinCif)
+        HPSAnalysis.RewriteCifToPDB(Path, ProteinToCif, Proteins)
 
         #pos = HPSAnalysis.writeStartConfiguration_Barostat(BasePath, fileName="$protein", StartFileName="$protein", Info, Sequences, BoxSize, ProteinCif)
         ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
-        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 100_000_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=100_000, ENM)
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=1_000, ENM)
 
-        sim.run("$(Path)/")
+        #sim.run("$(Path)/")
     end
 end
 
-run_sim_prot(Proteins[1], BasePath, DomainDict[Proteins[1]], ProteinJSON[Proteins[1]], ProteinCif[Proteins[1]], 7.0,0.8,300)
+run_sim_prot(Proteins[1], BasePath, DomainDict, ProteinJSON, ProteinCif, 7.0,0.8,300)

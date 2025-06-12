@@ -1,24 +1,40 @@
 function AlphaFold_startpos(ProteintoCif, Proteins, Sequences)
-    length=0
+    len=0
     for Seq in Sequences
-        length += length(Seq)
+        len += length(Seq)
     end
-    pos = zeros(Float64, length, 3)
+    pos = zeros(Float64, len, 3)
     index = 1
     for protein in Proteins
         open(ProteintoCif[protein], "r") do io
             for line in eachline(io)
-                if startswith(line, "ATOM")
+                field = split(strip(line))
+                if field[1] == "ATOM" && field[4] == "CA"
                     field = split(strip(line))
                     x = parse(Float64, field[11])
                     y = parse(Float64, field[12])
                     z = parse(Float64, field[13])
-                    pos[index, :] = [x, y, z] 
+                    pos[index, :] = [x, y, z]
+                    index += 1
                 end
             end
         end
     end
     return pos
+end
+
+function minboxforprotein(pos)
+    x = pos[1]
+    y = pos[2]
+    z = pos[3]
+    x_min, x_max = min(x), max(x)
+    y_min, y_max = min(y), max(y)
+    z_min, z_max = min(z), max(z)
+    dx = x_max - x_min
+    dy = y_max - y_min
+    dz = z_max - z_min
+    minbox = [dx, dy, dz]
+    return minbox
 end
 
 
@@ -40,7 +56,7 @@ function CreateStartConfiguration_barostat(SimulationName::String, Path::String,
 
     #Definition of the Box
     Data.BoxLength = [Float32(BoxSize[1]),Float32(BoxSize[2]),Float32(BoxSize[3])]
-    Data.BoxSize = zeros(eltype(Data.x), 3,2 )#Matrix of FloatType
+    Data.BoxSize = zeros(eltype(Data.x), 3,2)#Matrix of FloatType
     Data.BoxSize[1,1] = -Data.BoxLength[1]/2.
     Data.BoxSize[1,2] =  Data.BoxLength[1]/2.
     Data.BoxSize[2,1] = -Data.BoxLength[2]/2.
@@ -105,9 +121,31 @@ function CreateStartConfiguration_barostat(SimulationName::String, Path::String,
 
     if Regenerate
         pos = AlphaFold_startpos(ProteinToCif, Proteins, Sequences)
-        Data.x = pos[1, :]
-        Data.y = pos[2, :]
-        Data.z = pos[3, :]
+        minbox = minboxforprotein(pos)
+        #dx_Box = Data.BoxSize[1,2] - Data.BoxSize[1,1]
+        #dy_Box = Data.BoxSize[2,2] - Data.BoxSize[2,1]
+        #dz_Box = Data.BoxSize[3,2] - Data.BoxSize[3,1]
+        # nmber of boxes that can be in each dimension
+        #N_x = floor(dx_Box, minbox[1])
+        #N_y = floor(dy_Box, minbox[2])
+        #N_z = floor(dz_Box, minbox[3])
+        N_per_dim = ceil(Int, Data.NChains^(1/3))
+        count = 1
+
+        for ix in 0:N_per_dim-1
+            for iy in 0:N_per_dim-1
+                for iz in 0:N_per_dim
+                    count += 1
+                    if count > Data.NChains
+                        break
+                    end
+                    offset = [ix*minbox[1], iy*minbox[2], iz*minbox[3]]
+                    Data.x = vcat(Data.x, pos[:, 1] .+ offset[1])
+                    Data.y = vcat(Data.y, pos[:, 2] .+ offset[2])
+                    Data.z = vcat(Data.z, pos[:, 3] .+ offset[3])
+                end
+            end
+        end           
     end
 
     close(Data.xio)
@@ -185,17 +223,3 @@ end
 
 
 
-
-
-
-function writeStartConfiguration_forBarostat(BasePath, fileName, StartFileName, Info, Sequences, BoxSize, ProteintoCif; NSteps=100_000_000, SimulationType="Calvados2", Temperature=300, MixingRule="1-1001-1", Pos=zeros(Float32, 0), InitStyle="AlphaFold", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma, WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM)
-    
-    NAtoms, NBonds, NAngles, NDihedrals, AlphaAddition, SimulationType, AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list = HPSAnalysis.startConfigurationSetup(Sequences, SimulationType, pH, OneToChargeDef, OneToLambdaDef, OneToSigmaDef, MixingRule)
-
-    if InitStyle=="AlphaFold"
-        pos = AlphaFold_startpos(ProteintoCif, Proteins, Sequences)
-    else
-        pos = HPSAnalysis.createDenseStartingPosition(Sequences, BoxSize)
-    end
-    return pos
-end
