@@ -119,7 +119,7 @@ Write a data file that contains all Parameters of the Simulation.
 **Creat**:
 * Write a file with all parameters of the simulation that are given from the arguments.
 """
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=false, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]))
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]))
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
     write(io, "Domains: $(domain)\n")
@@ -167,7 +167,7 @@ function WriteENM_HOOMD_Indices(filename::String, ENM)
     io = open(filename, "w")
     write(io, "// N, ENMB_type, ENMB_typeid, ENMB_group_vector, harmonic\n")
     for i in 1:ENMB_N
-        write(io, "$(i) , $(ENMB_types[i]) , $(ENMB_typeid[i]) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[i]]) \n")
+        write(io, "$(i) , $(ENMB_types[ENMB_typeid[i]+1]) , $(ENMB_typeid[i]) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[ENMB_typeid[i]+1]]) \n")
     end
     close(io);
 end

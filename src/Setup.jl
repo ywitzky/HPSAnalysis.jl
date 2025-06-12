@@ -504,6 +504,90 @@ end
 
 @doc raw"""
     CalvadosSetup(Sequences,AtomTypes,pH)
+<<<<<<< HEAD
+=======
+
+Define escential Parameters for the Simulation based on the Simulation Type.
+    
+**Arguments**
+- `Sequences::Array{String}`: List of sequences of Proteins.
+- `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+- `pH::Float`: pH-value of the system.
+
+**Return**:
+A tuple containing:
+- `AtomTypes::Set{Char}`: Set of unique amino acid types in the provided sequences.
+- `LongAtomTypes::Set{Char}`: Set of amino acid types where the first and last amino acid in a sequence are treated as distinct types.
+- `AaToId::Dict{Char, Int32}`: Dictionary mapping each amino acid type to a unique ID number.
+- `IdToAa::Dict{Int32, Char}`: Dictionary mapping each ID number to its corresponding amino acid type.
+- `ResToLongAtomType::Dict{Tuple{Char, Bool}, Char}`: Dictionary mapping standard amino acids to their modified forms when at the beginning or end of a sequence.
+- `LongAtomTypesToRes::Dict{Char, Tuple{Char, Bool}}`: Reverse mapping of `ResToLongAtomType`.
+- `OneToCharge::Dict{Char, Float}`: Dictionary containing the charge values of amino acids, modified based on simulation type.
+- `OneToMass::Dict{Char, Float}`: Dictionary containing the mass values of amino acids.
+- `OneToSigma::Dict{Char, Float}`: Dictionary containing the sigma values of amino acids.
+- `OneToLambda::Dict{Char, Float}`: Dictionary containing the lambda values of amino acids.
+- `OneToHPSDihedral0110::Dict{Char, Any}`: Dictionary containing dihedral parameters for a specific configuration.
+- `OneToHPSDihedral1001::Dict{Char, Any}`: Dictionary containing dihedral parameters for another configuration.
+
+**Notes**:
+- If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding. Also the charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1/(1+10^(pH-6))`.
+"""
+function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
+    index_cnt = length(AtomTypes)
+    LongAtomTypes=deepcopy(AtomTypes)
+    ResToLongAtomType = Dict()
+    NewSequences= deepcopy(Sequences)
+    cnt = 96 ### use lower case ascii letters as modified residue types
+    for (id,Sequence) in enumerate(Sequences)
+        if( ~((Sequence[1], true) in  keys(ResToLongAtomType)))
+            ResToLongAtomType[(Sequence[1], true)] = Char(cnt+=1) 
+            push!(LongAtomTypes, ResToLongAtomType[(Sequence[1], true)] )#
+            AaToId[ResToLongAtomType[(Sequence[1], true)] ] = index_cnt+=1
+            NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
+        end
+        if( ~((Sequence[end], false) in  keys(ResToLongAtomType)))
+            ResToLongAtomType[(Sequence[end], false)] = Char(cnt+=1)
+            push!(LongAtomTypes, ResToLongAtomType[(Sequence[end], false)])
+            AaToId[ResToLongAtomType[(Sequence[end], false)] ] = index_cnt+=1
+            NewSequences[id] = NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
+        end
+    end
+
+    Sequences.=NewSequences
+    LongAtomTypes = union(LongAtomTypes, AtomTypes)
+    LongAtomTypesToRes=Dict( (v => k) for (k, v) in ResToLongAtomType)
+
+    OneToCharge = deepcopy(BioData.OneToHPSCharge)
+    OneToMass = deepcopy(BioData.AaToWeight)
+    OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
+    OneToHPSDihedral0110 = deepcopy(BioData.OneToHPSDihedral0110)
+    OneToHPSDihedral1001 = deepcopy(BioData.OneToHPSDihedral1001)
+    OneToCharge['H'] = 1.0/(1+10^(pH-6))  ### HIS is pH-Dependent for Calvados2/Calvados3
+
+    if SimulationType=="Calvados2"
+        OneToLambda = deepcopy(BioData.OneToCalvados2Lambda)
+    elseif SimulationType=="Calvados3"
+        OneToLambda = deepcopy(BioData.OneToCalvados3Lambda)
+    end
+
+    for e in LongAtomTypes ### added the charge modifications for the first/last amino acids
+        if ~(e in keys(OneToCharge))
+            (AA, front) = LongAtomTypesToRes[e]
+            OneToCharge[e] = front ? OneToCharge[AA] +1 :  OneToCharge[AA] -1
+            OneToMass[e] = front ? OneToMass[AA] +2.0 :  OneToMass[AA] +16
+            OneToSigma[e] = OneToSigma[AA]
+            OneToLambda[e] = OneToLambda[AA]
+            OneToHPSDihedral0110[e] = OneToHPSDihedral0110[AA]
+            OneToHPSDihedral1001[e] = OneToHPSDihedral1001[AA]
+        end
+    end
+    return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
+end
+
+
+@doc raw"""
+    DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
+>>>>>>> origin/main
 
 Define escential Parameters for the Simulation based on the Simulation Type.
     
@@ -725,22 +809,22 @@ Writes the datas for the simulation in different files with HOOMD.
 **Creates**:
 * Writes the datas for the simulation.
 """
-function writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
-        mkpath("./HOOMD_Setup")
-        WriteHOOMDSequences("./HOOMD_Setup/Sequences.txt", Sequences)
-        WriteHOOMDParticlesInput("./HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
+function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
+        mkpath("$(BasePath)/HOOMD_Setup")
+        WriteHOOMDSequences("$(BasePath)/HOOMD_Setup/Sequences.txt", Sequences)
+        WriteHOOMDParticlesInput("$(BasePath)/HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
         if AlphaAddition
-            WriteDihedrals("./HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
+            WriteDihedrals("$(BasePath)/HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
         end
         (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("./HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true) ### BoxLength has to be convert to nm
-        WriteDictionaries("./HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
-        WriteENM_HOOMD_Indices("./HOOMD_Setup/ENM_indices.txt", ENM)
+        WriteParams("$(BasePath)/HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true) ### BoxLength has to be convert to nm
+        WriteDictionaries("$(BasePath)/HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
+        WriteENM_HOOMD_Indices("$(BasePath)/HOOMD_Setup/ENM_indices.txt", ENM)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
-        writeGSDStartFile(StartFileName*".gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, domain, ENM)    
+        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, domain, ENM)    
 end
 
 @doc raw"""
@@ -870,21 +954,12 @@ Writes the start configuration for a molecular dynamics simulation.
 **Creates**:
 * Writes data files with the start configuration.
 """
-function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM)
+function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
     NAtoms,NBonds,NAngles,NDihedrals,AlphaAddition,SimulationType,AtomTypes, LongAtomTypes, AaToId, IdToAa,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, NAtomTypes, dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list = startConfigurationSetup(Sequences,SimulationType,pH,OneToChargeDef,OneToLambdaDef,OneToSigmaDef,MixingRule)
 
-    #if AlphaAddition then determine the Dihedral
-    dihedral_short_map=Dict()
-    dihedral_eps, dihedral_long_map = [] , []
-    dihedral_list = zeros(Int32, (0,0))
-    NDihedralsTypes=0
-    if AlphaAddition
-        (dihedral_short_map, dihedral_long_map, dihedral_eps, dihedral_list) = determineDihedrals(Sequences, AtomTypes, AaToId, OneToHPSDihedral0110, OneToHPSDihedral1001, MixingRule)
-        NDihedralsTypes = length(dihedral_eps)
-    end
 
     #Set start coordinates for the AA, with different variations
     if InitStyle=="Slab"
@@ -921,7 +996,7 @@ function writeStartConfiguration(fileName, StartFileName, Info, Sequences, BoxSi
     domain = []
     #Write all Inputs, Parameters (Yukawa Interaction with Debye-Hückle), Dictionaries and the Start-File
     if HOOMD
-        writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
+        writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
     else
         writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
     end
@@ -1031,94 +1106,140 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 - `ProteinJSON`: AlphaFold data of the Proteins.
 
 **Return**:
-* The nessesary Indices for HOOMD.
+- Number of bonds
+- Vector of bond type names 
+- ID connecting bond tuple to bond type
+- Vector of tuples defining all bonds
+- Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
 """
 function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
 
     ConstraintDict, Backbone_correction_Dict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
-
     HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
-    return HOOMD_Indices
+    UnfoldedRegions =  GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+    All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, Backbone_correction_Dict)
+
+    return All_Indices
+end
+
+
+@doc raw"""
+    CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)
+
+Combines the bond length potential of backbone and ENM.
+    
+**Arguments**
+- `Proteins`: List of Protein Names.
+- `Sequences`: The Sequences of the Proteins.
+- `HOOMD_Indices`: Tuple containing the info of ENM as defined by this functions return.
+- `UnfoldedRegions`: Dictionary defining the unfolded regions.
+- `BackboneCorrectionDict`::Dictionary with atoms, bond length and id which will be connected via backbone.
+
+**Return**:
+- Number of bonds
+- Vector of bond type names 
+- ID connecting bond tuple to bond type
+- Vector of tuples defining all bonds
+- Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
+"""
+function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)
+    offsets = vcat([0],cumsum(length.(Sequences)))
+
+    BackboneDiffLengths = Dict([prot=> [(i,j) for (i,j,_) in BackboneCorrectionDict[prot]] for prot in Set(Proteins)]) 
+
+    N_Bonds = sum([sum([b-a for (a,b) in UnfoldedRegions[prot]]) for prot in Proteins])
+    BB_ID = zeros(Int32, N_Bonds)
+    BB_groups = Vector{Tuple{Int32, Int32}}()
+
+
+    (ENM_Bonds, ENM_types, ENM_typeid, ENM_groups, harmonic) = HOOMD_Indices
+    ### ENM_types, harmonic contains [O-O] already
+    for (I, prot) in enumerate(Proteins)
+        for Domain in UnfoldedRegions[prot]
+            for i in range(Domain[1], Domain[2]-1)
+                if !( (i,i+1) in BackboneDiffLengths[prot])
+                    push!(BB_groups, (offsets[I]+i-1,offsets[I]+i)) ## shift from 1 -> 0, because of julia -> python
+                end
+            end
+        end
+    end
+    return (N_Bonds+ENM_Bonds, ENM_types, vcat(BB_ID, ENM_typeid), vcat(BB_groups, ENM_groups), harmonic )
 end
 
 @doc raw"""
-    ComputeHOOMD_ENMIndices(ConstraintDict, Sequences, Proteins)
+    ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict, Sequences, Proteins)
 
-Calculate the Indices, that are nessesary to creat a start file im HOOMD.
+Calculate the Indices, that are nessesary to creat a start file im HOOMD, .
     
 **Arguments**
-- `ConstraintDict::Dictionary with atoms and length which will be connected via ENM.
+- `ConstraintDict::Dictionary with atoms, bond length and id which will be connected via ENM.
+- `BackboneCorrectionDict`::Dictionary with atoms, bond length and id which will be connected via backbone.
 - `Sequences`: The Sequences of the Proteins.
 - `Proteins`: List of Protein Names.
 
 **Return**:
-* The nessesary Indices for HOOMD.
+- Number of bonds
+- Vector of bond type names 
+- ID connecting bond tuple to bond type
+- Vector of tuples defining all bonds
+- Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
 """
-function ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
+function ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict , Sequences, Proteins)
     offsets = cumsum(length.(Sequences))
 
-    NBonds = 0
-    B_types = []
-    B_typeid = Int[]
-    B_groups = Vector{Tuple{Int32, Int32}}()
+    bondLength = 0.38 # in nm
+    BB_N = 0
+    ENM_N = 0
+    BB_ID = Int[]
+    ENM_ID = Int[]
+    BB_groups = Vector{Tuple{Int32, Int32}}()
+    ENM_groups = Vector{Tuple{Int32, Int32}}()
     harmonic = Dict{String, Dict{Symbol, Float64}}()
-    binds = "ENM_bond_"
+    harmonic["O-O"] = Dict(:r => bondLength, :k => 8033.0) # default backbone bond values
     off = 0
-    bondLength = 3.8
 
-    type_cnt=1
-    MinimalTypes = Dict()
-    for Protein in Set(Proteins)
-        for (i,j, r0) in Backbone_correction_Dict[Protein]
+    for (i, Prot) in enumerate(Proteins)
+        for (atom_1, atom_2, r0, ind) in BackboneCorrectionDict[Prot]
             if r0 != bondLength
-                MinimalTypes[(Protein, i,j)] = type_cnt 
-                BB_bondname = "BB_$(MinimalTypes[(Protein, i, j)])"
-                harmonic[BB_bondname] = Dict(:r => r0, :k => 8033)
-                type_cnt+=1
-            end
-        end
-    end
-
-    for Protein in Set(Proteins)
-        for (i,j, r0) in ConstraintDict[Protein]
-            MinimalTypes[(Protein, i,j)] = type_cnt 
-            bondname = "ENM_$(MinimalTypes[(Protein, i, j)])"
-            harmonic[bondname] = Dict(:r => r0, :k => 700)
-            type_cnt+=1
-        end
-    end
-
-    for (i, Prot ) in enumerate(Proteins)
-        for (atom_1, atom_2, r0) in Backbone_correction_Dict[Prot]
-            if r0 != bondLength
-                bondname = "BB_$(MinimalTypes[(Prot, atom_1, atom_2)])"
-                push!(B_types, bondname)
-                push!(B_typeid, MinimalTypes[(Prot, atom_1, atom_2)])
-                push!(B_groups, (atom_1+off, atom_2+off))
-                #NBonds+= 1 # do not increase NBond, because N_BB is added later in writeGSDStartFile to check rigth bond number
+                push!(BB_ID, ind) 
             elseif r0 == bondLength
-                push!(B_typeid, 0)
-                push!(B_groups, (atom_1+off, atom_2+off))
+                push!(BB_ID, 0)
             end
-        end
-    end
-
-    for (i, Prot ) in enumerate(Proteins)
-        for (atom_1, atom_2, r0) in ConstraintDict[Prot]
-            bondname = "ENM_$(MinimalTypes[(Prot, atom_1, atom_2)])"
-            push!(B_types, bondname)
-            push!(B_typeid, MinimalTypes[(Prot, atom_1, atom_2)])
-            push!(B_groups, (atom_1+off, atom_2+off))
-            NBonds+= 1
+            push!(BB_groups, (atom_1 -1 + off, atom_2 -1 + off)) ## shift from 1 -> 0, because of julia -> python
+            BB_N+= 1
         end
         off = offsets[i]
     end
-    return (NBonds, B_types, B_typeid, B_groups, harmonic)
+    off = 0
+    for (i, Prot) in enumerate(Proteins)
+        for (atom_1, atom_2, r0, ind) in ConstraintDict[Prot]
+            push!(ENM_ID, ind) 
+            push!(ENM_groups, (atom_1 -1 + off, atom_2 -1 + off))
+            ENM_N+= 1
+        end
+        off = offsets[i]
+    end
+    BB_tmp  = vcat([BackboneCorrectionDict[prot] for prot in Set(Proteins)]...)
+    ENM_tmp = vcat([ConstraintDict[prot]           for prot in Set(Proteins)]...)
+
+    BB_types  = ["BB_$(ind)"  for ind in sort(collect(Set(getindex.(BB_tmp ,4)))) if ind != 0]
+    ENM_types = ["ENM_$(ind)" for ind in sort(collect(Set(getindex.(ENM_tmp,4))))]
+
+    for (r,ind) in zip(getindex.(BB_tmp,3) , getindex.(BB_tmp,4))
+        if ind!=0 ### "BB_0" is the same as "O-O"
+            harmonic["BB_$(ind)" ] = Dict(:r => r, :k => 8033)
+        end
+    end
+    for (r,ind) in zip(getindex.(ENM_tmp,3), getindex.(ENM_tmp,4))
+        harmonic["ENM_$(ind)" ] = Dict(:r => r, :k => 700)
+    end
+    
+    return (BB_N + ENM_N, vcat(["O-O"], BB_types, ENM_types), vcat(BB_ID, ENM_ID), vcat(BB_groups, ENM_groups), harmonic)
 end
 
 @doc raw"""
     DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
-Return a Dictionary of atoms and there distances that are nessesary for the Elastic Network Model.
+Return a dictionary of atoms and there distances that are nessesary for the Elastic Network Model, and a dictionary for the correction of the backbone bonds in the ENM domain.
     
 **Arguments**
 - `BasePath`: The base path of the simulation setup procedure.
@@ -1126,18 +1247,24 @@ Return a Dictionary of atoms and there distances that are nessesary for the Elas
 - `Proteins`: List of Protein Names.
 - `ProteinJSON`: Dictionary of AlphaFold data of the Proteins in JSON format.
 - `BBProtein`: The atom from which the AlphaFold datas are set for the aminoacid.
-- `rcut`: Cut of length for the ENM.
+- `rcut`: Cut of length for the ENM in Angstroem.
 - `plDDTcut`: Cut of plDDT parameter of AlphaFold reference for the ENM.
 - `pae_cut`: Cut of pae parameter of AlphaFold reference for the ENM.
 
 **Return**:
-* A Dictionary of atoms and lengths.
+* `ConstraintDict`: Dictionary that maps Protein names to a Vector containing Tuples of Indices of i,j and distance r which define additional bonds necessary for ENM.
+* `BackboneCorrectionDict`: Dictionary that maps Protein names to a Vector containing Tuples of Indices of i,j and distance r which define the backbone bonds that may have different lengths in ENM regions.
 """
-function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85)
+function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0, pae_cut=1.85, precision=1000)
+    ## distances in nm
     ciffolder = "$(BasePath)/InitFiles/CifFiles"
-    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
-    Backbone_correction_Dict = Dict{String, Vector{Tuple{Int,Int, Float64}}}()
-    bondLength = 3.8  ## coordinates are in nm
+    ConstraintDict = Dict{String, Vector{Tuple{Int,Int, Float64, Int32}}}() ### Contains the bonds from ENM
+    BackboneCorrectionDict = Dict{String, Vector{Tuple{Int,Int, Float64, Int32}}}() ### Contains the bonds from backbone with different lengths in folded regions
+    bondLength = 0.38  ## coordinates are in nm
+
+    ExistingConstraints=Dict{Float64, Int32}(bondLength=>1) ### maps existing constraint determined by distance onto integer
+    ExistingBackbone   =Dict{Float64, Int32}(bondLength=>1) ### maps existing backbone   determined by distance onto integer
+    cnt=1
     for Prot in Set(Proteins)
         if length(DomainDict[Prot])>0
             CifPath = "$(ciffolder)/$(Prot).cif"
@@ -1159,21 +1286,34 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                 end
             end
             ConstraintDict[Prot] = []
-            Backbone_correction_Dict[Prot] = []
+            BackboneCorrectionDict[Prot] = []
             pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
-            for i in 1:step-2
-                in_any_domain = false
+            for i in 1:step-1 # up to NAtom-1
+                #in_any_domain = false
                 for Domain in DomainDict[Prot]
                     if Domain[1] ≤ i ≤ Domain[2] && i + 1 ≤ Domain[2]
-                        dist_sqr = (x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2
-                        push!(Backbone_correction_Dict[Prot], (i, i+1, sqrt(dist_sqr)))
-                        in_any_domain = true
-            
+                        dist = sqrt((x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2)
+                        dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
+                        dist /= 10.0 ### convert to nm
+                        if !(dist in keys(ExistingBackbone))
+                            ExistingBackbone[dist]=cnt
+                            cnt+=1
+                        end
+                        push!(BackboneCorrectionDict[Prot], (i, i+1,dist, ExistingBackbone[dist]))
+
+                        #in_any_domain = true
                         if plDDT[i] ≥ plDDTcut
                             for j in i+3:Domain[2]
                                 dist_sqr = (x[j]-x[i])^2 + (y[j]-y[i])^2 + (z[j]-z[i])^2
                                 if dist_sqr < rcut^2 && plDDT[j] ≥ plDDTcut && pae[i][j] < pae_cut && pae[j][i] < pae_cut
-                                    push!(ConstraintDict[Prot], (i, j, sqrt(dist_sqr)))
+                                    dist=sqrt(dist_sqr)
+                                    dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
+                                    dist /= 10.0 ### convert to nm
+                                    if !(dist in keys(ExistingConstraints))
+                                        ExistingConstraints[dist]=cnt
+                                        cnt+=1
+                                    end
+                                    push!(ConstraintDict[Prot], (i, j, dist, ExistingConstraints[dist]))
                                 end
                             end
                         end
@@ -1181,13 +1321,51 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                     end
                 end
             
-                if !in_any_domain
-                    push!(Backbone_correction_Dict[Prot], (i, i+1, bondLength))
-                end
+                #if !in_any_domain
+                #    push!(BackboneCorrectionDict[Prot], (i, i+1, bondLength))
+                #end
             end
         end
     end
-    return ConstraintDict, Backbone_correction_Dict
+    return ConstraintDict, BackboneCorrectionDict
+end
+
+@doc raw"""
+    GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+
+Generates a dictionary that defines the unfolded regions of proteins based on the definition of folded regions.
+    
+**Arguments**
+- `Proteins`: List of Protein Names.
+- `DomainDict`:: The Domains in which the ENM is active.
+- `Sequences`: The Sequences of the Proteins.
+
+**Return**:
+- UnfoldedDict:: Dict{String, Vector{Tuple{Int64, Int64}}}(): Maps Protein names onto vectors of tuples that define the regions of unfolded regions.
+"""
+function GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+    ProtLength = Dict([prot=>length(seq) for (seq, prot) in zip(Sequences, Proteins)])
+    UnfoldedDict= Dict{String, Vector{Tuple{Int64, Int64}}}()
+
+    for Prot in Set(Proteins)
+        if length(DomainDict[Prot])>0
+            N = ProtLength[Prot]
+
+            FoldedDomains = sort(DomainDict[Prot])
+            UnfoldedDomains = []
+            if FoldedDomains[1][1]!=1
+                push!(UnfoldedDomains, (1, FoldedDomains[1][1]))
+            end
+            for (i, val) in enumerate(FoldedDomains[1:end-1])
+                push!(UnfoldedDomains, (val[2], FoldedDomains[i+1][1]))
+            end
+            if FoldedDomains[end][2]!=N
+                push!(UnfoldedDomains, (FoldedDomains[end][2], N))
+            end
+            UnfoldedDict[Prot] = UnfoldedDomains
+        end
+    end
+    return UnfoldedDict
 end
 
 @doc raw"""
@@ -1242,13 +1420,11 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     # Create Bonds
     if SimulationType == "Calvados3"
         ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
-
-        B_N += ENMB_N
-        B_types = ENMB_types#vcat(B_types, ENMB_types)
-        B_typeid = ENMB_typeid#vcat(B_typeid, Int32.(ENMB_typeid))
+        B_N = ENMB_N
+        B_types = ENMB_types
+        B_typeid = ENMB_typeid
         ENMB_group_matrix = permutedims(hcat(collect.(ENMB_group_vector)...))
-
-        B_group_matrix = ENMB_group_matrix#vcat(B_group_matrix,ENMB_group_matrix)
+        B_group_matrix = ENMB_group_matrix
     end
 
     snapshot.bonds.N = B_N
@@ -1273,7 +1449,6 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     file = GSDFormat.open(FileName, 'w')
     GSDFormat.append(file, snapshot)
     GSDFormat.close(file)
-
 end
 
 end

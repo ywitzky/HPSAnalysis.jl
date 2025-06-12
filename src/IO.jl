@@ -958,7 +958,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             mkpath("$(InitFiles)Elastic_Files/")
             ###Creat a pdb data from the AlphaFold cif data
             RewriteCifToPDB(Data.BasePath,ProteinToCif, Proteins )
-
+            #=
             itpPath="$(InitFiles)ITPS_Files/"
             mkpath(itpPath)
             Polyply.GenerateENM_ITPFilesOfSequence(Data.BasePath, Proteins,ProteinToDomain)
@@ -969,6 +969,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
             ### generate coordinates
             Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+            =#
         end
     elseif SimulationType=="Calvados2"
         if Regenerate
@@ -985,11 +986,12 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
             ### convert to PDB
             #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
+
+            ### read positons from gro
+            Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
         end
     end
-    println("$(InitFiles)$SimulationName.gro")
-    ### read positons from gro
-    Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
+
 
     ### sync RAM to disk before closing,
     Mmap.sync!(Data.x)

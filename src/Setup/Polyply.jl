@@ -61,7 +61,7 @@ function GenerateITPFilesOfSequence(Names, Sequences, OutputPath)
                 push!(SeqString, "$(OneToThree[AA]):1")
             end
         end
-       run(`$polyply gen_params -name $(name) -lib martini3 -seq $SeqString -o $(OutputPath)$(name).itp`)
+        run(`$polyply gen_params -name $(name) -lib martini3 -seq $SeqString -o $(OutputPath)$(name).itp`)
     end
 end
 
@@ -219,7 +219,7 @@ function GenerateENM_ITPFilesOfSequence(BasePath::String, Names, Domains::Dict{S
 
         force=4000 ## default 700; 4000 value of back bone bonds
 
-
+        cd(BasePath)
         run(`$martinize2 -f $(input_pdb_File) -o $(output_pdb) -x $(cg_pdb) -ff martini3001 -ss $(ss_string) -elastic -eu 0.9 -ef $force  -eunit $domains_str -name $(name)`)
 
         mv("$(BasePath)/$(name)_0.itp", "$(BasePath)/InitFiles/ITPS_Files/$(name).itp"; force=true)

@@ -5,8 +5,9 @@ using JSON
 @testset "Calvados3 ENM" begin 
 
 BasePath = "$SetupTestPath/ENM_Test/"
-
-rm(BasePath; force=true, recursive=true)
+if isdir(BasePath)
+    rm(BasePath; force=true, recursive=true)
+end
 mkpath(BasePath)
 
 DomainDict= Dict("RS31" => [[1,70], [90,150]], "RS31a" => [[1,75], [90,140]]) 
@@ -34,7 +35,7 @@ dom2 = DomainDict["RS31"][2]
  
 isinbounds(x, dom1, dom2) = (x>=dom1[1]&& x<=dom1[2] )|| (x>=dom2[1]&& x<=dom2[2])
 
-#check if ids are within bounds
+#check if ids are within bounds of folded regions
 @test reduce(*, map(x -> isinbounds(x,dom1, dom2), RS31_i ))
 @test reduce(*, map(x -> isinbounds(x,dom1, dom2), RS31_j ))
 
@@ -44,7 +45,7 @@ RS31a_j = getindex.(ConstraintDict["RS31a"],2)
 dom1 = DomainDict["RS31a"][1]
 dom2 = DomainDict["RS31a"][2]
 
-#check if ids are within bounds
+#check if ids are within bounds of folded regions
 @test reduce(*, map(x -> isinbounds(x,dom1, dom2), RS31a_i ))
 @test reduce(*, map(x -> isinbounds(x,dom1, dom2), RS31a_j ))
 
@@ -54,7 +55,7 @@ RS31a_pae =JSON.parsefile(ProteinJSON["RS31a"])["pae"]
 
 
 ### check if pae values are valid
-check(i,j,_, pae, cut) =pae[i][j]<cut
+check(i,j,_,_, pae, cut) =pae[i][j]<cut
 @test reduce(*, map(x->check(x..., RS31_pae, 1.85),  ConstraintDict["RS31"]))
 @test reduce(*, map(x->check(x..., RS31a_pae, 1.85),  ConstraintDict["RS31a"]))
 
@@ -81,7 +82,7 @@ end
 
 ###test whether all bonds are found 
 DomainDict= Dict("RS31" => [[1,70], [90,130]], "RS31a" => [[1,60], [90,140]]) 
-ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA")
+ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA",precision=10^12)
 
 
 valid_plDDT = [i for (i, val) in  enumerate(RS31_plDDT[1:70]) if val>90 ]
@@ -109,41 +110,109 @@ RS31a_dist = [ (RS31a_x[i]-RS31a_x[j])^2+(RS31a_y[i]-RS31a_y[j])^2+(RS31a_z[i]-R
 RS31_dist  .= sqrt.(RS31_dist)
 RS31a_dist .= sqrt.(RS31a_dist)
 
-RS31_pairs  = [(i,j,RS31_dist[i,j])  for (i,j) in vcat(RS31_dom1_pairs ,RS31_dom2_pairs ) if RS31_dist[i,j]<9.0 ]
-RS31a_pairs = [(i,j,RS31a_dist[i,j]) for (i,j) in vcat(RS31a_dom1_pairs,RS31a_dom2_pairs) if RS31a_dist[i,j]<9.0 ]
+RS31_pairs  = [(i,j,RS31_dist[i,j]/10.0)  for (i,j) in vcat(RS31_dom1_pairs ,RS31_dom2_pairs ) if RS31_dist[i,j]<9.0 ]
+RS31a_pairs = [(i,j,RS31a_dist[i,j]/10.0) for (i,j) in vcat(RS31a_dom1_pairs,RS31a_dom2_pairs) if RS31a_dist[i,j]<9.0 ]
 
-@test RS31_pairs == ConstraintDict["RS31"]
-@test RS31a_pairs == ConstraintDict["RS31a"]
+@test all(map((x,y) -> x[1]==y[1]&& x[2]==y[2] && x[3]≈y[3], RS31_pairs ,  ConstraintDict["RS31"]))
+@test all(map((x,y) -> x[1]==y[1]&& x[2]==y[2] && x[3]≈y[3], RS31a_pairs,  ConstraintDict["RS31a"]))
+
+### test the generation of unfolded regions
+Proteins = ["RS31", "RS31", "RS31a"]
+Sequences = [HPSAnalysis.ProteinSequences.NameToSeq[prot] for prot in Proteins]
+UnfoldedRegions = HPSAnalysis.Setup.GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+
+@test UnfoldedRegions == Dict("RS31a" => [(60, 90), (140, 250)], "RS31" => [(70, 90), (130, 264)])
+
+
+### check if all backbones are fully existent by automatic build
+
+Sim = HPSAnalysis.SimData()
+Sim.BasePath = SetupTestPath
+mkpath("$(Sim.BasePath)/InitFiles/CifFiles/")
+for Protein in Set(Proteins)
+    cp(ProteinToCif[Protein], "$(Sim.BasePath)/InitFiles/CifFiles/$(Protein).cif"; force=true)
+end
+(NBonds, B_types, B_typeid, B_groups, harmonic ) = HPSAnalysis.Setup.BuildENMModel(Sim, DomainDict, Proteins, Sequences, ProteinJSON)
+
+
+offsets = vcat([0], cumsum(length.(Sequences))[1:end-1])
+indices =  vcat([collect(1+off:length(seq)-1+off) for (seq, off) in zip(Sequences, offsets)]...) .- 1 ### use c indexing
+
+@test all(map(i-> (i,i+1) in B_groups, indices )) ## -1 because of python/c++ indexing
+
+
+### test read and write procedure
+HPSAnalysis.Setup.WriteENM_HOOMD_Indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt", (NBonds, B_types, B_typeid, B_groups, harmonic))
+(NBonds_read, B_types_read, B_typeid_read, B_groups_read, harmonic_read) = sim.read_ENM_HOOD_indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt")
+
+@test NBonds  == NBonds_read
+@test all(B_types  == B_types_read)
+@test B_typeid == B_typeid_read
+@test B_groups == B_groups_read
+@test all(map(key-> (harmonic[key][:k]== harmonic_read[key]["k"])&& (harmonic[key][:r]≈harmonic_read[key]["r"]), collect(keys(harmonic))))
 
 
 
-### Test using Constraints multiple times
-ConstraintDict = Dict("Prot1"=> [(1,4,0.5), (10,12, 1.2), (14,15,0.2)], "Prot2"=> [(3,7,0.5), (3,9, 1.3), (6,9,0.33)])
-Backbone_correction_Dict = Dict("Prot1"=> [(2,3,0.37), (4,5,0.38)], "Prot2"=> [(5,6,0.5), (6,7,0.38)])
+### Test using Constraints for copies of the same protein
+### Backbone_correction_Dict should contain all backbones connection in folded regions but they dont in the test
+ConstraintDict = Dict("Prot1"=> [(1,4,0.5,3), (10,12, 1.2,4), (14,15,0.2,5)], "Prot2"=> [(3,7,0.5,6), (3,9, 1.3,7), (6,9,0.33,8)])
+Backbone_correction_Dict = Dict("Prot1"=> [(2,3,0.37,1), (4,5,0.38,0)], "Prot2"=> [(5,6,0.5,2), (6,7,0.38,0)])
+DomainDict = Dict("Prot1" => [(1,4), (10,15)], "Prot2"=> [(3,9)])
 Seq_Dict = Dict("Prot1"=> "ABCABCABCABCABC", "Prot2"=> "ABABABABAB")
 Proteins = ["Prot1", "Prot1", "Prot2", "Prot1", "Prot2"]
 Sequences = [Seq_Dict[x] for x in Proteins]
 
+
+
+### check generation of bonds for IDRs
+UnfoldedRegions = HPSAnalysis.Setup.GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
+(NBonds, B_types, B_typeid, B_groups, _) = HPSAnalysis.Setup.CombineBackboneAndENM(Proteins, Sequences, (0,["O-O"], [], [], Dict()), UnfoldedRegions, Backbone_correction_Dict)
+
+@test NBonds == 24 
+@test B_types == ["O-O"]
+@test B_typeid == zeros(24)
+UnfoldedGroups = sort(vcat([[(4,5).+x , (5,6).+x , (6,7).+x ,(7,8).+x , (8,9).+x] for x in [0, 15, 40]]..., [[(0,1).+x , (1,2).+x , (8,9).+x ] for x in [30, 55]]...))  ### use c indexing
+
+@test B_groups == UnfoldedGroups
+
+### only generate additional bonds due to enm
 (NBonds, B_types, B_typeid, B_groups, harmonic) = HPSAnalysis.Setup.ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
 
-@test NBonds == 15
-@test all(B_typeid .== [1, 2, 1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 5, 6, 7, 8, 9, 10, 5, 6, 7, 8, 9, 10])
-@test all(B_groups .== [(2, 3), (4, 5), (2, 3), (4, 5), (5, 6), (6, 7), (2, 3), (4, 5), (5, 6), (6, 7), (1,4), (10,12), (14,15),(16, 19), (25, 27), (29,30), (33, 37), (33,39), (36,39), (41,44), (50,52), (54,55), (58, 62), (58,64), (61, 64)])
+FoldedGroups= [(1, 2), (3, 4), (16, 17), (18, 19), (34, 35), (35, 36), (41, 42), (43, 44), (59, 60), (60, 61), (0, 3), (9, 11), (13, 14), (15, 18), (24, 26), (28, 29), (32, 36), (32, 38), (35, 38), (40, 43), (49, 51), (53, 54), (57, 61), (57, 63), (60, 63)]
+
+@test NBonds == 25
+@test all(B_types .== ["O-O", "BB_1", "BB_2", "ENM_3", "ENM_4", "ENM_5", "ENM_6","ENM_7", "ENM_8"])
+@test all(B_typeid .== [1,0,1,0,2,0,1,0,2,0, 3,4,5,3,4,5,6,7,8,3,4,5,6,7,8]) # has a shift because default BB is 1
+@test all(B_groups .== FoldedGroups) # shift from 1 -> 0, because of julia -> python
 
 
 harmonic_test = Dict{String, Dict{Symbol, Float64}}()
 cnt = 5
 for Protein in Set(Proteins)
-for (i,j,r0) = ConstraintDict[Protein]
-    bondname = "ENM_$(cnt)"
-    harmonic_test[bondname] = Dict(:r => r0, :k => 700)
-    cnt+= 1
+    for (i,j,r0, ind) = ConstraintDict[Protein]
+        bondname = "ENM_$(ind)"
+        harmonic_test[bondname] = Dict(:r => r0, :k => 700)
+        cnt+= 1
+    end
 end
-end
+
 harmonic_test["BB_1"] = Dict(:k => 8033.0, :r => 0.37)
-harmonic_test["BB_2"] = Dict(:k => 8033.0, :r => 0.38)
-harmonic_test["BB_3"] = Dict(:k => 8033.0, :r => 0.5)
-harmonic_test["BB_4"] = Dict(:k => 8033.0, :r => 0.38)
+harmonic_test["BB_2"] = Dict(:k => 8033.0, :r => 0.5 )
+harmonic_test["O-O"]  = Dict(:k => 8033.0, :r => 0.38 )
 
 @test harmonic_test == harmonic
+
+
+### combine ENM and backbone of IDRs 
+
+(Comb_Bonds, Comb_types, Comb_typeid, Comb_groups, Comb_harmonic) = HPSAnalysis.Setup.CombineBackboneAndENM(Proteins, Sequences, (NBonds, B_types, B_typeid, B_groups, harmonic), UnfoldedRegions, Backbone_correction_Dict)
+
+@test Comb_Bonds == 25+24
+@test Comb_types == ["O-O", "BB_1", "BB_2", "ENM_3", "ENM_4", "ENM_5", "ENM_6","ENM_7", "ENM_8"]
+@test Comb_typeid == Int32.(vcat(zeros(24),  [1,0,1,0,2,0,1,0,2,0, 3,4,5,3,4,5,6,7,8,3,4,5,6,7,8]))
+@test Comb_groups == vcat(UnfoldedGroups, FoldedGroups)
+
+
+
+
 end
