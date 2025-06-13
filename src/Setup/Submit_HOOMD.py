@@ -36,43 +36,41 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     #Other LambdaDict for C2/C3
     IDS, IDToResName, IDToCharge, IDToMass, IDToSigma, IDToLambda = readDictionaries(f"{FolderPath}/HOOMD_Setup/Dictionaries.txt")
 
-
     ### constants 
     bondLength = 0.38
-
 
     kb = 0.00831446262
     kT = kb*Params["Temp"]
     forces = []
 
     ### Prepare HOOMD 
-    
     tmp = []
     for i in IDS: 
         tmp.append(str(IDToResName[i]))
     Types = np.array(tmp)
 
 
-    if Params["Device"]=="GPU":
-        device = hoomd.device.GPU()
-    else:
-        device = hoomd.device.CPU()
-
+    device = hoomd.device.GPU() if Params["Device"]=="GPU" else hoomd.device.CPU()
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
     if Restart:
         TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
+        NStepsOld *= Params["NOut"] 
         lastTrajectory = Params['Trajectory'] if TrajectoryNumber==1 else f"{Params['Trajectory'][:-4]}_{TrajectoryNumber-1}.gsd"
 
         RestartPath=f"{FolderPath}{Params['Simname']}_Restart_{TrajectoryNumber}.gsd"
         CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
 
-        NewGoal = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps ### Either extend to meet initial goal or extend simulations.
-        Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
+        Params["NSteps"] = Params["NSteps"]-NStepsOld if ExtendedSteps==0 else ExtendedSteps-NStepsOld ### Either extend to meet initial goal or extend simulations.
+        Params["NSteps"] = Params["NSteps"] if Params["NSteps"]>0 else 0
+
+        print(f"NSteps {Params['NSteps']}")
+        #Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
 
         with open(f"{FolderPath}/HOOMD_Setup/{Params['Simname']} +_RestartLog.txt", 'a+') as f:
-            f.write(f"Restart at timestep {NStepsOld} trying to extend to {NewGoal} by running {Params['NSteps']} additional steps.")
-        sim.create_state_from_gsd(filename=RestartPath)
+            f.write(f"Restart at timestep {NStepsOld} trying to extend to {Params['NSteps']+NStepsOld} by running {Params['NSteps']} additional steps.\n")
+        sim.timestep = int(NStepsOld)
+        sim.create_state_from_gsd(filename=RestartPath) ### takes the last frame
         Params["Trajectory"] = f"{Params['Trajectory'][:-4]}_{TrajectoryNumber}.gsd"
     else:
         if Params["Create_Start_Config"]:
@@ -135,7 +133,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     if Params["NSteps"] ==0:
         print("The number of necessary steps is zero. No simulation will be run.")
         return -1
-
 
     if Params["SimulationType"]!="Calvados3":
         ### Harmonic bonds
@@ -200,7 +197,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     #logger.add(thermodynamic_properties)
 
     write_mode = 'ab' if Restart else 'wb'
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image'])
+    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image', "timestep"])
     #sim.operations.writers.append(gsd_writer)
     gsd_writer.log = logger
 
@@ -210,15 +207,17 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     sim.operations.writers.append(table)
         
 
+    hdf5_writer=[]
     if True:
     ### track presure
         logger_pres = hoomd.logging.Logger(categories=['scalar', 'sequence'])
         logger_pres.add(sim, quantities=["timestep"])
+        logger_pres.add(sim, quantities=["initial_timestep"])
         logger_pres.add(thermodynamic_properties, quantities=['kinetic_temperature','kinetic_energy', 'potential_energy','pressure', 'pressure_tensor'])
-        #hdf5_writer = hoomd.write.HDF5Log(
-        #    trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode='w', logger=logger_pres
-        #)
-        #sim.operations.writers.append(hdf5_writer)
+        write_mode = 'a' if Restart else 'w'
+        hdf5_writer = hoomd.write.HDF5Log(
+            trigger=hoomd.trigger.Periodic(100), filename=FolderPath+'pressure.h5', mode=write_mode, logger=logger_pres
+        )
     else:
         print("Thermodynamic Quantities are not tracked!")
 
@@ -226,7 +225,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
     nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
     integrator.methods = [nvt]
     integrator.dt = Params["dt"]
 
@@ -235,11 +233,24 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         name = IDToResName[i]
         nvt.gamma[name] = IDToMass[i]*10.0**-5
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
-    sim.operations.integrator=integrator
 
+    sim.operations.integrator=integrator
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
+
+
+    sim.operations.writers.append(gsd_writer)
+    sim.operations.writers.append(hdf5_writer)
+
+    ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
+    if not Restart:
+        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
+            for i in range(10):
+                integrator.dt = Params["dt"]/fac
+                sim.run(100)
+                sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
+
 
     ### optimise cell list buffer
     now = sim.timestep
@@ -248,25 +259,15 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
-    #print("REMOVE THIS LINE BEFORE USING")
-    #sim.operations.writers.append(gsd_writer)
-
-
-    ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
-    if not Restart:
-        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
-            print(f"fac {fac}")
-            for i in range(10):
-                integrator.dt = Params["dt"]/fac
-                sim.run(100)
-                sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
-
     ### start simulation
-    sim.operations.writers.append(gsd_writer)
 
     integrator.dt = Params["dt"]
-    print(Params["NSteps"])
-    sim.run(Params["NSteps"])
+    print(f"Run simulation for {Params['NSteps']} steps")
+    sim.run(Params["NSteps"], write_at_start=True)
+
+    print(f"initial {sim.initial_timestep}")
+    print(f"final   {sim.final_timestep}")
+
     
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
