@@ -112,7 +112,9 @@ for (protID, protein) in enumerate(ToCreate)
         HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 1, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=100, ENM)
 
         ### test if it crashes
-        sim.run("$(Path)/")
+        if PythonTests
+            sim.run("$(Path)/")
+        end
 
         Charge_test, Mass_test, Sigma_test, Lambda_test = parseDictionary("$(Path)/HOOMD_Setup/Dictionaries.txt")
 
