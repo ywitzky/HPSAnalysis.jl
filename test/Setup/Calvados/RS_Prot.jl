@@ -5,11 +5,12 @@ EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python"
 
 using PyCall
-if isdir(SetupTestPath)
-    rm(SetupTestPath; force=true, recursive=true)
-end
-mkpath("$SetupTestPath/HOOMD_Setup/")
-BasePath=SetupTestPath
+BasePath="$SetupTestPath/RS_Prot/"
+
+
+rm(BasePath; force=true, recursive=true)
+mkpath(BasePath)
+mkpath("$BasePath/HOOMD_Setup/")
 
 
 ToCreate =  ["RS31"]
@@ -91,22 +92,22 @@ for (protID, protein) in enumerate(ToCreate)
         NChain=1
 
         Seque = HPSAnalysis.ProteinSequences.NameToSeq[protein]
-        Sequences= [deepcopy(Seque) for _ in 1:NChain]
+        local Sequences= [deepcopy(Seque) for _ in 1:NChain]
         Proteins = [deepcopy(protein) for _ in 1:NChain]
 
         ###FoldedDomain -> NChain * FoldedDomain
 
-        Info ="SLAB Simulation script for $protein.\n\n"
+        local Info ="SLAB Simulation script for $protein.\n\n"
         BoxLS=Float32(350.0)
         BoxLL=Float32(1500.)
-        BoxSize = [-BoxLS/2., BoxLS/2.,-BoxLL/2., BoxLL/2.,-BoxLS/2., BoxLS /2.]
+        local BoxSize = [-BoxLS/2., BoxLS/2.,-BoxLL/2., BoxLL/2.,-BoxLS/2., BoxLS /2.]
 
         SimulName = "$(protein)_$temp"
 
-        (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLS,BoxLS , BoxLS]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
+        (_, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLS,BoxLS , BoxLS]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
 
         pos = readPositionFromCif(ProteinToCif["RS31"])
-        ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
+        local ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
         HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 1, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=100, ENM)
 

@@ -422,13 +422,101 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
             f2.append(snapshot)
 
 
+def BondC3(NBeads, Domains, harmonic, coordinates):
+    Domains=ast.literal_eval(Domains)
+    index=1
+    seqdomain=[]
+    B_N=0
+    B_types = ['O-O']
+    B_typeid = []# np.zeros(NBeads, dtype=np.uint32)
+    B_group = []#.astype(np.uint32)
+
+    length=np.zeros((len(coordinates),len(coordinates)))
+    for i in range(len(coordinates)):
+        for j in range(i, len(coordinates)):
+            length[i][j]=np.sqrt((coordinates[i][0]-coordinates[j][0])**2+(coordinates[i][1]-coordinates[j][1])**2+(coordinates[i][2]-coordinates[j][2])**2)
+    
+    for dom in Domains:
+        seqdomain+=range(dom[0],dom[1]+1)
+    for i in range(NBeads-1):
+        if i in seqdomain or i+1 in seqdomain:
+            hmbondname="O-O_D"+str(index)
+            harmonic.params[hmbondname]=dict(k=8033,r0=length[i][i+1])
+            B_types.append(hmbondname)
+            B_typeid.append(index)
+            index+=1
+            B_group.append([i,i+1])
+            B_N+=1
+        else:
+            B_typeid.append(0)
+            B_group.append([i,i+1])
+            B_N+=1
+
+    binds="bond_"
+    index=len(B_types)
+    for i in range(NBeads-2):
+        for j in range(i+2,NBeads-1):
+            if check_fold(Domains, i,j):
+                k=700
+                if length[i][j]<0.9:
+                    d = length[i][j]
+                    bondname=binds+str(index)
+                    B_types.append(bondname)
+                    B_typeid=np.append(B_typeid,index)
+                    B_group.append([i,j])
+                    index+=1
+                    harmonic.params[bondname]=dict(k=k,r0=d)
+                    B_N+=1
+
+    return B_N,B_types,B_typeid,B_group
+
+def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
+    with gsd.hoomd.open(TrajectoryPath) as f:
+        frame = f[-1] ### take last frame for restart
+
+        snapshot = gsd.hoomd.Frame()  
+
+        ### Specify particles
+        snapshot.particles.N        = frame.particles.N
+        snapshot.particles.position = frame.particles.position
+        snapshot.particles.types    = frame.particles.types
+        snapshot.particles.typeid   = frame.particles.typeid
+        snapshot.particles.image    = frame.particles.image
+        snapshot.particles.mass     = frame.particles.mass
+        snapshot.particles.charge   = frame.particles.charge 
+
+        ### Configure box
+        snapshot.configuration.box  = frame.configuration.box
+
+        # Connect particles with bonds.
+        snapshot.bonds.N            = frame.bonds.N 
+        snapshot.bonds.types        = frame.bonds.types 
+        snapshot.bonds.typeid       = frame.bonds.typeid
+        snapshot.bonds.group        = frame.bonds.group
+
+        ## Create Angles
+        snapshot.angles.N           = frame.angles.N
+        snapshot.angles.types       = frame.angles.types
+        snapshot.angles.typeid      = frame.angles.typeid
+        snapshot.angles.group       = frame.angles.group
+
+        # Create Angles
+        snapshot.dihedrals.N        = frame.dihedrals.N
+        snapshot.dihedrals.types    = frame.dihedrals.types
+        snapshot.dihedrals.typeid   = frame.dihedrals.typeid 
+        snapshot.dihedrals.group    = frame.dihedrals.group
+
+        with gsd.hoomd.open(RestartPath, mode='w') as f2:
+            f2.append(snapshot)
+
+
 def CountNumberOfTrajectoryFiles(FolderPath):
     data =os.listdir(FolderPath)
     trajectoryfiles=[e for e in data if re.search("traj",e) and re.search(".gsd", e)]
     sum_val=0
     for file in trajectoryfiles:
         with gsd.hoomd.open(f"{FolderPath}{file}") as f:
-           sum_val += len(f)
+           sum_val += len(f) -1
     return len(trajectoryfiles), sum_val
 
 def compute_Mass_List(IDs, IDToMass):

@@ -95,7 +95,6 @@ function nextproc()
     i = i % length(procs) + 1
     return p
 end
-
 @sync begin
     for protein in Proteins
         @async remotecall_wait(run_sim_prot, nextproc(), protein, BasePath, DomainDict, ProteinJSON, ProteinCif, pH, width_multiplier, Temperatures)
