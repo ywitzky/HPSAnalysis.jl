@@ -3,10 +3,12 @@ using HPSAnalysis,Test,Printf, PyCall
 filename_test="$SetupTestPath/HOOMD_write_test.csv"
 filename="$SetupTestPath/HOOMD_write.csv"
 
-### define python based conversion from numpy to pure python
-py"""import numpy
-def castToInt(x):
-    return int(x)"""
+if PythonTests
+    ### define python based conversion from numpy to pure python
+    py"""import numpy
+    def castToInt(x):
+        return int(x)"""
+end
 
 @testset "WriteHOOMDSequences" begin
     filename_test="$SetupTestPath/HOOMD_sequence_test.txt"
