@@ -1,7 +1,5 @@
 using GSDFormat, HDF5, Plots
 
-import Base: lastindex
-
 SetupTestPath="$(TestPath)/Restart_test/"
 rm(SetupTestPath; force=true, recursive=true)
 mkpath(SetupTestPath)
@@ -27,14 +25,6 @@ pos[6:10, 2] .= collect(1:5)*3.8.+50
 ENM = (0,[],[],[], Dict())
 cd(SetupTestPath)
 HPSAnalysis.Setup.writeStartConfiguration(SetupTestPath, "./Test_slab","./Test_Start_slab.txt",Info, Sequences, BoxSize , 10_000, HOOMD=true; SimulationType="Calvados2" , Temperature=300,  InitStyle="Pos", Pos=pos , pH=pH, SaltConcentration=0.2, Device="CPU", WriteOutFreq=1_000, ENM=ENM)
-
-
-function lastindex(traj::GSDFormat.HOOMDTrajectory{Int64})
-    """ Lowers to end in Array index A[begin:end] """    
-    return traj.file.nframes
-end
-
-
 
 @testset "Restarts" begin
     TrajectoryNumber , NStepsOld = sim.CountNumberOfTrajectoryFiles(SetupTestPath)
@@ -123,6 +113,13 @@ end
     @test all( traj_3[6].particles.position .≈ traj_4[1].particles.position)
     @test all( traj_4[6].particles.position .≈ traj_5[1].particles.position)
     @test all( traj_5[6].particles.position .≈ traj_6[1].particles.position)
+
+    close(traj_1)
+    close(traj_2)
+    close(traj_3)
+    close(traj_4)
+    close(traj_5)
+    close(traj_6)
+
+    cd(TestPath)
 end
-
-
