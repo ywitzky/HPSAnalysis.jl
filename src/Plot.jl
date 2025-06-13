@@ -438,7 +438,7 @@ end
 
 @doc raw"""
     plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-Plots the logarithmic density histrogram computed by [`computeDensityHistogram`](@ref).
+Plots the logarithmic density histogram computed by [`computeDensityHistogram`](@ref).
 
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
@@ -460,7 +460,7 @@ end
 @doc raw"""
     plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 
-Plots the square intra chain distance |r_i-r_j| on logatrithmis scales as computed by [`computeInterChainScalingNaiv`](@ref) and [`computeInterChainScalingSlidingWindow`](@ref).
+Plots the square intra chain distance |r_i-r_j| on logarithmic scales as computed by [`computeIntraChainScalingNaiv`](@ref) and [`computeIntraChainScalingSlidingWindow`](@ref).
 
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
