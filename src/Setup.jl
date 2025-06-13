@@ -502,10 +502,9 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
     return (ϵ_r, κ)
 end
 
+
 @doc raw"""
     CalvadosSetup(Sequences,AtomTypes,pH)
-<<<<<<< HEAD
-=======
 
 Define escential Parameters for the Simulation based on the Simulation Type.
     
@@ -584,10 +583,9 @@ function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
     return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
 
-
+#=
 @doc raw"""
     DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
->>>>>>> origin/main
 
 Define escential Parameters for the Simulation based on the Simulation Type.
     
@@ -665,7 +663,7 @@ function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
     end
     return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
-
+=#
 
 @doc raw"""
     DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)

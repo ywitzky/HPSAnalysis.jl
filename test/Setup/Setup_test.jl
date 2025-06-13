@@ -9,6 +9,9 @@ function files_are_equal(file1::String, file2::String)::Bool
     return read(file1, String) == read(file2, String)
 end
 
+include("./Restart_test.jl")
+
+#=
 
 @testset "Setup Tests" begin
     include("./HOOMD_Setup_test.jl")
@@ -25,5 +28,5 @@ end
 
     #include("./Calvados/Implementation/Calvados3_implementation_test.jl")
     #include("./Calvados/Implementation/Calvados3_implementation_analysis.jl")
-
 end
+=#

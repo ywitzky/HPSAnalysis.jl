@@ -209,9 +209,9 @@ function CountStepsInGSDTrajectoryFiles(Sim::SimData{R,I}) where {R<:Real, I<:In
     N=0
     for file in getGSDTrajectoryFiles(Sim)
         gsdfileobj = GSDFormat.open_gsd(file, "r";application="gsd.hoomd ", schema="hoomd", schema_version=(1, 4))
-        N += convert(Int32, GSDFormat.get_nframes(gsdfileobj))
+        N += convert(Int32, GSDFormat.get_nframes(gsdfileobj)) -1 ### hoomd is set to write at the start which we will throw away to not double count if we stich trajetories together
     end
-    N
+    return N
 end
 
 

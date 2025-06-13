@@ -13,7 +13,7 @@ function read_HOOMD_GSD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     for file in getGSDTrajectoryFiles(Sim)
         gsdfileobj = GSDFormat.open(file, "r")
 
-        for gsd_step in 1:length(gsdfileobj) ### eachindex(gsdfileobj)
+        for gsd_step in 2:length(gsdfileobj) ### eachindex(gsdfileobj); skip the first index since we enabled write_at_start
             xyz   = gsdfileobj[gsd_step].particles.position
 
             Sim.x[1:N,step] .=  xyz[1:N,1] .*10.0

@@ -61,13 +61,16 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         RestartPath=f"{FolderPath}{Params['Simname']}_Restart_{TrajectoryNumber}.gsd"
         CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
 
-        NewGoal = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps ### Either extend to meet initial goal or extend simulations.
+        Params["NSteps"] = Params["NSteps"]-NStepsOld if ExtendedSteps==0 else ExtendedSteps-NStepsOld ### Either extend to meet initial goal or extend simulations.
+        Params["NSteps"] = Params["NSteps"] if Params["NSteps"]>0 else 0
 
-        Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
+        print(f"NSteps {Params['NSteps']}")
+        #Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
 
         with open(f"{FolderPath}/HOOMD_Setup/{Params['Simname']} +_RestartLog.txt", 'a+') as f:
-            f.write(f"Restart at timestep {NStepsOld} trying to extend to {NewGoal} by running {Params['NSteps']} additional steps.\n")
-        sim.create_state_from_gsd(filename=RestartPath)
+            f.write(f"Restart at timestep {NStepsOld} trying to extend to {Params['NSteps']+NStepsOld} by running {Params['NSteps']} additional steps.\n")
+        sim.timestep = int(NStepsOld)
+        sim.create_state_from_gsd(filename=RestartPath) ### takes the last frame
         Params["Trajectory"] = f"{Params['Trajectory'][:-4]}_{TrajectoryNumber}.gsd"
     else:
         if Params["Create_Start_Config"]:
@@ -194,7 +197,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     #logger.add(thermodynamic_properties)
 
     write_mode = 'ab' if Restart else 'wb'
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image'])
+    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image', "timestep"])
     #sim.operations.writers.append(gsd_writer)
     gsd_writer.log = logger
 
@@ -222,7 +225,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
     nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
     integrator.methods = [nvt]
     integrator.dt = Params["dt"]
 
@@ -231,11 +233,15 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         name = IDToResName[i]
         nvt.gamma[name] = IDToMass[i]*10.0**-5
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
-    sim.operations.integrator=integrator
 
+    sim.operations.integrator=integrator
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
+
+
+    sim.operations.writers.append(gsd_writer)
+    sim.operations.writers.append(hdf5_writer)
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
     if not Restart:
@@ -253,23 +259,15 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
 
-
-    ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
-    if not Restart:
-        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
-            print(f"fac {fac}")
-            for i in range(10):
-                integrator.dt = Params["dt"]/fac
-                sim.run(100)
-                sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
-
     ### start simulation
-    sim.operations.writers.append(gsd_writer)
-    sim.operations.writers.append(hdf5_writer)
 
     integrator.dt = Params["dt"]
     print(f"Run simulation for {Params['NSteps']} steps")
-    sim.run(Params["NSteps"])
+    sim.run(Params["NSteps"], write_at_start=True)
+
+    print(f"initial {sim.initial_timestep}")
+    print(f"final   {sim.final_timestep}")
+
     
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
