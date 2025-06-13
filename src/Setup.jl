@@ -502,6 +502,7 @@ function DetermineYukawaInteractions(;SimulationType="", Temperature=300, SaltCo
     return (ϵ_r, κ)
 end
 
+
 @doc raw"""
     CalvadosSetup(Sequences,AtomTypes,pH)
 
@@ -582,7 +583,7 @@ function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
     return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
 end
 
-
+#=
 @doc raw"""
     DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
 
@@ -591,6 +592,87 @@ Define escential Parameters for the Simulation based on the Simulation Type.
 **Arguments**
 - `Sequences::Array{String}`: List of sequences of Proteins.
 - `SimulationType::String`: Type of Simulation (e.g.: "Calvados2").
+- `pH::Float`: pH-value of the system.
+
+**Return**:
+A tuple containing:
+- `AtomTypes::Set{Char}`: Set of unique amino acid types in the provided sequences.
+- `LongAtomTypes::Set{Char}`: Set of amino acid types where the first and last amino acid in a sequence are treated as distinct types.
+- `AaToId::Dict{Char, Int32}`: Dictionary mapping each amino acid type to a unique ID number.
+- `IdToAa::Dict{Int32, Char}`: Dictionary mapping each ID number to its corresponding amino acid type.
+- `ResToLongAtomType::Dict{Tuple{Char, Bool}, Char}`: Dictionary mapping standard amino acids to their modified forms when at the beginning or end of a sequence.
+- `LongAtomTypesToRes::Dict{Char, Tuple{Char, Bool}}`: Reverse mapping of `ResToLongAtomType`.
+- `OneToCharge::Dict{Char, Float}`: Dictionary containing the charge values of amino acids, modified based on simulation type.
+- `OneToMass::Dict{Char, Float}`: Dictionary containing the mass values of amino acids.
+- `OneToSigma::Dict{Char, Float}`: Dictionary containing the sigma values of amino acids.
+- `OneToLambda::Dict{Char, Float}`: Dictionary containing the lambda values of amino acids.
+- `OneToHPSDihedral0110::Dict{Char, Any}`: Dictionary containing dihedral parameters for a specific configuration.
+- `OneToHPSDihedral1001::Dict{Char, Any}`: Dictionary containing dihedral parameters for another configuration.
+
+**Notes**:
+- If `SimulationType` is "Calvados2", the first and last amino acids in each sequence are assigned different types to account for altered mass due to peptide bonding. Also the charge of histidine ('H') is adjusted based on the provided pH value using the formula: `1/(1+10^(pH-6))`.
+"""
+function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
+    index_cnt = length(AtomTypes)
+    LongAtomTypes=deepcopy(AtomTypes)
+    ResToLongAtomType = Dict()
+    NewSequences= deepcopy(Sequences)
+    cnt = 96 ### use lower case ascii letters as modified residue types
+    for (id,Sequence) in enumerate(Sequences)
+        if( ~((Sequence[1], true) in  keys(ResToLongAtomType)))
+            ResToLongAtomType[(Sequence[1], true)] = Char(cnt+=1) 
+            push!(LongAtomTypes, ResToLongAtomType[(Sequence[1], true)] )#
+            AaToId[ResToLongAtomType[(Sequence[1], true)] ] = index_cnt+=1
+            NewSequences[id] =  ResToLongAtomType[(Sequence[1], true)]* Sequence[2:end]
+        end
+        if( ~((Sequence[end], false) in  keys(ResToLongAtomType)))
+            ResToLongAtomType[(Sequence[end], false)] = Char(cnt+=1)
+            push!(LongAtomTypes, ResToLongAtomType[(Sequence[end], false)])
+            AaToId[ResToLongAtomType[(Sequence[end], false)] ] = index_cnt+=1
+            NewSequences[id] = NewSequences[id][1:end-1]* ResToLongAtomType[(Sequence[end], false)]
+        end
+    end
+
+    Sequences.=NewSequences
+    LongAtomTypes = union(LongAtomTypes, AtomTypes)
+    LongAtomTypesToRes=Dict( (v => k) for (k, v) in ResToLongAtomType)
+
+    OneToCharge = deepcopy(BioData.OneToHPSCharge)
+    OneToMass = deepcopy(BioData.AaToWeight)
+    OneToSigma  = deepcopy(BioData.OneToHPSCalvadosSigma)
+    OneToHPSDihedral0110 = deepcopy(BioData.OneToHPSDihedral0110)
+    OneToHPSDihedral1001 = deepcopy(BioData.OneToHPSDihedral1001)
+    OneToCharge['H'] = 1.0/(1+10^(pH-6))  ### HIS is pH-Dependent for Calvados2/Calvados3
+
+    if SimulationType=="Calvados2"
+        OneToLambda = deepcopy(BioData.OneToCalvados2Lambda)
+    elseif SimulationType=="Calvados3"
+        OneToLambda = deepcopy(BioData.OneToCalvados3Lambda)
+    end
+
+    for e in LongAtomTypes ### added the charge modifications for the first/last amino acids
+        if ~(e in keys(OneToCharge))
+            (AA, front) = LongAtomTypesToRes[e]
+            OneToCharge[e] = front ? OneToCharge[AA] +1 :  OneToCharge[AA] -1
+            OneToMass[e] = front ? OneToMass[AA] +2.0 :  OneToMass[AA] +16
+            OneToSigma[e] = OneToSigma[AA]
+            OneToLambda[e] = OneToLambda[AA]
+            OneToHPSDihedral0110[e] = OneToHPSDihedral0110[AA]
+            OneToHPSDihedral1001[e] = OneToHPSDihedral1001[AA]
+        end
+    end
+    return (AtomTypes, LongAtomTypes, AaToId,ResToLongAtomType, LongAtomTypesToRes, OneToCharge, OneToMass, OneToSigma, OneToLambda, OneToHPSDihedral0110, OneToHPSDihedral1001)
+end
+=#
+
+@doc raw"""
+    DetermineAtomTypes(Sequences, SimulationType, pH; OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma)
+
+Defines essential Parameters for the simulation based on the type of the simulation.
+    
+**Arguments**
+- `Sequences::Array{String}`: List of sequences of proteins.
+- `SimulationType::String`: Type of simulation (e.g.: "Calvados2").
 - `pH::Float`: pH-value of the system.
 
 **Optional Arguments**:

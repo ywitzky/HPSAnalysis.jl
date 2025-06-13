@@ -13,6 +13,7 @@ end
 @testset "Setup Tests" begin
     include("./HOOMD_Setup_test.jl")
     include("./GSD_test.jl")
+    include("./Restart_test.jl")
 end
 
 @testset "Calvados Tests" begin
@@ -24,5 +25,4 @@ end
 
     #include("./Calvados/Implementation/Calvados3_implementation_test.jl")
     #include("./Calvados/Implementation/Calvados3_implementation_analysis.jl")
-
 end
