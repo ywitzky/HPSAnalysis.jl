@@ -9,11 +9,10 @@ using HPSAnalysis
 makedocs(
     sitename = "HPSAnalysis",
     authors = "Yannick Witzky",
-    format = Documenter.HTML(;edit_link=:commit,
-    prettyurls = get(ENV, "CI", nothing) == "true"), # easier local build
+    format = Documenter.HTML(;edit_link=:commit, prettyurls = true), #get(ENV, "CI", nothing) == "true"), # easier local build
     #size_threshold_ignore = ["listfunctions.md"], # easier local build
     modules = [HPSAnalysis],
-    repo = "https://gitlab.rlp.net/ywitzky/HPSAnalysis.jl",
+    repo = "https://github/com/ywitzky/HPSAnalysis.jl",
     pages = [
         "Home" => "index.md",
         "Setup" => "setup.md",

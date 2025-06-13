@@ -21,9 +21,10 @@ ProteinToCif= Dict("RS31" =>"$(PkgPath)/data/TestData/fold_rs31_model_0.cif","RS
 Temperatures=300
 pH=7.0
 
-pushfirst!(pyimport("sys")."path", "$(PkgSourcePath)/Setup/")
-sim = pyimport("Submit_HOOMD")
-
+if PythonTests
+    pushfirst!(pyimport("sys")."path", "$(PkgSourcePath)/Setup/")
+    sim = pyimport("Submit_HOOMD")
+end
 
 ### implement calvados 3 parameters b hand
 ### taken from https://github.com/KULL-Centre/CALVADOS/blob/main/examples/slab_IDR_MDP/input/residues_CALVADOS3.csv

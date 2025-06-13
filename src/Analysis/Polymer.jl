@@ -303,7 +303,7 @@ end
 
 
 @doc raw"""
-    computeIntraChainScalingSlidingWindow(Sim::SimData{R,I})
+    computeIntraChainScalingNaiv(Sim::SimData{R,I})
 
 Computes the square intra chain distance |r_i-r_j| for all combinations and averages over the trajectory.
 
