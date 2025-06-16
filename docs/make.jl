@@ -9,10 +9,10 @@ using HPSAnalysis
 makedocs(
     sitename = "HPSAnalysis",
     authors = "Yannick Witzky",
+    repo=Remotes.GitHub("ywitzky", "HPSAnalysis.jl"),
     format = Documenter.HTML(;edit_link=:commit, prettyurls = true), #get(ENV, "CI", nothing) == "true"), # easier local build
     #size_threshold_ignore = ["listfunctions.md"], # easier local build
     modules = [HPSAnalysis],
-    repo = "https://github/com/ywitzky/HPSAnalysis.jl",
     pages = [
         "Home" => "index.md",
         "Setup" => "setup.md",
@@ -26,8 +26,7 @@ makedocs(
 # Documenter can also automatically deploy documentation to gh-pages.
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
-#=deploydocs(
-    devbranch="LF_Docs",
+deploydocs(
     repo = "https://gitlab.rlp.net/ywitzky/HPSAnalysis.jl",
     push_preview=true,
-)=#
+)
