@@ -122,13 +122,6 @@ function CreateStartConfiguration_barostat(SimulationName::String, Path::String,
     if Regenerate
         pos = AlphaFold_startpos(ProteinToCif, Proteins, Sequences)
         minbox = minboxforprotein(pos)
-        #dx_Box = Data.BoxSize[1,2] - Data.BoxSize[1,1]
-        #dy_Box = Data.BoxSize[2,2] - Data.BoxSize[2,1]
-        #dz_Box = Data.BoxSize[3,2] - Data.BoxSize[3,1]
-        # nmber of boxes that can be in each dimension
-        #N_x = floor(dx_Box, minbox[1])
-        #N_y = floor(dy_Box, minbox[2])
-        #N_z = floor(dz_Box, minbox[3])
         N_per_dim = ceil(Int, Data.NChains^(1/3))
         count = 1
 
