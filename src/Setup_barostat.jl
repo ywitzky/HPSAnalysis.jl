@@ -1,11 +1,11 @@
 function AlphaFold_startpos(ProteintoCif, Proteins, Sequences)
     len=0
-    for Seq in Sequences
+    for Seq in Set(Sequences)
         len += length(Seq)
     end
     pos = zeros(Float64, len, 3)
     index = 1
-    for protein in Proteins
+    for protein in Set(Proteins)
         open(ProteintoCif[protein], "r") do io
             for line in eachline(io)
                 field = split(strip(line))
@@ -24,12 +24,12 @@ function AlphaFold_startpos(ProteintoCif, Proteins, Sequences)
 end
 
 function minboxforprotein(pos)
-    x = pos[1]
-    y = pos[2]
-    z = pos[3]
-    x_min, x_max = min(x), max(x)
-    y_min, y_max = min(y), max(y)
-    z_min, z_max = min(z), max(z)
+    x = pos[:, 1]
+    y = pos[:, 2]
+    z = pos[:, 3]
+    x_min, x_max = minimum(minimum.(x)), maximum(maximum.(x))
+    y_min, y_max = minimum(minimum.(y)), maximum(maximum.(y))
+    z_min, z_max = minimum(minimum.(z)), maximum(maximum.(z))
     dx = x_max - x_min
     dy = y_max - y_min
     dz = z_max - z_min
@@ -122,23 +122,27 @@ function CreateStartConfiguration_barostat(SimulationName::String, Path::String,
     if Regenerate
         pos = AlphaFold_startpos(ProteinToCif, Proteins, Sequences)
         minbox = minboxforprotein(pos)
-        N_per_dim = ceil(Int, Data.NChains^(1/3))
-        count = 1
+        max_N_x = div(Data.BoxLength[1], Float32(minbox[1]))
+        max_N_y = div(Data.BoxLength[2], Float32(minbox[2]))
+        max_N_z = div(Data.BoxLength[3], Float32(minbox[3]))
 
-        for ix in 0:N_per_dim-1
-            for iy in 0:N_per_dim-1
-                for iz in 0:N_per_dim
+        count = 0
+        proteinlenght = Int(Data.NAtoms / Data.NChains)
+
+        for iz in 0:max_N_z-1
+            for iy in 0:max_N_y-1
+                for ix in 0:max_N_x-1
                     count += 1
                     if count > Data.NChains
                         break
                     end
                     offset = [ix*minbox[1], iy*minbox[2], iz*minbox[3]]
-                    Data.x = vcat(Data.x, pos[:, 1] .+ offset[1])
-                    Data.y = vcat(Data.y, pos[:, 2] .+ offset[2])
-                    Data.z = vcat(Data.z, pos[:, 3] .+ offset[3])
+                    Data.x[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[1:proteinlenght, 1] .+ offset[1]
+                    Data.y[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[1:proteinlenght, 2] .+ offset[2]
+                    Data.z[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[1:proteinlenght, 3] .+ offset[3]
                 end
             end
-        end           
+        end
     end
 
     close(Data.xio)
@@ -213,6 +217,3 @@ function CreateStartConfiguration_barostat(SimulationName::String, Path::String,
 
     return (pos, Data) 
 end
-
-
-

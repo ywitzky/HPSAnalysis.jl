@@ -200,7 +200,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     #logger.add(thermodynamic_properties)
 
     write_mode = 'ab' if Restart else 'wb'
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image'])
+    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box'])
     #sim.operations.writers.append(gsd_writer)
     gsd_writer.log = logger
 
@@ -225,16 +225,28 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
-    nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
-    integrator.methods = [nvt]
-    integrator.dt = Params["dt"]
+
+    if Params["UseBarostat"] == "true":
+        print(Params["Axis"])
+        dof = [False,False,False,False,False,False]
+        dof[int(Params["Axis"])-1] = True # 'y' -> 2 in julia is 'y' -> 1 in python
+        print(dof)
+        sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+        npt = hoomd.md.methods.ConstantPressure(filter=hoomd.filter.All(), tauS=1.0, S=2.0, couple='none', thermostat=hoomd.md.methods.thermostats.Bussi(kT=kT), box_dof=dof)
+        integrator.methods = [npt]
+    else:
+        nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
+        sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
+        integrator.methods = [nvt]
+        integrator.dt = Params["dt"]
 
 
-    for i in IDToResName.keys():
-        name = IDToResName[i]
-        nvt.gamma[name] = IDToMass[i]*10.0**-5
-        nvt.gamma_r[name] = (0.0, 0.0, 0.0)
+        for i in IDToResName.keys():
+            name = IDToResName[i]
+            nvt.gamma[name] = IDToMass[i]*10.0**-5
+            nvt.gamma_r[name] = (0.0, 0.0, 0.0)
+        
+    
     sim.operations.integrator=integrator
 
     sim.operations.integrator.forces=forces
