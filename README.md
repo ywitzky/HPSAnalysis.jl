@@ -1,6 +1,7 @@
 # HPSAnalysis
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![CI](https://github.com/ywitzky/HPSAnalysis.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ywitzky/HPSAnalysis.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/ywitzky/HPSAnalysis.jl/branch/main/graph/badge.svg?token=LHT7MZ2JP5)](https://codecov.io/gh/ywitzky/HPSAnalysis.jl)
 
 This is a collection of scripts to set up molecular dynamics simulations using mostly the HOOMD simulation software for coarse-grained united residue models.
 
