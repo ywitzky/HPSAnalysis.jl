@@ -725,7 +725,7 @@ Writes the datas for the simulation in different files with HOOMD.
 **Creates**:
 * Writes the datas for the simulation.
 """
-function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM, UseBarostat, SlabAxis)
+function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM, SlabAxis)
         mkpath("$(BasePath)/HOOMD_Setup")
         WriteHOOMDSequences("$(BasePath)/HOOMD_Setup/Sequences.txt", Sequences)
         WriteHOOMDParticlesInput("$(BasePath)/HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
@@ -735,7 +735,7 @@ function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,O
         (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
 
         BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
-        WriteParams("$(BasePath)/HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true, UseBarostat, SlabAxis) ### BoxLength has to be convert to nm
+        WriteParams("$(BasePath)/HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true, SlabAxis) ### BoxLength has to be convert to nm
         WriteDictionaries("$(BasePath)/HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
         WriteENM_HOOMD_Indices("$(BasePath)/HOOMD_Setup/ENM_indices.txt", ENM)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
@@ -870,7 +870,7 @@ Writes the start configuration for a molecular dynamics simulation.
 **Creates**:
 * Writes data files with the start configuration.
 """
-function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM, UseBarostat=false, SlabAxis=2)
+function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM, SlabAxis=2)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
@@ -911,7 +911,7 @@ function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequen
 
     #Write all Inputs, Parameters (Yukawa Interaction with Debye-Hückle), Dictionaries and the Start-File
     if HOOMD
-        writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM, UseBarostat, SlabAxis)
+        writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM, SlabAxis)
     else
         writeHPSLammps(fileName,Sequences,AtomTypes,LongAtomTypes,LongAtomTypesToRes,InitStyle,ChargeTemperSteps,ChargeTemperSwapSteps,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,pH,NAtoms,NBonds,NAngles,NDihedrals,Info,NAtomTypes)
     end

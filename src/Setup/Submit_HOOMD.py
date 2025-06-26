@@ -18,7 +18,7 @@ import copy
 
 PWD = os.getcwd()
 
-def run(FolderPath, Restart=False, ExtendedSteps=0):
+def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
     #new Parameter SimType Calvados3 default C2
@@ -59,6 +59,12 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         device = hoomd.device.CPU()
 
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
+
+    if prerun:
+        Params["UseBarostat"] = True
+        Params["NSteps"] = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps
+    else:
+        Params["UseBarostat"] = False
 
     if Restart:
         TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
@@ -124,11 +130,16 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             #snapshot.dihedrals.types = []#list(dihedral_list)
             #snapshot.dihedrals.typeid =  dihedral_AllIDs
             #snapshot.dihedrals.group = InputDihedrals
+            if prerun:
+                TrajectoryNumber , _ = CountNumberOfTrajectoryFiles(FolderPath) # simulation is done so -> +1
+                with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + "prerun_"+str(TrajectoryNumber+1)+".gsd", mode='w') as f:
+                    f.append(snapshot)
+                sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + "prerun_"+str(TrajectoryNumber+1)+".gsd")
+            else:
+                with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd", mode='w') as f:
+                    f.append(snapshot)
+                sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd")
 
-            with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd", mode='w') as f:
-                f.append(snapshot)
-
-            sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd")
         else:
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
@@ -199,15 +210,27 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     logger = hoomd.logging.Logger(categories=['scalar', 'string'])
     #logger.add(thermodynamic_properties)
 
-    write_mode = 'ab' if Restart else 'wb'
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box'])
-    #sim.operations.writers.append(gsd_writer)
-    gsd_writer.log = logger
+    if prerun:
+        write_mode = 'ab' if Restart else 'wb'
+        TrajectoryNumber , _ = CountNumberOfTrajectoryFiles(FolderPath)
+        filename = FolderPath+"/prerun_"+Params["Trajectory"]
+        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box'])
+        gsd_writer.log = logger
 
-    #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
-    logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
-    table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
-    sim.operations.writers.append(table)
+        #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
+        logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
+        table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
+        sim.operations.writers.append(table)
+    else:
+        write_mode = 'ab' if Restart else 'wb'
+        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=FolderPath+Params["Trajectory"], filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box'])
+        #sim.operations.writers.append(gsd_writer)
+        gsd_writer.log = logger
+
+        #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
+        logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
+        table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
+        sim.operations.writers.append(table)
         
 
     if True:
@@ -226,11 +249,9 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
 
-    if Params["UseBarostat"] == "true":
-        print(Params["Axis"])
+    if Params["UseBarostat"]:
         dof = [False,False,False,False,False,False]
         dof[int(Params["Axis"])-1] = True # 'y' -> 2 in julia is 'y' -> 1 in python
-        print(dof)
         sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
         npt = hoomd.md.methods.ConstantPressure(filter=hoomd.filter.All(), tauS=1.0, S=2.0, couple='none', thermostat=hoomd.md.methods.thermostats.Bussi(kT=kT), box_dof=dof)
         integrator.methods = [npt]
@@ -283,6 +304,8 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
+def preRun(FolderPath, prerunSteps=100000):
+    run(FolderPath, Restart=False, ExtendedSteps=prerunSteps, prerun=True)
 
 def restart(FolderPath, ExtendedSteps=0):
     run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)

@@ -119,7 +119,7 @@ Write a data file that contains all Parameters of the Simulation.
 **Creat**:
 * Write a file with all parameters of the simulation that are given from the arguments.
 """
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]), UseBarostat=false, SlabAxis=2)
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]), SlabAxis=2)
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
     write(io, "Domains: $(domain)\n")
@@ -138,7 +138,6 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     write(io, "Trajectory: $(TrajectoryName)\n")
     write(io, "UseAngles: $(UseAngles)\n")
     write(io, "UseCharge: $(UseCharge)\n")
-    write(io, "UseBarostat: $(UseBarostat)\n")
     write(io, "Alt_GSD_Start: $(Alt_GSD_Start)\n")
     write(io, "Create_Start_Config: $(Create_Start_Config)\n")
     write(io, "epsilon_r: $(ϵ_r)\n")

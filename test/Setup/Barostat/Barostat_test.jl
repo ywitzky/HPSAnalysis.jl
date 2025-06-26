@@ -23,7 +23,6 @@ function run_sim_prot(protein, BasePath, DomainDict, ProteinJSON, ProteinCif, pH
     ENV["PYCALL_JL_RUNTIME_PYTHON"] = "$(EnvironmentPath)/bin/python"
     pushfirst!(pyimport("sys")."path", "$(PkgSourcePath)/Setup/")
     sim = pyimport("Submit_HOOMD")
-    func = pyimport("PythonFuncs")
 
     RunsPerProtein = 1
     FoldedDomains = DomainDict
@@ -38,7 +37,7 @@ function run_sim_prot(protein, BasePath, DomainDict, ProteinJSON, ProteinCif, pH
         Path = BasePath*"$(protein)/$(temp)K/RUN_$(pad)/"
         
         Seq = HPSAnalysis.ProteinSequences.NameToSeq[protein]
-        NChains = 200
+        NChains = 150
         Sequences = [deepcopy(Seq) for _ in 1:NChains]
         Proteins  = [deepcopy(protein) for _ in 1:NChains]
 
@@ -49,13 +48,23 @@ function run_sim_prot(protein, BasePath, DomainDict, ProteinJSON, ProteinCif, pH
 
         SimulName = "$(protein)_$temp"
 
-        (pos, Data) = HPSAnalysis.CreateStartConfiguration_barostat(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinCif)
+        (pos, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthLong*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinCif)
+        
+        
         HPSAnalysis.RewriteCifToPDB(Path, ProteinToCif, Proteins)
 
-        #pos = HPSAnalysis.writeStartConfiguration_Barostat(BasePath, fileName="$protein", StartFileName="$protein", Info, Sequences, BoxSize, ProteinCif)
         ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
+    
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=1_000, ENM, SlabAxis=Data.SlabAxis)
 
-        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=1_000, ENM, UseBarostat=true, SlabAxis=Data.SlabAxis)
+        sim.preRun("$(Path)/", prerunSteps=10_000)
+        @info "End Prerun"
+
+        ### side step to do unwrap because old box -> do preRun as new start conficuration with unwrap in old box
+        (barostat_pos, new_Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinCif, Data=Data, prerun=true)
+        
+        Sequences = [deepcopy(Seq) for _ in 1:NChains] #-> somthing has chainged the first and last letter of the first Sequenze to a and b
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab_prerun","/$(SimulName)_Start_slab_prerun", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=barostat_pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=1_000, ENM, SlabAxis=Data.SlabAxis)
 
         sim.run("$(Path)/")
     end
