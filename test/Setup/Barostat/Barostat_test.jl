@@ -55,16 +55,18 @@ function run_sim_prot(protein, BasePath, DomainDict, ProteinJSON, ProteinCif, pH
 
         ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
     
-        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=1_000, ENM, SlabAxis=Data.SlabAxis)
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_prerun_Start_slab", Info, Sequences, BoxSize , 100_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="GPU",WriteOutFreq=1_000, ENM, SlabAxis=Data.SlabAxis)
 
-        sim.preRun("$(Path)/", prerunSteps=10_000)
+        sim.preRun("$(Path)/", prerunSteps=100_000)
         @info "End Prerun"
 
         ### side step to do unwrap because old box -> do preRun as new start conficuration with unwrap in old box
-        (barostat_pos, new_Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLengthShort,BoxLengthShort*width_multiplier , BoxLengthShort]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinCif, Data=Data, prerun=true)
+        barostat_pos = HPSAnalysis.readXYZ!(Data, TrajectoryFile="$Path/prerun_traj.gsd")
+
         
         Sequences = [deepcopy(Seq) for _ in 1:NChains] #-> somthing has chainged the first and last letter of the first Sequenze to a and b
-        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab_prerun","/$(SimulName)_Start_slab_prerun", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=barostat_pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=1_000, ENM, SlabAxis=Data.SlabAxis)
+        
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 10_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=barostat_pos , pH=pH,domain=FoldedDomains,Device="GPU",WriteOutFreq=1_000, ENM, SlabAxis=Data.SlabAxis)
 
         sim.run("$(Path)/")
     end
