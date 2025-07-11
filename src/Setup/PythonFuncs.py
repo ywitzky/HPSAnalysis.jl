@@ -177,7 +177,7 @@ def parseKeywords(keyword, value):
         return int(value)
     if keyword in ["dt", "Lx", "Ly", "Lz", "Temp","epsilon_r", "kappa","yk_prefactor", "AHCutoff", "YukawaCutoff", "ionic", "pH"]:
         return float(value)
-    if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config"]:
+    if keyword in ["Minimise", "UseAngles", "UseCharge", "Create_Start_Config", "Prerun"]:
         return value=="True" or value=="true"
     return value
 

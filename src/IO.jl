@@ -205,8 +205,11 @@ function readH5MD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return size(Sim.x,2)
 end
 
-function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String, Minimize=false, NumSteps=-1, Delimiter=" ")  where {T<:Real,I<:Integer}
-    readEnergyFile(Sim; EnergyFile=EnergyFile, NumSteps=NumSteps)
+function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String="", Minimize=false, NumSteps=-1, Delimiter=" ")  where {T<:Real,I<:Integer}
+    if EnergyFile != ""
+        readEnergyFile(Sim; EnergyFile=EnergyFile, NumSteps=NumSteps)
+    end
+    Sim.TrajectoryFile = TrajectoryFile
     N = Sim.NSteps
 
     ### Sim.StepFrequency is for data that will be reduceed, Sim.reduce sets discrepancy between energy data and .xyz created by presorting
@@ -282,9 +285,14 @@ function readXYZ!(Sim::SimData{T,I}; TrajectoryFile::String, EnergyFile::String,
     Mmap.sync!(Sim.x)
     Mmap.sync!(Sim.y)
     Mmap.sync!(Sim.z)
+    pos = zeros(length(Sim.x[:,1]), 3)
+    pos[:, 1] = Sim.x[:, 1]
+    pos[:, 2] = Sim.y[:, 1]
+    pos[:, 3] = Sim.z[:, 1]
     close(Sim.xio)
     close(Sim.yio)
     close(Sim.zio)
+    return pos
 end
 
 function replaceLammpsVariables(str::S, dict::Dict{String, A}) where {S<:AbstractString, A<:Any}
@@ -836,6 +844,48 @@ function WriteAsPDB_Help(Sim::SimData{T,I}, x::Matrix{T}, y::Matrix{T}, z::Matri
     write(file, "END")
 end
 
+function AlphaFold_startpos(ProteintoCif, Proteins, Sequences)
+    LengthDict = Dict()
+    for (Prot, Seq) in zip(Proteins,Sequences)
+        LengthDict[Prot] =length(Seq)
+    end
+    PositionDict =Dict()
+    for protein in Set(Proteins)
+        pos = zeros(Float64, LengthDict[protein], 3)
+        index = 1
+        open(ProteintoCif[protein], "r") do io
+            for line in eachline(io)
+                field = split(strip(line))
+                if field[1] == "ATOM" && field[4] == "CA"
+                    field = split(strip(line))
+                    x = parse(Float64, field[11])
+                    y = parse(Float64, field[12])
+                    z = parse(Float64, field[13])
+                    pos[index, :] = [x, y, z]
+                    index += 1
+                end
+            end
+        end
+        PositionDict[protein] = pos
+    end
+    return PositionDict, LengthDict
+end
+
+function getLargestBoundingbox(PositionDict)
+    min_val = ones(3)*floatmax()
+    max_val = ones(3)*floatmin()
+
+    for pos in values(PositionDict)
+        min_val_  = [minimum(pos[:,i]) for i in 1:3]
+        max_val_  = [maximum(pos[:,i]) for i in 1:3]
+
+        for i in 1:3
+            min_val[i] = min(min_val[i],min_val_[i])
+            max_val[i] = max(max_val[i],max_val_[i])
+        end
+    end
+    return min_val, max_val
+end
 
 @doc raw"""
     CreateStartConfiguration(SimulationName::String, Path::String, BoxSize::Vector{R}, Proteins::Vector{String}, Sequences::Vector{String} ; Axis=`y`, Regenerate=true,SimulationType="Calvados2",ProteinToDomain=Dict(),ProteinToCif=Dict())
@@ -946,9 +996,12 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
     if SimulationType=="Calvados3"
         if Regenerate
-            mkpath("$(InitFiles)Elastic_Files/")
+            if Axis != "y"
+                @error("I can only setup with slab axis being y")
+            end
+            #mkpath("$(InitFiles)Elastic_Files/")
             ###Creat a pdb data from the AlphaFold cif data
-            RewriteCifToPDB(Data.BasePath,ProteinToCif, Proteins )
+            #RewriteCifToPDB(Data.BasePath,ProteinToCif, Proteins )
             #=
             itpPath="$(InitFiles)ITPS_Files/"
             mkpath(itpPath)
@@ -961,6 +1014,35 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             ### generate coordinates
             Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
             =#
+
+            ####  get individual bounding boxes, compute the largest one
+            PositionDict, LengthDict = AlphaFold_startpos(ProteinToCif, Proteins, Sequences) 
+            min_vals, max_vals = getLargestBoundingbox(PositionDict)
+            LargestBoundingbox = (min_vals, max_vals)
+
+            max_length = max_vals .- min_vals
+            max_N = div.(Data.BoxLength, max_length)
+
+            count = 0
+            NLayers = div(Data.NChains, max_N[3]*max_N[1])+1
+            yoffset = ( (NLayers-1)*max_length[2])/2.0
+            for iy in 0:max_N[2]-1 ### Y is the typicall slab axis
+                for iz in 0:max_N[3]-1
+                    for ix in 0:max_N[1]-1
+                        count += 1
+                        if count > Data.NChains
+                            break
+                        end
+                        pos = PositionDict[Proteins[count]]
+                        proteinlenght = LengthDict[Proteins[count]]
+
+                        offset = [ix*max_length[1], iy*max_length[2]-yoffset, iz*max_length[3]]
+                        Data.x[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[:, 1] .+ offset[1]
+                        Data.y[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[:, 2] .+ offset[2] 
+                        Data.z[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[:, 3] .+ offset[3]
+                    end
+                end
+            end
         end
     elseif SimulationType=="Calvados2"
         if Regenerate
@@ -1031,7 +1113,9 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
     ### shift so that box center is at 0,0,0
     pos[:,1] .-= BoxSize[1]/2
-    pos[:,2] .-= BoxSize[2]/2
+    if SimulationType!="Calvados3"
+        pos[:,2] .-= BoxSize[2]/2 # y as slab axis is centered before
+    end
     pos[:,3] .-= BoxSize[3]/2
 
     Data.x[:,1] .=  pos[:,1]
