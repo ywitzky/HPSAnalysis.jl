@@ -18,7 +18,7 @@ import copy
 
 PWD = os.getcwd()
 
-def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10000):
+def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=100000):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
     #new Parameter SimType Calvados3 default C2
@@ -61,13 +61,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
 
     if prerun:
-        Params["UseBarostat"] = False
-        Params["resize"] = True
-        Params["resizeSteps"] = resizeSteps
-        Params["NSteps"] = Params["NSteps"] if ExtendedSteps==0 else ExtendedSteps
-    else:
-        Params["UseBarostat"] = False
-        Params["resize"] = False
+        Params["NSteps"] = resizeSteps+8000
 
     if Restart:
         TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
@@ -213,8 +207,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     #logger.add(thermodynamic_properties)
 
     if prerun:
-        write_mode = 'ab' if Restart else 'wb'
-        TrajectoryNumber , _ = CountNumberOfTrajectoryFiles(FolderPath)
         filename = FolderPath+"/prerun_"+Params["Trajectory"]
         gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
         gsd_writer.log = logger
@@ -251,36 +243,31 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
 
-    if Params["UseBarostat"]:
-        dof = [False,False,False,False,False,False]
-        dof[int(Params["Axis"])-1] = True # 'y' -> 2 in julia is 'y' -> 1 in python
-        sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
-        npt = hoomd.md.methods.ConstantPressure(filter=hoomd.filter.All(), tauS=1.0, S=2.0, couple='none', thermostat=hoomd.md.methods.thermostats.Bussi(kT=kT), box_dof=dof)
-        integrator.methods = [npt]
-    elif Params["resize"]:
-        rho = 0.4 / (1.66/1000) # Mass/Vomulen = dalton/AA^3 = dalton/nm^3/1000
+    if prerun:
+        rho = 0.4 / (1.66/1000) # Mass/Volume = dalton/AA^3 = dalton/nm^3/1000
         A = Params["Lx"] * Params["Lz"] # nm^2
         TotalMass = sum(InputMasses) # dalton
         # dalton /((dalton / nm^3) * nm^2) = nm 
         L = TotalMass / (A*rho) # nm
 
-        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])
+        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])*1.3
         state_box = [Params["Lx"], Ly_start , Params["Lz"], 0, 0, 0]
         goalbox = [Params["Lx"], L , Params["Lz"], 0, 0, 0]
 
-        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(Params["resizeSteps"]), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+Params["resizeSteps"]))
+        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+Params["resizeSteps"]))
         sim.operations.updaters.append(box_resize)
-    else:
-        nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
-        sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
-        integrator.methods = [nvt]
-        integrator.dt = Params["dt"]
 
 
-        for i in IDToResName.keys():
-            name = IDToResName[i]
-            nvt.gamma[name] = IDToMass[i]*10.0**-5
-            nvt.gamma_r[name] = (0.0, 0.0, 0.0)
+    nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
+    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/100.0)
+    integrator.methods = [nvt]
+    integrator.dt = Params["dt"]
+
+
+    for i in IDToResName.keys():
+        name = IDToResName[i]
+        nvt.gamma[name] = IDToMass[i]*10.0**-5
+        nvt.gamma_r[name] = (0.0, 0.0, 0.0)
         
     
     sim.operations.integrator=integrator
@@ -295,9 +282,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         now = 0
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell , maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
     hoomd.md.tune.NeighborListBuffer(trigger=hoomd.trigger.Before(now+20000), nlist=cell2, maximum_buffer=1.0, solver=hoomd.tune.GradientDescent())
-
-    #print("REMOVE THIS LINE BEFORE USING")
-    #sim.operations.writers.append(gsd_writer)
 
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
@@ -319,8 +303,8 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
-def preRun(FolderPath, prerunSteps=100000):
-    run(FolderPath, Restart=False, ExtendedSteps=prerunSteps, prerun=True, resizeSteps=10_000)
+def preRun(FolderPath, prerunSteps=100_000):
+    run(FolderPath, Restart=False, ExtendedSteps=prerunSteps, prerun=True, resizeSteps=prerunSteps)
 
 def restart(FolderPath, ExtendedSteps=0):
     run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)

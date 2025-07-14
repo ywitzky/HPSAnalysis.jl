@@ -5,7 +5,6 @@ import copy
 import gsd.hoomd
 from hoomd import ashbaugh_plugin
 import ast
-from CifFile import ReadCif
 import re
 import os
 

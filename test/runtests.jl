@@ -2,6 +2,7 @@ using HPSAnalysis
 PkgSourcePath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
 PkgPath="/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-2])
 
+PythonTests = false
 EnvironmentPath= HPSAnalysis.getPythonEnvironment(PkgSourcePath)
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="$(EnvironmentPath)/bin/python3"
 # might need to run the following lines once
