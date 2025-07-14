@@ -115,6 +115,7 @@ Write a data file that contains all Parameters of the Simulation.
 - `pH::Float`: PH value of the simulation.
 - `SimType::String`: Type of the simulation (like Calvados2, Calvados3).
 - `domain::Array`: Area in with the ENM is active (only for Calvados3).
+- `SlabAxis::Int`: Integer representing the long slab axis.
 
 **Creat**:
 * Write a file with all parameters of the simulation that are given from the arguments.

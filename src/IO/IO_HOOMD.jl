@@ -1,24 +1,33 @@
+function getGSDTrajectoryFiles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    FolderPath="/"*joinpath(split(Sim.TrajectoryFile,"/")[1:end-1])*"/"
+    return ["$(FolderPath)$file" for file in readdir(FolderPath) if length(file)>4 && file[1:4]=="traj" && file[end-3:end]==".gsd"]
+end
+
 function read_HOOMD_GSD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-    gsdfileobj = GSDFormat.open(Sim.TrajectoryFile, "r")
 
     N = Sim.NAtoms
     image_old = zeros(R, (N, 3))
 
     images_not_saved = zeros(Bool, Sim.NSteps)# false
-    for step in 1:Sim.NSteps
-        xyz   = gsdfileobj[step].particles.position
+    step=1
+    for file in getGSDTrajectoryFiles(Sim)
+        gsdfileobj = GSDFormat.open(file, "r")
 
-        Sim.x[1:N,step] .=  xyz[1:N,1] .*10.0
-        Sim.y[1:N,step] .=  xyz[1:N,2] .*10.0
-        Sim.z[1:N,step] .=  xyz[1:N,3] .*10.0
+        for gsd_step in 2:length(gsdfileobj) ### eachindex(gsdfileobj); skip the first index since we enabled write_at_start
+            xyz   = gsdfileobj[gsd_step].particles.position
 
-            image =  gsdfileobj[step].particles.image 
+            Sim.x[1:N,step] .=  xyz[1:N,1] .*10.0
+            Sim.y[1:N,step] .=  xyz[1:N,2] .*10.0
+            Sim.z[1:N,step] .=  xyz[1:N,3] .*10.0
+
+            image =  gsdfileobj[gsd_step].particles.image 
             Sim.x_uw[1:N,step] .= Sim.x[1:N,step] .+ Sim.BoxLength[1].*(image[1:N,1])
             Sim.y_uw[1:N,step] .= Sim.y[1:N,step] .+ Sim.BoxLength[2].*image[1:N,2]
             Sim.z_uw[1:N,step] .= Sim.z[1:N,step] .+ Sim.BoxLength[3].*(image[1:N,3])
             image_old .= image
+            step += 1
+        end
     end
-
 
     return nothing
 end

@@ -143,14 +143,16 @@ indices =  vcat([collect(1+off:length(seq)-1+off) for (seq, off) in zip(Sequence
 
 ### test read and write procedure
 HPSAnalysis.Setup.WriteENM_HOOMD_Indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt", (NBonds, B_types, B_typeid, B_groups, harmonic))
-(NBonds_read, B_types_read, B_typeid_read, B_groups_read, harmonic_read) = sim.read_ENM_HOOD_indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt")
 
-@test NBonds  == NBonds_read
-@test all(B_types  == B_types_read)
-@test B_typeid == B_typeid_read
-@test B_groups == B_groups_read
-@test all(map(key-> (harmonic[key][:k]== harmonic_read[key]["k"])&& (harmonic[key][:r]≈harmonic_read[key]["r"]), collect(keys(harmonic))))
+if PythonTests
+    (NBonds_read, B_types_read, B_typeid_read, B_groups_read, harmonic_read) = sim.read_ENM_HOOD_indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt")
 
+    @test NBonds  == NBonds_read
+    @test all(B_types  == B_types_read)
+    @test B_typeid == B_typeid_read
+    @test B_groups == B_groups_read
+    @test all(map(key-> (harmonic[key][:k]== harmonic_read[key]["k"])&& (harmonic[key][:r]≈harmonic_read[key]["r"]), collect(keys(harmonic))))
+end
 
 
 ### Test using Constraints for copies of the same protein

@@ -421,13 +421,53 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
             f2.append(snapshot)
 
 
+def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
+    with gsd.hoomd.open(TrajectoryPath) as f:
+        frame = f[-1] ### take last frame for restart
+
+        snapshot = gsd.hoomd.Frame()  
+
+        ### Specify particles
+        snapshot.particles.N        = frame.particles.N
+        snapshot.particles.position = frame.particles.position
+        snapshot.particles.types    = frame.particles.types
+        snapshot.particles.typeid   = frame.particles.typeid
+        snapshot.particles.image    = frame.particles.image
+        snapshot.particles.mass     = frame.particles.mass
+        snapshot.particles.charge   = frame.particles.charge 
+
+        ### Configure box
+        snapshot.configuration.box  = frame.configuration.box
+
+        # Connect particles with bonds.
+        snapshot.bonds.N            = frame.bonds.N 
+        snapshot.bonds.types        = frame.bonds.types 
+        snapshot.bonds.typeid       = frame.bonds.typeid
+        snapshot.bonds.group        = frame.bonds.group
+
+        ## Create Angles
+        snapshot.angles.N           = frame.angles.N
+        snapshot.angles.types       = frame.angles.types
+        snapshot.angles.typeid      = frame.angles.typeid
+        snapshot.angles.group       = frame.angles.group
+
+        # Create Angles
+        snapshot.dihedrals.N        = frame.dihedrals.N
+        snapshot.dihedrals.types    = frame.dihedrals.types
+        snapshot.dihedrals.typeid   = frame.dihedrals.typeid 
+        snapshot.dihedrals.group    = frame.dihedrals.group
+
+        with gsd.hoomd.open(RestartPath, mode='w') as f2:
+            f2.append(snapshot)
+
+
 def CountNumberOfTrajectoryFiles(FolderPath):
     data =os.listdir(FolderPath)
     trajectoryfiles=[e for e in data if re.search("traj",e) and re.search(".gsd", e)]
     sum_val=0
     for file in trajectoryfiles:
         with gsd.hoomd.open(f"{FolderPath}{file}") as f:
-           sum_val += len(f)
+           sum_val += len(f) -1
     return len(trajectoryfiles), sum_val
 
 def compute_Mass_List(IDs, IDToMass):
