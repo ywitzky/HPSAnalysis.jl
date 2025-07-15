@@ -105,7 +105,7 @@ for (protID, protein) in enumerate(ToCreate)
 
         SimulName = "$(protein)_$temp"
 
-        (_, Data) = HPSAnalysis.CreateStartConfiguration(SimulName,Path , Float32.([BoxLS,BoxLS , BoxLS]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
+        (_, Data) = HPSAnalysis.Setup.CreateStartConfiguration(SimulName,Path , Float32.([BoxLS,BoxLS , BoxLS]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
 
         pos = readPositionFromCif(ProteinToCif["RS31"])
         local ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
