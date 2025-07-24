@@ -268,8 +268,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
         
     sim.operations.integrator=integrator
-
-    sim.operations.integrator=integrator
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
@@ -284,6 +282,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
                 integrator.dt = Params["dt"]/fac
                 sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
+    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
 
 
     ### optimise cell list buffer
