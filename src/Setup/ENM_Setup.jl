@@ -18,16 +18,14 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 - Vector of tuples defining all bonds
 - Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
 """
-function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON) where {T<:Real, I<:Integer} 
-
-    ConstraintDict, Backbone_correction_Dict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=90.0)
-    HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, Backbone_correction_Dict, Sequences, Proteins)
+function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON; plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer} 
+    ConstraintDict, BackboneCorrectionDict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=plDDTcut, pae_cut=pae_cut)
+    HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict, Sequences, Proteins)
     UnfoldedRegions =  GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
-    All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, Backbone_correction_Dict)
+    All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)
 
     return All_Indices
 end
-
 
 @doc raw"""
     CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)
@@ -53,10 +51,9 @@ function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegio
 
     BackboneDiffLengths = Dict([prot=> [(i,j) for (i,j,_) in BackboneCorrectionDict[prot]] for prot in Set(Proteins)]) 
 
-    N_Bonds = sum([sum([b-a for (a,b) in UnfoldedRegions[prot]]) for prot in Proteins])
-    BB_ID = zeros(Int32, N_Bonds)
+    #N_Bonds = sum([sum([b-a for (a,b) in UnfoldedRegions[prot]]) for prot in Proteins])
+    #BB_ID = zeros(Int32, N_Bonds)
     BB_groups = Vector{Tuple{Int32, Int32}}()
-
 
     (ENM_Bonds, ENM_types, ENM_typeid, ENM_groups, harmonic) = HOOMD_Indices
     ### ENM_types, harmonic contains [O-O] already
@@ -69,6 +66,9 @@ function CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegio
             end
         end
     end
+    N_Bonds = length(BB_groups)
+    BB_ID = zeros(Int32, N_Bonds)
+
     return (N_Bonds+ENM_Bonds, ENM_types, vcat(BB_ID, ENM_typeid), vcat(BB_groups, ENM_groups), harmonic )
 end
 
@@ -126,21 +126,25 @@ function ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict , Sequen
         off = offsets[i]
     end
     BB_tmp  = vcat([BackboneCorrectionDict[prot] for prot in Set(Proteins)]...)
-    ENM_tmp = vcat([ConstraintDict[prot]           for prot in Set(Proteins)]...)
+    ENM_tmp = vcat([ConstraintDict[prot]         for prot in Set(Proteins)]...)
 
     BB_types  = ["BB_$(ind)"  for ind in sort(collect(Set(getindex.(BB_tmp ,4)))) if ind != 0]
     ENM_types = ["ENM_$(ind)" for ind in sort(collect(Set(getindex.(ENM_tmp,4))))]
 
     for (r,ind) in zip(getindex.(BB_tmp,3) , getindex.(BB_tmp,4))
         if ind!=0 ### "BB_0" is the same as "O-O"
-            harmonic["BB_$(ind)" ] = Dict(:r => r, :k => 8033)
+            harmonic["BB_$(ind)"] = Dict(:r => r, :k => 8033)
         end
     end
     for (r,ind) in zip(getindex.(ENM_tmp,3), getindex.(ENM_tmp,4))
-        harmonic["ENM_$(ind)" ] = Dict(:r => r, :k => 700)
+        harmonic["ENM_$(ind)"] = Dict(:r => r, :k => 700)
     end
     
-    return (BB_N + ENM_N, vcat(["O-O"], BB_types, ENM_types), vcat(BB_ID, ENM_ID), vcat(BB_groups, ENM_groups), harmonic)
+    ### sort list according to types indices
+    merged = vcat(BB_types, ENM_types)
+    inds = sortperm(parse.(Int32,getindex.(split.(merged, "_"),2)))
+
+    return (BB_N + ENM_N, vcat(["O-O"], merged[inds]), vcat(BB_ID, ENM_ID), vcat(BB_groups, ENM_groups), harmonic)
 end
 
 @doc raw"""
@@ -171,6 +175,7 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
     ExistingConstraints=Dict{Float64, Int32}(bondLength=>1) ### maps existing constraint determined by distance onto integer
     ExistingBackbone   =Dict{Float64, Int32}(bondLength=>1) ### maps existing backbone   determined by distance onto integer
     cnt=1
+    Masses = Dict("C"=>12.011, "N"=>14.007, "O"=>15.999, "S"=>32.065, "H"=>1.0078)
     for Prot in Set(Proteins)
         if length(DomainDict[Prot])>0
             CifPath = "$(ciffolder)/$(Prot).cif"
@@ -178,19 +183,28 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
             x = zeros(length(lines))
             y = zeros(length(lines))
             z = zeros(length(lines))
+            norm = zeros(length(lines))
             plDDT = zeros(length(lines))
 
-            step = 1
+            step = 0
             for line in readlines(CifPath)
                 fields = strip.(split(line))
-                if !isempty(fields) && fields[1] == "ATOM" && fields[4] == BBProtein
-                    x[step] = parse(Float64, fields[11])
-                    y[step] = parse(Float64, fields[12])
-                    z[step] = parse(Float64, fields[13])
-                    plDDT[step]= parse(Float64, fields[15])
-                    step += 1
+                if !isempty(fields) && fields[1] == "ATOM" #&& fields[4] == BBProtein
+                    if fields[4] == "N"
+                        step += 1
+                    end
+                    mass = Masses[fields[3]]
+                    x[step] += parse(Float64, fields[11])*mass
+                    y[step] += parse(Float64, fields[12])*mass
+                    z[step] += parse(Float64, fields[13])*mass
+                    plDDT[step]+= parse(Float64, fields[15])*mass
+                    norm[step] += mass
                 end
             end
+            x = x[1:step]./norm[1:step]
+            y = y[1:step]./norm[1:step]
+            z = z[1:step]./norm[1:step]
+            plDDT[1:step] = plDDT[1:step]./norm[1:step]
             ConstraintDict[Prot] = []
             BackboneCorrectionDict[Prot] = []
             pae =JSON.parsefile(ProteinJSON[Prot])["pae"]

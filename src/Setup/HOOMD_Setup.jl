@@ -168,8 +168,8 @@ function WriteENM_HOOMD_Indices(filename::String, ENM)
     ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
     io = open(filename, "w")
     write(io, "// N, ENMB_type, ENMB_typeid, ENMB_group_vector, harmonic\n")
-    for i in 1:ENMB_N
-        write(io, "$(i) , $(ENMB_types[ENMB_typeid[i]+1]) , $(ENMB_typeid[i]) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[ENMB_typeid[i]+1]]) \n")
+    for (i,id) in enumerate(ENMB_typeid)
+        write(io, "$(i) , $(ENMB_types[id+1]) , $(id) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[id+1]]) \n")
     end
     close(io);
 end
