@@ -18,7 +18,7 @@ import copy
 
 PWD = os.getcwd()
 
-def run(FolderPath, Restart=False, ExtendedSteps=0):
+def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=100000):
     ### Read Input Data
     ### All inputs are in lammps units, have to convert to 
     #new Parameter SimType Calvados3 default C2
@@ -52,6 +52,9 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
     device = hoomd.device.GPU() if Params["Device"]=="GPU" else hoomd.device.CPU()
     sim = hoomd.Simulation(device=device, seed=Params["Seed"])
+
+    if prerun:
+        Params["NSteps"] = resizeSteps+8000
 
     if Restart:
         TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
@@ -122,11 +125,15 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
             #snapshot.dihedrals.types = []#list(dihedral_list)
             #snapshot.dihedrals.typeid =  dihedral_AllIDs
             #snapshot.dihedrals.group = InputDihedrals
+            if prerun:
+                with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + "prerun.gsd", mode='w') as f:
+                    f.append(snapshot)
+                sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + "prerun.gsd")
+            else:
+                with gsd.hoomd.open(name=FolderPath + Params["Simname"] + ".gsd", mode='w') as f:
+                    f.append(snapshot)
+                sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + ".gsd")
 
-            with gsd.hoomd.open(name=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd", mode='w') as f:
-                f.append(snapshot)
-
-            sim.create_state_from_gsd(filename=FolderPath + Params["Simname"] + "_" + str(Params["Temp"]) + "_Start_slab.gsd")
         else:
             print(f"Creat start from: {FolderPath+Params['Simname']}.gsd")
             sim.create_state_from_gsd(filename=FolderPath+Params["Simname"]+".gsd")
@@ -196,15 +203,25 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     logger = hoomd.logging.Logger(categories=['scalar', 'string'])
     #logger.add(thermodynamic_properties)
 
-    write_mode = 'ab' if Restart else 'wb'
-    gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]),filename=FolderPath+Params["Trajectory"] ,filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image', "timestep"])
-    #sim.operations.writers.append(gsd_writer)
-    gsd_writer.log = logger
+    if prerun:
+        filename = FolderPath+"/prerun_"+Params["Trajectory"]
+        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
+        gsd_writer.log = logger
 
-    #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
-    logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
-    table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
-    sim.operations.writers.append(table)
+        #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
+        logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
+        table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
+        sim.operations.writers.append(table)
+    else:
+        write_mode = 'ab' if Restart else 'wb'
+        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=FolderPath+Params["Trajectory"], filter=hoomd.filter.All(),mode=write_mode,dynamic=['particles/position', 'particles/image'])
+        #sim.operations.writers.append(gsd_writer)
+        gsd_writer.log = logger
+
+        #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
+        logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
+        table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
+        sim.operations.writers.append(table)
         
 
     hdf5_writer=[]
@@ -224,6 +241,22 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
 
     ### apply langevin
     integrator = hoomd.md.Integrator(dt=Params["dt"]) 
+
+    if prerun:
+        rho = 0.4 / (1.66/1000) # Mass/Volume = dalton/AA^3 = dalton/nm^3/1000
+        A = Params["Lx"] * Params["Lz"] # nm^2
+        TotalMass = sum(InputMasses) # dalton
+        # dalton /((dalton / nm^3) * nm^2) = nm 
+        L = TotalMass / (A*rho) # nm
+
+        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])*1.3
+        state_box = [Params["Lx"], Ly_start , Params["Lz"], 0, 0, 0]
+        goalbox = [Params["Lx"], L , Params["Lz"], 0, 0, 0]
+
+        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+Params["resizeSteps"]))
+        sim.operations.updaters.append(box_resize)
+
+
     nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT) ### ps^-1
     integrator.methods = [nvt]
     integrator.dt = Params["dt"]
@@ -233,12 +266,11 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
         name = IDToResName[i]
         nvt.gamma[name] = IDToMass[i]*10.0**-5
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
-
+        
     sim.operations.integrator=integrator
     sim.operations.integrator.forces=forces
 
     print("Before simulation\n")
-
 
     sim.operations.writers.append(gsd_writer)
     sim.operations.writers.append(hdf5_writer)
@@ -250,6 +282,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
                 integrator.dt = Params["dt"]/fac
                 sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
+    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
 
 
     ### optimise cell list buffer
@@ -272,6 +305,8 @@ def run(FolderPath, Restart=False, ExtendedSteps=0):
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
+def preRun(FolderPath, prerunSteps=100_000):
+    run(FolderPath, Restart=False, ExtendedSteps=prerunSteps, prerun=True, resizeSteps=prerunSteps)
 
 def restart(FolderPath, ExtendedSteps=0):
     run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)

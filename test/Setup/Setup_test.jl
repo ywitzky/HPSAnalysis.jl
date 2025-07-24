@@ -28,7 +28,8 @@ end
     end
     include("./Calvados/Calvados3_ENM_test.jl")
     include("./Calvados/RS_Prot.jl") 
-
+  
+    include("./Calvados/Prerun_resize_test.jl")
 
     #include("./Calvados/Implementation/Calvados3_implementation_test.jl")
     #include("./Calvados/Implementation/Calvados3_implementation_analysis.jl")

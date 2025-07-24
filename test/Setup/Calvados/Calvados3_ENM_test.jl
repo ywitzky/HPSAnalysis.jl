@@ -60,21 +60,63 @@ check(i,j,_,_, pae, cut) =pae[i][j]<cut
 @test reduce(*, map(x->check(x..., RS31a_pae, 1.85),  ConstraintDict["RS31a"]))
 
 CifData = Dict()
-RS31_plDDT  = [parse.(Float64,line[15]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
-RS31a_plDDT = [parse.(Float64,line[15]) for line in split.(strip.(readlines(ProteinToCif["RS31a"]))) if line[1]=="ATOM" && line[4]=="CA"]
+norm_RS31 = zeros(264)
+RS31_plDDT = zeros(264)
+RS31_x = zeros(264)
+RS31_y = zeros(264)
+RS31_z = zeros(264)
+Masses = Dict("C"=>12.011, "N"=>14.007, "O"=>15.999, "S"=>32.065, "H"=>1.0078)
+for line in split.(strip.(readlines(ProteinToCif["RS31"] )))
+    if line[1]=="ATOM"
+        cnt = parse(Int32, line[9])
+        mass = Masses[line[3]]
+        RS31_plDDT[cnt] += parse.(Float64,line[15])*mass
+        RS31_x[cnt]+= parse.(Float64,line[11])*mass
+        RS31_y[cnt]+= parse.(Float64,line[12])*mass
+        RS31_z[cnt]+= parse.(Float64,line[13])*mass
+        norm_RS31[cnt]  += mass
+    end
+end
+RS31_plDDT ./= norm_RS31
+RS31_x ./= norm_RS31
+RS31_y ./= norm_RS31
+RS31_z ./= norm_RS31
+
+
+norm_RS31a = zeros(250)
+RS31a_plDDT = zeros(250)
+RS31a_x = zeros(250)
+RS31a_y = zeros(250)
+RS31a_z = zeros(250)
+for line in split.(strip.(readlines(ProteinToCif["RS31a"] )))
+    if line[1]=="ATOM"
+        mass = Masses[line[3]]
+        cnt = parse(Int32, line[9])
+        RS31a_plDDT[cnt] += parse.(Float64,line[15])*mass
+        RS31a_x[cnt]+= parse.(Float64,line[11])*mass
+        RS31a_y[cnt]+= parse.(Float64,line[12])*mass
+        RS31a_z[cnt]+= parse.(Float64,line[13])*mass
+        norm_RS31a[cnt]  += mass
+    end
+end
+RS31a_plDDT ./= norm_RS31a
+RS31a_x ./= norm_RS31a
+RS31a_y ./= norm_RS31a
+RS31a_z ./= norm_RS31a
+
 for (plDDTcut, pae_cut) in zip([80.0,90.0,92.0], [1.7, 1.85,2.0])
     local ConstraintDict,Backbone_correction_Dict = HPSAnalysis.Setup.DetermineCalvados3ENMfromAlphaFold(BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=plDDTcut, pae_cut=pae_cut)
 
-    @test reduce(*, map(x->check(x..., RS31_pae,pae_cut),  ConstraintDict["RS31"]))
+    @test reduce(*, map(x->check(x..., RS31_pae ,pae_cut),  ConstraintDict["RS31"]))
     @test reduce(*, map(x->check(x..., RS31a_pae,pae_cut),  ConstraintDict["RS31a"]))
 
-    local RS31_i  = getindex.(ConstraintDict["RS31"],1)
-    local RS31_j  = getindex.(ConstraintDict["RS31"],2)
+    local RS31_i  = getindex.(ConstraintDict["RS31"] ,1)
+    local RS31_j  = getindex.(ConstraintDict["RS31"] ,2)
     local RS31a_i = getindex.(ConstraintDict["RS31a"],1)
     local RS31a_j = getindex.(ConstraintDict["RS31a"],2)
     
-    @test reduce(*, map(i-> RS31_plDDT[i]>plDDTcut, RS31_i))
-    @test reduce(*, map(i-> RS31_plDDT[i]>plDDTcut, RS31_j))
+    @test reduce(*, map(i-> RS31_plDDT[i] >plDDTcut, RS31_i ))
+    @test reduce(*, map(i-> RS31_plDDT[i] >plDDTcut, RS31_j ))
     @test reduce(*, map(i-> RS31a_plDDT[i]>plDDTcut, RS31a_i))
     @test reduce(*, map(i-> RS31a_plDDT[i]>plDDTcut, RS31a_j))
 end
@@ -97,13 +139,6 @@ RS31a_dom1_pairs = [(i,j) for i in valid_plDDT for j in valid_plDDT if i<j-2 && 
 valid_plDDT = [i+89 for (i, val) in  enumerate(RS31a_plDDT[90:140]) if val>90 ]
 RS31a_dom2_pairs = [(i,j) for i in valid_plDDT for j in valid_plDDT if i<j-2 && RS31a_pae[i][j]<1.85  && RS31a_pae[j][i]<1.85]
 
-RS31_x  = [parse.(Float64,line[11]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
-RS31_y  = [parse.(Float64,line[12]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
-RS31_z  = [parse.(Float64,line[13]) for line in split.(strip.(readlines(ProteinToCif["RS31"] ))) if line[1]=="ATOM" && line[4]=="CA"]
-
-RS31a_x  = [parse.(Float64,line[11]) for line in split.(strip.(readlines(ProteinToCif["RS31a"] ))) if line[1]=="ATOM" && line[4]=="CA"]
-RS31a_y  = [parse.(Float64,line[12]) for line in split.(strip.(readlines(ProteinToCif["RS31a"] ))) if line[1]=="ATOM" && line[4]=="CA"]
-RS31a_z  = [parse.(Float64,line[13]) for line in split.(strip.(readlines(ProteinToCif["RS31a"] ))) if line[1]=="ATOM" && line[4]=="CA"]
 
 RS31_dist  = [ (RS31_x[i]  -RS31_x[j])^2+(RS31_y[i]  -RS31_y[j])^2+(RS31_z[i]  -RS31_z[j])^2 for i in 1:150, j in 1:150 ]
 RS31a_dist = [ (RS31a_x[i]-RS31a_x[j])^2+(RS31a_y[i]-RS31a_y[j])^2+(RS31a_z[i]-RS31a_z[j])^2 for i in 1:150, j in 1:150 ]
@@ -140,10 +175,15 @@ indices =  vcat([collect(1+off:length(seq)-1+off) for (seq, off) in zip(Sequence
 
 @test all(map(i-> (i,i+1) in B_groups, indices )) ## -1 because of python/c++ indexing
 
-
 ### test read and write procedure
 HPSAnalysis.Setup.WriteENM_HOOMD_Indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt", (NBonds, B_types, B_typeid, B_groups, harmonic))
 
+data  = [strip.(split(line, ",")) for line in readlines("$SetupTestPath/HOOMD_Setup/ENM_indices.txt")[2:end]]
+ids = parse.(Int32, getindex.(data,3))
+types  = getindex.(data,2)
+
+@test [val != "O-O" ? parse(Int32,split(val,"_")[2]) : 0 for val in types] == ids ### test if id matches the one in type name
+@test ["$(harmonic[v])" for v in types] == ["$n, $m" for (n,m) in zip(getindex.(data, 6), getindex.(data, 7))]
 if PythonTests
     (NBonds_read, B_types_read, B_typeid_read, B_groups_read, harmonic_read) = sim.read_ENM_HOOD_indices("$SetupTestPath/HOOMD_Setup/ENM_indices.txt")
 
@@ -170,9 +210,9 @@ Sequences = [Seq_Dict[x] for x in Proteins]
 UnfoldedRegions = HPSAnalysis.Setup.GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
 (NBonds, B_types, B_typeid, B_groups, _) = HPSAnalysis.Setup.CombineBackboneAndENM(Proteins, Sequences, (0,["O-O"], [], [], Dict()), UnfoldedRegions, Backbone_correction_Dict)
 
-@test NBonds == 24 
+@test NBonds == 21
 @test B_types == ["O-O"]
-@test B_typeid == zeros(24)
+@test B_typeid == zeros(21)
 UnfoldedGroups = sort(vcat([[(4,5).+x , (5,6).+x , (6,7).+x ,(7,8).+x , (8,9).+x] for x in [0, 15, 40]]..., [[(0,1).+x , (1,2).+x , (8,9).+x ] for x in [30, 55]]...))  ### use c indexing
 
 @test B_groups == UnfoldedGroups
@@ -209,12 +249,22 @@ harmonic_test["O-O"]  = Dict(:k => 8033.0, :r => 0.38 )
 
 (Comb_Bonds, Comb_types, Comb_typeid, Comb_groups, Comb_harmonic) = HPSAnalysis.Setup.CombineBackboneAndENM(Proteins, Sequences, (NBonds, B_types, B_typeid, B_groups, harmonic), UnfoldedRegions, Backbone_correction_Dict)
 
-@test Comb_Bonds == 25+24
+@test Comb_Bonds == 25+21
 @test Comb_types == ["O-O", "BB_1", "BB_2", "ENM_3", "ENM_4", "ENM_5", "ENM_6","ENM_7", "ENM_8"]
-@test Comb_typeid == Int32.(vcat(zeros(24),  [1,0,1,0,2,0,1,0,2,0, 3,4,5,3,4,5,6,7,8,3,4,5,6,7,8]))
+@test Comb_typeid == Int32.(vcat(zeros(21),  [1,0,1,0,2,0,1,0,2,0, 3,4,5,3,4,5,6,7,8,3,4,5,6,7,8]))
 @test Comb_groups == vcat(UnfoldedGroups, FoldedGroups)
 
 
 
+### test write out and reading again
+filepath = BasePath*"/ENM_indices.txt"
+HPSAnalysis.Setup.WriteENM_HOOMD_Indices(filepath, (Comb_Bonds, Comb_types, Comb_typeid, Comb_groups, Comb_harmonic))
+
+data  = [strip.(split(line, ",")) for line in readlines(filepath)[2:end]]
+ids = parse.(Int32, getindex.(data,3))
+types  = getindex.(data,2)
+
+@test [val != "O-O" ? parse(Int32,split(val,"_")[2]) : 0 for val in types] == ids ### test if id matches the one in type name
+@test ["$(Comb_harmonic[v])" for v in types] == ["$n, $m" for (n,m) in zip(getindex.(data, 6), getindex.(data, 7))]
 
 end

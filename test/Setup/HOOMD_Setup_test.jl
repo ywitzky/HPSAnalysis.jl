@@ -126,8 +126,8 @@ if PythonTests
         sequences=["MRPVFV","MRPVF","MRPV","MRP"]
         io=open(filename_test,"w")
         epsilon_r = 1.73136
-        Params=Dict("Simname"=>"C2", "Temp"=>300, "NSteps"=>10000, "NOut"=>10, "dt"=>1000,
-        "Lx"=>10, "Ly"=>100, "Lz"=>11, "Seed"=>10, "Minimise"=>true, "Trajectory"=>"testtraj.gsd", "UseAngles"=>true, "UseCharge"=>true, "Alt_GSD_Start"=>"-", "Create_Start_Config"=>false, "epsilon_r"=>epsilon_r, "kappa"=>1.0, "Device"=>"GPU", "YukawaCutoff"=>4.0, "AHCutoff"=>2.0, "ionic"=>0.1, "pH"=>7.0, "SimulationType"=>"Calvados2","Domains"=>Array([[0,0]]), "yk_prefactor"=>138.9315360433804/epsilon_r )
+        Params=Dict("Simname"=>"C2", "Temp"=>300.0, "NSteps"=>10000, "NOut"=>10, "dt"=>1000.0,
+        "Lx"=>10, "Ly"=>100, "Lz"=>11, "Seed"=>10, "Minimise"=>true, "Trajectory"=>"testtraj.gsd", "UseAngles"=>true, "UseCharge"=>true, "Alt_GSD_Start"=>"-", "Create_Start_Config"=>false, "epsilon_r"=>epsilon_r, "kappa"=>1.0, "Device"=>"GPU", "YukawaCutoff"=>4.0, "AHCutoff"=>2.0, "ionic"=>0.1, "pH"=>7.0, "SimulationType"=>"Calvados2","Domains"=>Array([[0,0]]), "yk_prefactor"=>138.9315360433804/epsilon_r , "Axis"=>"2")
         
         for (key, value) in Params
             write(io, "$(key): $(value)\n")

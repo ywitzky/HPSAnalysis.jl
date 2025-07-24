@@ -115,11 +115,12 @@ Write a data file that contains all Parameters of the Simulation.
 - `pH::Float`: PH value of the simulation.
 - `SimType::String`: Type of the simulation (like Calvados2, Calvados3).
 - `domain::Array`: Area in with the ENM is active (only for Calvados3).
+- `SlabAxis::Int`: Integer representing the long slab axis.
 
 **Creat**:
 * Write a file with all parameters of the simulation that are given from the arguments.
 """
-function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]))
+function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]), SlabAxis=2)
     io = open(filename, "w");
     write(io, "Simname: $SimName\n")
     write(io, "Domains: $(domain)\n")
@@ -147,6 +148,7 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     write(io, "Device: $(Device)\n")
     write(io, "YukawaCutoff: $(yk_cut)\n")
     write(io, "AHCutoff: $(ah_cut)\n")
+    write(io, "Axis: $(SlabAxis)\n")
     close(io);
 end
 
@@ -166,8 +168,37 @@ function WriteENM_HOOMD_Indices(filename::String, ENM)
     ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
     io = open(filename, "w")
     write(io, "// N, ENMB_type, ENMB_typeid, ENMB_group_vector, harmonic\n")
-    for i in 1:ENMB_N
-        write(io, "$(i) , $(ENMB_types[ENMB_typeid[i]+1]) , $(ENMB_typeid[i]) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[ENMB_typeid[i]+1]]) \n")
+    for (i,id) in enumerate(ENMB_typeid)
+        write(io, "$(i) , $(ENMB_types[id+1]) , $(id) , $(ENMB_group_vector[i]) , $(harmonic[ENMB_types[id+1]]) \n")
     end
     close(io);
+end
+
+@doc raw"""
+    writeHOOMD(Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM)
+
+Writes the datas for the simulation in different files with HOOMD.
+    
+**Arguments**
+- from writeStartConfiguration()
+
+**Creates**:
+* Writes the datas for the simulation.
+"""
+function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM, SlabAxis)
+        mkpath("$(BasePath)/HOOMD_Setup")
+        WriteHOOMDSequences("$(BasePath)/HOOMD_Setup/Sequences.txt", Sequences)
+        WriteHOOMDParticlesInput("$(BasePath)/HOOMD_Setup/Particles.txt", pos,  OneToCharge, AaToId,Sequences, OneToMass, OneToSigma, image)
+        if AlphaAddition
+            WriteDihedrals("$(BasePath)/HOOMD_Setup/DihedralMap.txt", dihedral_long_map, dihedral_eps)
+        end
+        (ϵ_r, κ) = DetermineYukawaInteractions(;SimulationType=SimulationType, Temperature=Temperature, SaltConcentration=SaltConcentration)
+
+        BoxLength = [BoxSize[2]-BoxSize[1],BoxSize[4]-BoxSize[3],BoxSize[6]-BoxSize[5] ]
+        WriteParams("$(BasePath)/HOOMD_Setup/Params.txt", StartFileName, Temperature, NSteps, WriteOutFreq, 0.01, BoxLength/10.0, rand(1:65535), UseAngles=AlphaAddition;ϵ_r=ϵ_r, κ=κ,Device=Device, yk_cut=yk_cut/10.0, ah_cut=ah_cut/10.0, ionic=SaltConcentration, pH=pH, SimType=SimulationType, domain=domain,Create_Start_Config=true, SlabAxis) ### BoxLength has to be convert to nm
+        WriteDictionaries("$(BasePath)/HOOMD_Setup/Dictionaries.txt", OneToCharge, AaToId, OneToMass, OneToSigma, OneToLambda)
+        WriteENM_HOOMD_Indices("$(BasePath)/HOOMD_Setup/ENM_indices.txt", ENM)
+        InputMasses = [OneToMass[res] for res in join(Sequences)]
+        InputCharges = [OneToCharge[res] for res in join(Sequences)]
+        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, domain, ENM)    
 end
