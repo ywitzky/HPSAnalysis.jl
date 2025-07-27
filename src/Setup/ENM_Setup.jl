@@ -18,8 +18,8 @@ Calculate the Indices, that are nessesary to creat a start file im HOOMD.
 - Vector of tuples defining all bonds
 - Dict{String, Dict{Symbol, Float64}} which defines the bonds as used in HOOMD.
 """
-function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON; plDDTcut=90.0, pae_cut=1.85) where {T<:Real, I<:Integer} 
-    ConstraintDict, BackboneCorrectionDict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=plDDTcut, pae_cut=pae_cut)
+function BuildENMModel(Sim::HPSAnalysis.SimData{T,I}, DomainDict, Proteins, Sequences, ProteinJSON; plDDTcut=90.0, pae_cut=1.85, precision=1000) where {T<:Real, I<:Integer} 
+    ConstraintDict, BackboneCorrectionDict = DetermineCalvados3ENMfromAlphaFold(Sim.BasePath, DomainDict, Proteins, ProteinJSON; BBProtein="CA", rcut = 9.0, plDDTcut=plDDTcut, pae_cut=pae_cut, precision=precision)
     HOOMD_Indices = ComputeHOOMD_ENMIndices(ConstraintDict, BackboneCorrectionDict, Sequences, Proteins)
     UnfoldedRegions =  GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
     All_Indices = CombineBackboneAndENM(Proteins, Sequences, HOOMD_Indices, UnfoldedRegions, BackboneCorrectionDict)

@@ -165,6 +165,7 @@ Write a data file with all necessary datas for the ENM in HOOMD.
 * Write a file with all datas for the ENM.
 """
 function WriteENM_HOOMD_Indices(filename::String, ENM)
+    if isnothing(ENM) return nothing end
     ENMB_N, ENMB_types, ENMB_typeid, ENMB_group_vector, harmonic = ENM
     io = open(filename, "w")
     write(io, "// N, ENMB_type, ENMB_typeid, ENMB_group_vector, harmonic\n")

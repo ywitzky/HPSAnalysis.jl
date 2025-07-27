@@ -50,7 +50,7 @@ end
     close(io)
 end
 
-@everywhere function run_sim_prot(protein, BasePath, FoldedDomains, ProteinToJSON, ProteinToCif, pH, width_multiplier, Temperatures)
+@everywhere function run_sim_prot(protein, BasePath, FoldedDomains, ProteinToJSON, ProteinToCif, pH, width_multiplier, Temperatures, precision=1000)
     PkgSourcePath = "/"*joinpath(split(pathof(HPSAnalysis),"/")[1:end-1])
     EnvironmentPath = HPSAnalysis.getPythonEnvironment(PkgSourcePath)
     ENV["PYCALL_JL_RUNTIME_PYTHON"] = "$(EnvironmentPath)/bin/python"
@@ -81,7 +81,7 @@ end
 
     (pos, Data) = HPSAnalysis.Setup.CreateStartConfiguration(SimulName,Path , Float32.([BoxLength,BoxLength*width_multiplier , BoxLength]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
 
-    ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON; plDDTcut=0, pae_cut=10000.0) ### turnoff cut offs
+    ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON; plDDTcut=0, pae_cut=10000.0, precision=precision) ### turnoff cut offs
 
     HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 100_000_000, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos, SaltConcentration=ionic[protein], pH=pH[protein],domain=FoldedDomains,Device="CPU",WriteOutFreq=100_000, ENM, ah_cut=22)
 

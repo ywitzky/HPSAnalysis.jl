@@ -98,7 +98,7 @@ function GenerateSlabTopologyFile(Filename, ITPPath, Names, SimulationName)
     write(f,"\n[ system ]\n; name\nProtein Sim\n\n[ molecules ]\n; name  number\n")
 
     for (ind, name) in enumerate(NameSet)
-        write(f, "$(name)_0 $(Occurences[name])\n")
+        write(f, "$(name) $(Occurences[name])\n")
     end
     close(f)
 end

@@ -180,7 +180,7 @@ Writes the start configuration for a molecular dynamics simulation.
 **Creates**:
 * Writes data files with the start configuration.
 """
-function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM, SlabAxis=2)
+function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequences, BoxSize,NSteps=100_000_000; SimulationType="Calvados2", Temperature=300,MixingRule="1-1001-1", Pos =zeros(Float32, 0),InitStyle="Slab", SaltConcentration=0.15, pH=6, ChargeTemperSteps=[], ChargeTemperSwapSteps=100_000, HOOMD=false, OneToChargeDef=BioData.OneToHPSCharge, OneToLambdaDef=BioData.OneToCalvados2Lambda, OneToSigmaDef=BioData.OneToHPSCalvadosSigma,WriteOutFreq=100_000, Device="GPU", yk_cut=40.0, ah_cut=20.0, domain=Array([]), ENM=nothing, SlabAxis=2)
 
     ChargeTemperSim=length(ChargeTemperSteps)>0
 
@@ -389,10 +389,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     Data.Sequences = Sequences
 
     #Definition of the length of all chains
-    Data.NAtoms = 0
-    for Prot in Proteins
-        Data.NAtoms += length(HPSAnalysis.ProteinSequences.NameToSeq[Prot]) 
-    end
+    Data.NAtoms = sum(length.(Data.Sequences))
 
     #All Residues get an ID, same Residue -> same ID, and definition for other way around
     Data.IDs = zeros(eltype(Data.NAtoms), Data.NAtoms)
@@ -480,20 +477,20 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
         if Regenerate
             ### generate Martini ITP Files
             mkpath("$(InitFiles)ITPS_Files/")
-            Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
+            HPSAnalysis.Polyply.GenerateITPFilesOfSequence(Proteins, Data.Sequences, "$(InitFiles)ITPS_Files/")
 
             ### Generate Topology files
             TopologyFile = "$(InitFiles)$(Data.SimulationName).top"
-            Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
+            HPSAnalysis.Polyply.GenerateSlabTopologyFile(TopologyFile,"$(InitFiles)ITPS_Files/", Proteins, Data.SimulationName)
 
             ### generate coordinates
-            Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
+            HPSAnalysis.Polyply.GenerateCoordinates(InitFiles, Data.SimulationName, BoxSize/10.0, TopologyFile)
 
             ### convert to PDB
             #Polyply.ConvertGroToPDB(InitFiles, Data.SimulationName)
 
             ### read positons from gro
-            Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
+            HPSAnalysis.Polyply.readSimpleGRO("$(InitFiles)$SimulationName.gro", Data.x,Data.y,Data.z)
         end
     end
 
