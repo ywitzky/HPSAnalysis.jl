@@ -213,8 +213,8 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                 for Domain in DomainDict[Prot]
                     if Domain[1] ≤ i ≤ Domain[2] && i + 1 ≤ Domain[2]
                         dist = sqrt((x[i+1]-x[i])^2 + (y[i+1]-y[i])^2 + (z[i+1]-z[i])^2)
-                        dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
                         dist /= 10.0 ### convert to nm
+                        dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
                         if !(dist in keys(ExistingBackbone))
                             ExistingBackbone[dist]=cnt
                             cnt+=1
@@ -227,8 +227,8 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
                                 dist_sqr = (x[j]-x[i])^2 + (y[j]-y[i])^2 + (z[j]-z[i])^2
                                 if dist_sqr < rcut^2 && plDDT[j] ≥ plDDTcut && pae[i][j] < pae_cut && pae[j][i] < pae_cut
                                     dist=sqrt(dist_sqr)
-                                    dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
                                     dist /= 10.0 ### convert to nm
+                                    dist = round(dist*precision)/precision ### reduces distance in bond length to .3f precision
                                     if !(dist in keys(ExistingConstraints))
                                         ExistingConstraints[dist]=cnt
                                         cnt+=1
