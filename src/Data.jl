@@ -172,6 +172,10 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     IntraChainScalingSlidingWindow::Vector{Vector{FloatType}}
     IntraChainContactMatrix::Vector{Matrix{FloatType}}
 
+    BinderSlabCumulants::Vector{FloatType}
+    SlabDenseCumulantBoxes::Array{FloatType}
+    SlabDiluteCumulantBoxes::Array{FloatType}
+
 
     function SimData()
         return new{ChoosenFloatType, ChoosenIntType}(false,"",1,0, 0,0,0,0,0,0,0,0,0,0,0.0,2,zeros(3,2), zeros(3),[""],
@@ -207,7 +211,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
         
         zeros(0), 0,0,zeros(0),zeros(0),
         
-        [], [],[]) 
+        [], [],[],
+        
+        zeros(0), zeros(0), zeros(0)) 
     end
 end
 
