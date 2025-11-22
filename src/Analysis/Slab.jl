@@ -327,5 +327,5 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
     Sim.SlabDenseCumulantBoxes  = DenseCumulantBoxes .*conversion
     Sim.SlabDiluteCumulantBoxes = DiluteCumulantBoxes.*conversion
 
-    return  Sim.SlabDenseCumulantBoxes, Sim.SlabDiluteCumulantBoxes
+    return Sim.SlabDenseCumulantBoxes, Sim.SlabDiluteCumulantBoxes
 end

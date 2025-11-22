@@ -432,6 +432,18 @@ function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100, dilute
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.pdf")
+
+    if dilute_pos!=0
+        pos = (center-dilute_pos, center+dilute_pos)
+        start = ceil(-dilute_pos/100)*100
+        xval= start:100:dilute_pos
+        xticks = (xval.-Sim.BoxSize[Sim.SlabAxis,1], [@sprintf("%.0f", val) for val in xval])
+        Plots.plot!(xlim=pos, xticks=xticks, xminorticks=10, grid=true, minorgrid=true, gridalpha=0.8, minorgridalpha=0.4)#, xrotation=90)
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution_zoom.png")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution_zoom.pdf")
+    end
+
+
     return fig
 end
 
