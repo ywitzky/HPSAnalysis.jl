@@ -32,7 +32,7 @@ Results are not return but stored in Sim.SlabHistogramSeries as an Offset array 
 **Creat**:
 * `Sim.SlabHistogramSeries`: Stores mass densities across slabs for different atom types.
 """
-function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
+function computeSlabHistogram(Sim::SimData{R,I}; Ranges::Union{Nothing, Vector{UnitRange{I2}}}=nothing, Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer, I2<:Integer}
     if Use_Alpha && sum(Sim.TorsionAngles[:,1])==0 
         computeDihedralAngles(Sim) ### ensure that TorsionAngles have been computed
     end
@@ -44,7 +44,12 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
     Len = deepcopy(Sim.BoxLength[Sim.SlabAxis])
     Len_inv = 1.0/Len
 
-    NHists = 1 + 2 +1 + Sim.NAtomTypes*Use_Types # one normal, one for positive charge, one for negative charge, one for alpha helices and one for each type
+    # all residue types, one for positive charged, one for negative charged, one for alpha helices,  one for each type, and according to range definition
+    NHists = 1 + 2 +1 + Sim.NAtomTypes*Use_Types 
+    rangeoffset = 1 + 2 +1 + Sim.NAtomTypes*Use_Types 
+    if !isnothing(Ranges)
+        NHists += length(Ranges)
+    end
 
     ### array with 1:N steps for -boxwidth:boxwitdh in the direction of the slab
     Sim.SlabHistogramSeries = OffsetArray(zeros(R, Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
@@ -73,26 +78,37 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
             decidePseudoHelicals(Sim, Pseudohelical, AlphaHelixProb, step)
         end
 
-        for atom in 1:Sim.NAtoms 
-            pos = getRecenteredPositions(SlabCoord, atom,j , step, AxisCOM, Len, Len_inv)
-            ind = ceil(Int32,((pos-0.5)/Sim.Resolution))    ### get index according to resolution
-            if ind == lowestind-1
-                ind = highestind
-            end
+        for C in 1:Sim.NChains
+            for (atom_in_chain, atom) in enumerate(Sim.ChainStart[C]:Sim.ChainStop[C])
+                pos = getRecenteredPositions(SlabCoord, atom,j , step, AxisCOM, Len, Len_inv)
+                ind = ceil(Int32,((pos-0.5)/Sim.Resolution))    ### get index according to resolution
+                if ind == lowestind-1
+                    ind = highestind
+                end
 
-            Sim.SlabHistogramSeries[ind , step,1]+= Sim.Masses[atom]
-            if Sim.Charges[atom] > 0
-                Sim.SlabHistogramSeries[ind , step,2]+= Sim.Masses[atom]
-            elseif Sim.Charges[atom] < 0
-                Sim.SlabHistogramSeries[ind , step,3]+= Sim.Masses[atom]
-            end
+                Sim.SlabHistogramSeries[ind , step,1]+= Sim.Masses[atom]
+                if Sim.Charges[atom] > 0
+                    Sim.SlabHistogramSeries[ind , step,2]+= Sim.Masses[atom]
+                elseif Sim.Charges[atom] < 0
+                    Sim.SlabHistogramSeries[ind , step,3]+= Sim.Masses[atom]
+                end
 
-            if Use_Alpha && AlphaHelixProb[atom]>0
-                Sim.SlabHistogramSeries[ind, step, 4] += Sim.Masses[atom]
-            end
+                if Use_Alpha && AlphaHelixProb[atom]>0
+                    Sim.SlabHistogramSeries[ind, step, 4] += Sim.Masses[atom]
+                end
 
-            if Use_Types
-                Sim.SlabHistogramSeries[ind, step, Sim.IDs[atom]+4]+= Sim.Masses[atom] ### lowest ID is 1
+                if Use_Types
+                    Sim.SlabHistogramSeries[ind, step, Sim.IDs[atom]+4]+= Sim.Masses[atom] ### lowest ID is 1
+                end
+
+                if !isnothing(Ranges)
+                    atom_in_chain .∈ Ranges 
+                    for (k, in_range) in enumerate(atom_in_chain .∈ Ranges)
+                        if in_range
+                            Sim.SlabHistogramSeries[ind, step, rangeoffset+k]+= Sim.Masses[atom]
+                        end
+                    end
+                end
             end
         end
     end

@@ -359,7 +359,7 @@ end
 
 Plots the average slab histogram of the frames in range Sim.NSteps-Windowlength:Sim.NSteps. Result is empty if the Windowlength is larger then the step size at which histgrams here computed.
 """
-function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
+function plotAvgSlabDensity(Sim::SimData{R,I}; IndexDict=Dict(1=>"all"), Windowlength=100) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
@@ -370,7 +370,9 @@ function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real,
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
     fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 
-    Plots.plot!(xaxis, AvgHist[:,1,1], color=:black, label="",  title=Sim.SimulationName)
+    for (index, label) in IndexDict
+        Plots.plot!(xaxis, AvgHist[:,1,index],  label=label, title=Sim.SimulationName) # color=:black,
+    end
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.pdf")
