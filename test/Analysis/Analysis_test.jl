@@ -5,4 +5,5 @@
     include("./Slab_Cumulant_test.jl")
     include("./IntraChainScaling_test.jl")
     include("./IntraChainContactMatrix_test.jl")
+    include("./InterChainContactMatrix_test.jl")
 end

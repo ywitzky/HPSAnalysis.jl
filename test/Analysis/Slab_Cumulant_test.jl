@@ -26,16 +26,16 @@ conv_fac=1.66053906660 ### conversion from u/AA^3 to kg/L which is done in the f
 @testset "Binder Cumulant in Slab Simulations" begin
     ### Check getUnwrappedSlabCoordinate
     Sim.SlabAxis = 1
-    @test Sim.x === HPSAnalysis.getUnwrappedSlabCoordinate(Sim; Unwrapped=false)
-    @test Sim.x_uw === HPSAnalysis.getUnwrappedSlabCoordinate(Sim; Unwrapped=true) 
+    @test Sim.x === HPSAnalysis.getSlabCoordinate(Sim; Unwrapped=false)
+    @test Sim.x_uw === HPSAnalysis.getSlabCoordinate(Sim; Unwrapped=true) 
 
     Sim.SlabAxis = 2
-    @test Sim.y === HPSAnalysis.getUnwrappedSlabCoordinate(Sim; Unwrapped=false)
-    @test Sim.y_uw === HPSAnalysis.getUnwrappedSlabCoordinate(Sim; Unwrapped=true)
+    @test Sim.y === HPSAnalysis.getSlabCoordinate(Sim; Unwrapped=false)
+    @test Sim.y_uw === HPSAnalysis.getSlabCoordinate(Sim; Unwrapped=true)
 
     Sim.SlabAxis = 3
-    @test Sim.z === HPSAnalysis.getUnwrappedSlabCoordinate(Sim; Unwrapped=false)
-    @test Sim.z_uw === HPSAnalysis.getUnwrappedSlabCoordinate(Sim; Unwrapped=true)
+    @test Sim.z === HPSAnalysis.getSlabCoordinate(Sim; Unwrapped=false)
+    @test Sim.z_uw === HPSAnalysis.getSlabCoordinate(Sim; Unwrapped=true)
 
     ### Check getVoxelIndex
     @test  3 == HPSAnalysis.getVoxelIndex(11.0, 5.0, 0)

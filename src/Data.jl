@@ -74,6 +74,7 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     COM_uw::Array{FloatType}
     IDToResName::Dict{IntType, String}
     IDToMasses::Vector{FloatType}
+    IDToSigmas::Vector{FloatType}
     ChainStart::Vector{IntType}
     ChainStop::Vector{IntType}
     ChainLength::Vector{IntType}
@@ -127,9 +128,10 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
 
     MaxParticlesPerCell::IntType
     CellDimensions::Array{IntType}
-    CellResolution::FloatType
+    CellResolution::Array{FloatType}
     CellListCounters::OffsetArray{IntType}
     CellList::OffsetArray{Vector{IntType}}
+    ChainNumCellList::OffsetArray{Vector{IntType}}
     PositiveCellList::OffsetArray{Vector{IntType}}
     NegativeCellList::OffsetArray{Vector{IntType}}
 
@@ -148,7 +150,8 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     BondHist::Vector{FloatType}
     box_id::Array{FloatType}
 
-    ContactMatrices::Array{IntType}
+    ContactMatrices::Array{FloatType}
+    ContactMatricesError::Array{FloatType}
     ContactMatrixCutoffs::Array{FloatType}
     ContactMatrixTypeCutoffs::Array{FloatType}
 
@@ -188,18 +191,18 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
 
         "","","","","","",[],
 
-        zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),Dict(), zeros(0), zeros(0), zeros(0), zeros(0), 0,
+        zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),Dict(), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), 0,
         
         0,0,0,zeros(0),zeros(0),zeros(0), zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0), 
         1,zeros(0),zeros(0),zeros(0), zeros(0),zeros(0),
         
         zeros(0),zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0) ,zeros(0) ,
        
-        [1],zeros(0),zeros(0),zeros(0),zeros(0), zeros(0),0,zeros(3,2), 20.,OffsetArray(zeros(0)), OffsetArray(zeros(0)), OffsetArray(zeros(0)), OffsetArray(zeros(0)),
+        [1],zeros(0),zeros(0),zeros(0),zeros(0), zeros(0),0,zeros(3,2), zeros(3),OffsetArray(zeros(0)), OffsetArray(zeros(0)), OffsetArray(zeros(0)), OffsetArray(zeros(0)),OffsetArray(zeros(0)),
        
         1., OffsetArray(zeros(0)), Dict(), Dict(), zeros(0), Dict(), Dict(), zeros(0), zeros(0),
        
-        zeros(0), zeros(0), zeros(0),
+        zeros(0), zeros(0), zeros(0),zeros(0),
 
         zeros(0),zeros(0),zeros(0),
         

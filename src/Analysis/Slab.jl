@@ -13,9 +13,34 @@ function getSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:
     return SlabCoord
 end
 
-@inline function getRecenteredPositions(SlabCoord::Array{R}, atom ,j, step, AxisCOM, Len, Len_inv) where {R<:Real}
-    pos = (SlabCoord[atom,step]-AxisCOM[j]) ### center slab at 0
+@inline function getRecenteredPositions(coord, com , Len, Len_inv)
+    pos = (coord-com)                       ### center slab at 0
     pos -= Len*round(Int32, pos*Len_inv)    ### wrap back to central images
+end
+
+@inline function getRecenteredPositions(SlabCoord::Array{R}, atom ,j, step, AxisCOM, Len, Len_inv) where {R<:Real}
+    getRecenteredPositions(SlabCoord[atom,step],AxisCOM[j], Len, Len_inv )
+end
+
+@inline function getChainsInBounds(Sim::SimData{R,I}, bounds::Union{Nothing, Vector{Tuple{R, R}}}, COM::Vector{R}, step, Len::Vector{R}, Len_inv::Vector{R}) where {R<:Real, I<:Integer}
+    chains = Vector{I}()
+    if !isnothing(bounds)
+        for (C, (start, stop)) in enumerate(zip(Sim.ChainStart, Sim.ChainStop))
+            (x_min, x_max) = getRecenteredPositions.(extrema(Sim.x_uw[start:stop, step]), COM[1], Len[1], Len_inv[1])
+            (y_min, y_max) = getRecenteredPositions.(extrema(Sim.y_uw[start:stop, step]), COM[2], Len[2], Len_inv[2])
+            (z_min, z_max) = getRecenteredPositions.(extrema(Sim.z_uw[start:stop, step]), COM[3], Len[3], Len_inv[3])
+
+            if  x_min>bounds[1][1] && x_max < bounds[1][2] && 
+                y_min>bounds[2][1] && y_max < bounds[2][2] && 
+                z_min>bounds[3][1] && z_max < bounds[3][2] 
+
+                push!(chains,C)
+            #else 
+            #    println("$y_min, $y_max, $(bounds[2])")
+            end
+        end
+    end
+    return chains
 end
 
 @doc raw"""
@@ -32,7 +57,7 @@ Results are not return but stored in Sim.SlabHistogramSeries as an Offset array 
 **Creat**:
 * `Sim.SlabHistogramSeries`: Stores mass densities across slabs for different atom types.
 """
-function computeSlabHistogram(Sim::SimData{R,I}; Ranges::Union{Nothing, Vector{UnitRange{I2}}}=nothing, Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer, I2<:Integer}
+function computeSlabHistogram(Sim::SimData{R,I}; Ranges::Union{Nothing, Vector{UnitRange{I}}}=nothing, Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
     if Use_Alpha && sum(Sim.TorsionAngles[:,1])==0 
         computeDihedralAngles(Sim) ### ensure that TorsionAngles have been computed
     end
@@ -263,7 +288,7 @@ end
 
 @inline function getVoxelIndex(pos, res, off)
     tmp = ceil(Int32,((pos)/res))+off
-    tmp > res ? tmp-2*off :  (tmp< 1 ? tmp+2*off : tmp)
+    #tmp > res ? tmp-2*off :  (tmp< 1 ? tmp+2*off : tmp)
 end
 
 

@@ -13,7 +13,6 @@ include("./Analysis/HREMD/Unify.jl")
 include("./Analysis/HREMD/HREMD.jl")
 
 
-
 function symmetriesMatrix(A::Matrix{T}) where {T<:Number}
     B = zeros(T, axes(A))
     for i in axes(A,1)
@@ -447,9 +446,6 @@ function computeBondsHists(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
                 ind = Int32(ceil(sqrt(diff)*Resolution))
 
                 if ind==0
-                    println("$step, $chain, $atom, $diff")
-                    println("$(Sim.x[atom, step]) $(Sim.x_uw[atom, step])")
-                    println("$(Sim.x[atom+1, step]) $(Sim.x_uw[atom+1, step])")
                     continue
                 end
                 if ind<1000

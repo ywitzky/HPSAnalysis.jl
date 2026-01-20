@@ -62,7 +62,7 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
     data = HPSAnalysis.computeCOMOfLargestCluster(Sim)
     @test (all(data .≈ offset)) ### check whether wether COM of largest Cluster matches intended value
 
-    HPSAnalysis.computeSlabHistogram(Sim, Ranges=[1:3,3:6 ])
+    HPSAnalysis.computeSlabHistogram(Sim, Ranges=Vector{UnitRange{Int32}}([1:3,3:6 ]))
     axis = axes(Sim.SlabHistogramSeries, 1)
     ### test for the true histogram and the two subranges
     for (i,ind) in enumerate([1,5,6])

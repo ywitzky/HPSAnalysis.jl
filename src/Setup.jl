@@ -16,9 +16,9 @@ include("Setup/ENM_Setup.jl")
 using .BioData
 
 
-BondStrength = Dict("Calvados2"=>19.19,"ArashModell"=>20.0 )
-EpsilonAshbaughHatch = Dict("Calvados2"=> 0.20,"ArashModell"=>0.2)
-Cutoff = Dict("Calvados2"=> 40.0, "HPS-Alpha"=>35.0,"ArashModell"=>35.0 )
+BondStrength = Dict("Calvados2"=>19.19,"TestModell"=>20.0 )
+EpsilonAshbaughHatch = Dict("Calvados2"=> 0.20,"TestModell"=>0.2)
+Cutoff = Dict("Calvados2"=> 40.0, "HPS-Alpha"=>35.0,"TestModell"=>35.0 )
 
 Formats=Dict([("h5md", "position image create_group yes")])
 
