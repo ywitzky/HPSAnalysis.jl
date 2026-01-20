@@ -46,7 +46,7 @@ function read_HOOMD_Particles(Sim::SimData{R,I}, File::String) where {R<:Real, I
     for line in lines[2:end]
         split = Base.split(line, ",")
         index  = parse(I, split[1])
-        id     = parse(I, split[2])
+        id     = parse(I, split[2]) +1 ### +1 to be able to use id as index, and be consistent with dictionary
         charge = parse(R, split[6])
         mass   = parse(R, split[7])
         Sim.IDs[index] = id
@@ -86,13 +86,13 @@ end
 function read_HOOMD_Dictionaries(Sim::SimData{R,I}, File::String) where {R<:Real, I<:Integer}
     lines = readlines(File)
     Sim.IDToMasses = zeros(R, length(lines)-1)
+    Sim.IDToSigmas = zeros(R, length(lines)-1)
     for line in lines[2:end]
         split = Base.split(line, ",")
         id       = parse(I, split[1])
-        res_name = strip(split[2])
-        mass     = parse(R, split[4])
-        Sim.IDToResName[id] = res_name
-        Sim.IDToMasses[id] = mass
+        Sim.IDToResName[id] = strip(split[2])
+        Sim.IDToMasses[id]  = parse(R, split[4])
+        Sim.IDToSigmas[id]  = parse(R, split[5])
     end
     Sim.NAtomTypes= length(lines)-1
     Sim.NBondTypes=1

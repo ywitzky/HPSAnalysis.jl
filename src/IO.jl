@@ -195,7 +195,7 @@ function readH5MD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
             Sim.z[:,start:stop] .= data["all"]["position"]["value"][3,:,:] 
 
             Sim.x_uw[:,start:stop] .= Sim.x[:,start:stop] .+ Sim.BoxLength[1].*data["all"]["image"]["value"][1,:,:] 
-            Sim.y_uw[:,start:stop].= Sim.y[:,start:stop] .+ Sim.BoxLength[2].*data["all"]["image"]["value"][2,:,:] 
+            Sim.y_uw[:,start:stop] .= Sim.y[:,start:stop] .+ Sim.BoxLength[2].*data["all"]["image"]["value"][2,:,:] 
             Sim.z_uw[:,start:stop] .= Sim.z[:,start:stop] .+ Sim.BoxLength[3].*data["all"]["image"]["value"][3,:,:] 
 
             start += N
@@ -389,7 +389,7 @@ function readAtoms!(Sim::SimData{R,I}, file::IOStream) where {R<:Real, I<:Intege
         end
         if length(words)>=4
             ID = parse(Int32, words[1])
-            atom_ID=parse(Int32, words[3])
+            atom_ID=parse(Int32, words[3]) 
             Sim.IDs[ID]=atom_ID
             Sim.Masses[ID]= Sim.IDToMasses[atom_ID]
             Sim.Charges[ID]=parse(Float32, words[4])
@@ -703,7 +703,7 @@ end
 
 function GetBigDataRecords(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     FilesInData =readdir(Sim.DataPath; join=true)
-    Handles = Vector{String}()
+    Handles = Vector{String}([])
     split_len=0
     for to_get in FilesInData
         tmp = split(lstrip(to_get,'.'),".")

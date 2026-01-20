@@ -29,7 +29,7 @@ function computeChargeBondTimesForCell(Sim::HPSAnalysis.SimData{T,I2}, xind::I, 
                 Sim.NeighBox[1:JMax,3] .= Sim.z[Sim.NegativeCellList[xi, yi, zi], Sim.CellStep[1]]
 
                 ### computes distances into CL_Dist[:,1]
-                computeDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax,  border)
+                computeDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax)
                 
                 for i in 1:IMax
                     atom_i = (Sim.PositiveCellList[xind, yind, zind])[i]
@@ -90,7 +90,7 @@ function computeChargeBonds(Sim::HPSAnalysis.SimData{T,I2}, xind::I, yind::I, zi
                 Sim.NeighBox[1:JMax,3] .= Sim.z[Sim.NegativeCellList[xi, yi, zi], Sim.CellStep[1]]
 
                 ### computes distances into CL_Dist[:,1]
-                computeDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax,  border)
+                computeDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax)
                 
                 for i in 1:IMax
                     atom_i = (Sim.PositiveCellList[xind, yind, zind])[i]
@@ -269,7 +269,6 @@ function computeChargeCorrelations(Sim::SimData{T,I};MaxTimeStep=250) where {T<:
     Sim.ChargeResidueContactMatrix /= Sim.NSteps
     Sim.ChargeChainContactMatrix /= Sim.NSteps
 end
-
 
 function computeHREMDChargeAnalysis(Sims::Vector{SimData{T,I}}, ID::Matrix{I2};MaxDistance=25, Resolution=0.1) where {T<:Real, I<:Integer, I2<:Integer}
     printstyled("computeHREMDChargeAnalysis is still heavily manipulated"; color=:yellow)

@@ -16,9 +16,9 @@ include("Setup/ENM_Setup.jl")
 using .BioData
 
 
-BondStrength = Dict("Calvados2"=>19.19,"ArashModell"=>20.0 )
-EpsilonAshbaughHatch = Dict("Calvados2"=> 0.20,"ArashModell"=>0.2)
-Cutoff = Dict("Calvados2"=> 40.0, "HPS-Alpha"=>35.0,"ArashModell"=>35.0 )
+BondStrength = Dict("Calvados2"=>19.19,"TestModell"=>20.0 )
+EpsilonAshbaughHatch = Dict("Calvados2"=> 0.20,"TestModell"=>0.2)
+Cutoff = Dict("Calvados2"=> 40.0, "HPS-Alpha"=>35.0,"TestModell"=>35.0 )
 
 Formats=Dict([("h5md", "position image create_group yes")])
 
@@ -219,7 +219,7 @@ function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequen
 
     image = Setup.getImageCopyNumber(pos, AltBox, Sequences)
 
-    domain = []
+    #domain = []
     #Write all Inputs, Parameters (Yukawa Interaction with Debye-Hückle), Dictionaries and the Start-File
     if HOOMD
         writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,OneToSigma,OneToLambda,AlphaAddition,dihedral_long_map,dihedral_eps,SimulationType,Temperature,SaltConcentration,BoxSize,StartFileName,NSteps,WriteOutFreq,Device,yk_cut,ah_cut,pH,domain,NAtoms,NBonds,NAngles,NDihedrals,dihedral_short_map,dihedral_list, ENM, SlabAxis)
@@ -455,6 +455,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             count = 0
             NLayers = div(Data.NChains, max_N[3]*max_N[1])+1
             yoffset = ( (NLayers-1)*max_length[2])/2.0 
+            old = 1
             for iy in 0:max_N[2]-1 ### Y is the typicall slab axis
                 for iz in 0:max_N[3]-1
                     for ix in 0:max_N[1]-1
@@ -463,12 +464,14 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
                             break
                         end
                         pos = PositionDict[Proteins[count]]
-                        proteinlenght = LengthDict[Proteins[count]]
+                        proteinlength = LengthDict[Proteins[count]]
 
                         offset = [(ix+0.5)*max_length[1], (iy+0.5)*max_length[2]-yoffset, (iz+0.5)*max_length[3]]
-                        Data.x[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[:, 1] .+ offset[1]
-                        Data.y[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[:, 2] .+ offset[2] 
-                        Data.z[(count-1)*proteinlenght+1:count*proteinlenght, 1] = pos[:, 3] .+ offset[3]
+
+                        Data.x[old:old+proteinlength-1, 1] = pos[:, 1] .+ offset[1]
+                        Data.y[old:old+proteinlength-1, 1] = pos[:, 2] .+ offset[2] 
+                        Data.z[old:old+proteinlength-1, 1] = pos[:, 3] .+ offset[3]
+                        old += proteinlength
                     end
                 end
             end

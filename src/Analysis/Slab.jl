@@ -1,4 +1,6 @@
-function getUnwrappedSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
+using Base.Iterators
+
+function getSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
     if Sim.SlabAxis==1
         SlabCoord = Unwrapped ? Sim.x_uw : Sim.x
     elseif Sim.SlabAxis==2
@@ -11,9 +13,34 @@ function getUnwrappedSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:
     return SlabCoord
 end
 
-@inline function getRecenteredPositions(SlabCoord::Array{R}, atom ,j, step, AxisCOM, Len, Len_inv) where {R<:Real}
-    pos = (SlabCoord[atom,step]-AxisCOM[j]) ### center slab at 0
+@inline function getRecenteredPositions(coord, com , Len, Len_inv)
+    pos = (coord-com)                       ### center slab at 0
     pos -= Len*round(Int32, pos*Len_inv)    ### wrap back to central images
+end
+
+@inline function getRecenteredPositions(SlabCoord::Array{R}, atom ,j, step, AxisCOM, Len, Len_inv) where {R<:Real}
+    getRecenteredPositions(SlabCoord[atom,step],AxisCOM[j], Len, Len_inv )
+end
+
+@inline function getChainsInBounds(Sim::SimData{R,I}, bounds::Union{Nothing, Vector{Tuple{R, R}}}, COM::Vector{R}, step, Len::Vector{R}, Len_inv::Vector{R}) where {R<:Real, I<:Integer}
+    chains = Vector{I}()
+    if !isnothing(bounds)
+        for (C, (start, stop)) in enumerate(zip(Sim.ChainStart, Sim.ChainStop))
+            (x_min, x_max) = getRecenteredPositions.(extrema(Sim.x_uw[start:stop, step]), COM[1], Len[1], Len_inv[1])
+            (y_min, y_max) = getRecenteredPositions.(extrema(Sim.y_uw[start:stop, step]), COM[2], Len[2], Len_inv[2])
+            (z_min, z_max) = getRecenteredPositions.(extrema(Sim.z_uw[start:stop, step]), COM[3], Len[3], Len_inv[3])
+
+            if  x_min>bounds[1][1] && x_max < bounds[1][2] && 
+                y_min>bounds[2][1] && y_max < bounds[2][2] && 
+                z_min>bounds[3][1] && z_max < bounds[3][2] 
+
+                push!(chains,C)
+            #else 
+            #    println("$y_min, $y_max, $(bounds[2])")
+            end
+        end
+    end
+    return chains
 end
 
 @doc raw"""
@@ -30,19 +57,24 @@ Results are not return but stored in Sim.SlabHistogramSeries as an Offset array 
 **Creat**:
 * `Sim.SlabHistogramSeries`: Stores mass densities across slabs for different atom types.
 """
-function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
+function computeSlabHistogram(Sim::SimData{R,I}; Ranges::Union{Nothing, Vector{UnitRange{I}}}=nothing, Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
     if Use_Alpha && sum(Sim.TorsionAngles[:,1])==0 
         computeDihedralAngles(Sim) ### ensure that TorsionAngles have been computed
     end
 
     AxisCOM = computeCOMOfLargestCluster(Sim)
 
-    SlabCoord =  getUnwrappedSlabCoordinate(Sim)
+    SlabCoord =  getSlabCoordinate(Sim)
 
     Len = deepcopy(Sim.BoxLength[Sim.SlabAxis])
     Len_inv = 1.0/Len
 
-    NHists = 1 + 2 +1 + Sim.NAtomTypes*Use_Types # one normal, one for positive charge, one for negative charge, one for alpha helices and one for each type
+    # all residue types, one for positive charged, one for negative charged, one for alpha helices,  one for each type, and according to range definition
+    NHists = 1 + 2 +1 + Sim.NAtomTypes*Use_Types 
+    rangeoffset = 1 + 2 +1 + Sim.NAtomTypes*Use_Types 
+    if !isnothing(Ranges)
+        NHists += length(Ranges)
+    end
 
     ### array with 1:N steps for -boxwidth:boxwitdh in the direction of the slab
     Sim.SlabHistogramSeries = OffsetArray(zeros(R, Int32(ceil((Sim.BoxSize[Sim.SlabAxis,2]-Sim.BoxSize[Sim.SlabAxis,1])/Sim.Resolution)) , Int32(Sim.NSteps), NHists), Int32(ceil(Sim.BoxSize[Sim.SlabAxis,1]/Sim.Resolution))+1:Int32(ceil(Sim.BoxSize[Sim.SlabAxis,2]/Sim.Resolution)) , 1:Sim.NSteps, 1:NHists)
@@ -71,26 +103,37 @@ function computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=fals
             decidePseudoHelicals(Sim, Pseudohelical, AlphaHelixProb, step)
         end
 
-        for atom in 1:Sim.NAtoms 
-            pos = getRecenteredPositions(SlabCoord, atom,j , step, AxisCOM, Len, Len_inv)
-            ind = ceil(Int32,((pos-0.5)/Sim.Resolution))    ### get index according to resolution
-            if ind == lowestind-1
-                ind = highestind
-            end
+        for C in 1:Sim.NChains
+            for (atom_in_chain, atom) in enumerate(Sim.ChainStart[C]:Sim.ChainStop[C])
+                pos = getRecenteredPositions(SlabCoord, atom,j , step, AxisCOM, Len, Len_inv)
+                ind = ceil(Int32,((pos-0.5)/Sim.Resolution))    ### get index according to resolution
+                if ind == lowestind-1
+                    ind = highestind
+                end
 
-            Sim.SlabHistogramSeries[ind , step,1]+= Sim.Masses[atom]
-            if Sim.Charges[atom] > 0
-                Sim.SlabHistogramSeries[ind , step,2]+= Sim.Masses[atom]
-            elseif Sim.Charges[atom] < 0
-                Sim.SlabHistogramSeries[ind , step,3]+= Sim.Masses[atom]
-            end
+                Sim.SlabHistogramSeries[ind , step,1]+= Sim.Masses[atom]
+                if Sim.Charges[atom] > 0
+                    Sim.SlabHistogramSeries[ind , step,2]+= Sim.Masses[atom]
+                elseif Sim.Charges[atom] < 0
+                    Sim.SlabHistogramSeries[ind , step,3]+= Sim.Masses[atom]
+                end
 
-            if Use_Alpha && AlphaHelixProb[atom]>0
-                Sim.SlabHistogramSeries[ind, step, 4] += Sim.Masses[atom]
-            end
+                if Use_Alpha && AlphaHelixProb[atom]>0
+                    Sim.SlabHistogramSeries[ind, step, 4] += Sim.Masses[atom]
+                end
 
-            if Use_Types
-                Sim.SlabHistogramSeries[ind, step, Sim.IDs[atom]+4]+= Sim.Masses[atom] ### lowest ID is 1
+                if Use_Types
+                    Sim.SlabHistogramSeries[ind, step, Sim.IDs[atom]+4]+= Sim.Masses[atom] ### lowest ID is 1
+                end
+
+                if !isnothing(Ranges)
+                    atom_in_chain .∈ Ranges 
+                    for (k, in_range) in enumerate(atom_in_chain .∈ Ranges)
+                        if in_range
+                            Sim.SlabHistogramSeries[ind, step, rangeoffset+k]+= Sim.Masses[atom]
+                        end
+                    end
+                end
             end
         end
     end
@@ -186,7 +229,7 @@ Computes average density within dense phase and dilute phase as well as the indi
 
 A mirror symmetric density around zero is computed from which dense phase approximation ρ\_app is defined as the mean value of the first **Width** steps. The dense phase boundary is **Surface_fac** times the distance **r_dense** at which the density drops below **MaxVal** times ρ\_app. Similarly the dilute phase boundary is the distance at which the density drops below **1-MaxVal** times ρ\_app plus **r_dense** times (1-**Surface_fac**).
 """
-function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.9, Surface_fac=0.8, safety=75.0)  where {R<:Real, I<:Integer}
+function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.9, Surface_fac=0.8, safety=75.0, global_inds=(nothing, nothing))  where {R<:Real, I<:Integer}
 
     safety_ = ceil(Int32, safety/Sim.Resolution)
 
@@ -200,25 +243,32 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.
     ind_dense  = zeros(I, NSteps)
     ind_dilute = zeros(I, NSteps)
 
-    for step in axes(Sim.SlabHistogramSeries,2)
-        computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
+    #if all(isnothing.(global_inds)) ### default automatic setting of dense/dilute phases
+        for step in axes(Sim.SlabHistogramSeries,2)
+            computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
 
-        avg = mean(density[1:Width])
+            avg = mean(density[1:Width])
 
-        tmp = findlast(density.>avg*MaxVal)
-        diff = tmp *(1-Surface_fac)
-        ind_dense[step] = round(I, tmp*Surface_fac)
-        ρ_dense[step] = mean(density[1:ind_dense[step]]) ### will be overwritten lated
+            tmp = findlast(density.>avg*MaxVal)
+            diff = tmp *(1-Surface_fac)
+            ind_dense[step] = round(I, tmp*Surface_fac)
+            ρ_dense[step] = mean(density[1:ind_dense[step]]) ### will be overwritten later
 
-        N_dilute = 2*ind_dense[step]*1/Surface_fac< N ? 2*ind_dense[step]*1/Surface_fac :  N-Width
-        N_dilute =  ceil(I, N_dilute)
-        avg = mean(density[N_dilute:end])
+            N_dilute = 2*ind_dense[step]*1/Surface_fac< N ? 2*ind_dense[step]*1/Surface_fac :  N-Width
+            N_dilute =  ceil(I, N_dilute)
+            avg = mean(density[N_dilute:end])
 
-        ind_dilute[step] = ceil(I,findfirst(density.-avg .<(1.0-MaxVal)*(ρ_dense[step]-avg)))
-    end
+            ind_dilute[step] = ceil(I,findfirst(density.-avg .<(1.0-MaxVal)*(ρ_dense[step]-avg)))
+        end
 
-    global_ind_dilute = min(maximum(ind_dilute)+safety_, N)
-    global_ind_dense  = minimum(ind_dense)
+        
+        global_ind_dilute = isnothing(global_inds[1]) ? min(maximum(ind_dilute)+safety_, N) : global_inds[1]
+        global_ind_dense  = isnothing(global_inds[2]) ? minimum(ind_dense) : global_inds[2]
+        
+    #else  ### manually set phase borders
+    #    global_ind_dilute = global_inds[1]
+    #    global_ind_dense  = global_inds[2]
+    #end
 
     for step in axes(Sim.SlabHistogramSeries,2)
         computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
@@ -237,12 +287,30 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.
 end
 
 @inline function getVoxelIndex(pos, res, off)
-    ceil(Int32,((pos)/res))+off
+    tmp = ceil(Int32,((pos)/res))+off
+    #tmp > res ? tmp-2*off :  (tmp< 1 ? tmp+2*off : tmp)
 end
 
 
 function computeBinderCumulantsOfSlabDensities(Sim::HPSAnalysis.SimData{R,I}, indices_dilute, indices_dense)  where {R<:Real, I<:Integer}
 
+    #DenseCumulantBoxes, DiluteCumulantBoxes = computeBinderCumulantsSubBoxes(Sim, indices_dilute, indices_dense)
+
+    order_param = Sim.SlabDenseCumulantBoxes .- Sim.SlabDiluteCumulantBoxes
+
+    Sim.BinderSlabCumulants = zeros(5)
+    norm = zeros(5)
+
+    for (wid,width) in enumerate([1,2,3,4,6])
+        for ax1 in partition(1:12, width)
+            for ax2 in partition(1:12, width)
+                tmp = order_param[ax1,ax2,:].^2
+                Sim.BinderSlabCumulants[wid] += mean(tmp)^2/mean(tmp.^2)
+                norm[wid] += 1
+            end
+        end
+    end
+    Sim.BinderSlabCumulants ./= norm
 end
 
 function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_dilute, indices_dense)  where {R<:Real, I<:Integer}
@@ -258,12 +326,12 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
     conversion = 1.66053906660/volume/Sim.Resolution
 
     ### get Long Axis and short axis depending on selection
-    SlabCoord =  getUnwrappedSlabCoordinate(Sim)
+    SlabCoord =  getSlabCoordinate(Sim;Unwrapped=false )
     tmp = deepcopy(Sim.SlabAxis)
     Sim.SlabAxis= AllAxis[1]
-    Axis1 =  getUnwrappedSlabCoordinate(Sim)
+    Axis1 =  getSlabCoordinate(Sim;Unwrapped=false)
     Sim.SlabAxis= AllAxis[2]
-    Axis2 =  getUnwrappedSlabCoordinate(Sim)
+    Axis2 =  getSlabCoordinate(Sim;Unwrapped=false)
     Sim.SlabAxis= tmp
 
     Len = deepcopy(Sim.BoxLength[Sim.SlabAxis])
@@ -274,8 +342,7 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
     DiluteCumulantBoxes = zeros(R, 12,12, Sim.NSteps)
 
     dilute_cutoff = indices_dilute .* Sim.Resolution
-    dense_cutoff = indices_dense .* Sim.Resolution
-
+    dense_cutoff  = indices_dense  .* Sim.Resolution
     for (j,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
         if j %200 == 0 println("step $j/$(length(Sim.ClusterRange))") end
 
@@ -286,20 +353,20 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
             if abs(pos)< dense_cutoff[step]
                 ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
                 ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
-                DenseCumulantBoxes[ind1, ind2, step] += Sim.Masses[atom]
+                DenseCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
             end
 
             if abs(pos)> dilute_cutoff[step]
                 ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
                 ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
-                DiluteCumulantBoxes[ind1, ind2, step] += Sim.Masses[atom]
+                DiluteCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
             end
         end
-        DenseCumulantBoxes[:,:,step] /= dense_cutoff[step]*2 
-        DiluteCumulantBoxes[:,:,step] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff[step]*2 )
+        DenseCumulantBoxes[:,:,j] /= dense_cutoff[step]*2 
+        DiluteCumulantBoxes[:,:,j] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff[step]*2 )
     end
-    DenseCumulantBoxes  *= conversion
-    DiluteCumulantBoxes *= conversion
+    Sim.SlabDenseCumulantBoxes  = DenseCumulantBoxes .*conversion
+    Sim.SlabDiluteCumulantBoxes = DiluteCumulantBoxes.*conversion
 
-    return DenseCumulantBoxes, DiluteCumulantBoxes
+    return Sim.SlabDenseCumulantBoxes, Sim.SlabDiluteCumulantBoxes
 end

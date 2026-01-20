@@ -39,9 +39,16 @@ Sim.EquilibrationTime=1
 Sim.RGMeasureStep = 1
 
 ### definition how true slab histogram looks like
-hist_def = OffsetArray(zeros(200), -99:100)
+hist_def = OffsetArray(zeros(200,3), -99:100, 1:3)
 for i in 1:Sim.NAtoms
-    hist_def[ceil(Int32, Sim.y_uw[i, 1])] += 1.0/TotalMass
+    hist_def[ceil(Int32, Sim.y_uw[i, 1]),1] += 1.0/TotalMass
+end
+### defitnion of slab histogram for range 1 & 2
+for y_pos in vcat(Sim.y_uw[1:3, 1], Sim.y_uw[62:64, 1])
+    hist_def[ceil(Int32,y_pos),2] += 1.0/6.0    ### normalized just this time for comparison
+end
+for y_pos in vcat(Sim.y_uw[3:6, 1], Sim.y_uw[64:end, 1])
+    hist_def[ceil(Int32,y_pos),3] += 1.0/8.0    ### normalized just this time for comparison
 end
 
 sigmoid(x) =  1/(1+exp(-x)) # abs(x)<10.0 ? 1/(1+exp(-x)) : 0.0
@@ -55,12 +62,15 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
     data = HPSAnalysis.computeCOMOfLargestCluster(Sim)
     @test (all(data .≈ offset)) ### check whether wether COM of largest Cluster matches intended value
 
-    HPSAnalysis.computeSlabHistogram(Sim)
+    HPSAnalysis.computeSlabHistogram(Sim, Ranges=Vector{UnitRange{Int32}}([1:3,3:6 ]))
     axis = axes(Sim.SlabHistogramSeries, 1)
-    hist = sum(Sim.SlabHistogramSeries[:,:,1], dims=2)/Sim.NSteps
-    hist /= sum(hist) ### normalise histogram u/A
+    ### test for the true histogram and the two subranges
+    for (i,ind) in enumerate([1,5,6])
+        hist = sum(Sim.SlabHistogramSeries[:,:,ind], dims=2)/Sim.NSteps
+        hist /= sum(hist) ### normalise histogram u/A
+        @test (all(hist.≈hist_def[:,i]))
+    end
 
-    @test (all(hist.≈hist_def))
 
     ### decaying box slab density over time
     values = collect(1.06:-0.01:0.07)
@@ -73,7 +83,6 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
 
     @test all(ρ_dense .≈ values)
     @test all(ρ_dilute .≈ 0.05)
-
 
     ### decaying sigmoidal slab density over time
     values = collect(1.06:-0.01:0.07)

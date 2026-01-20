@@ -177,6 +177,8 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
     cnt=1
     Masses = Dict("C"=>12.011, "N"=>14.007, "O"=>15.999, "S"=>32.065, "H"=>1.0078)
     for Prot in Set(Proteins)
+        BackboneCorrectionDict[Prot] = []
+        ConstraintDict[Prot] = []
         if length(DomainDict[Prot])>0
             CifPath = "$(ciffolder)/$(Prot).cif"
             lines = readlines(CifPath)
@@ -205,8 +207,6 @@ function DetermineCalvados3ENMfromAlphaFold(BasePath::String, DomainDict, Protei
             y = y[1:step]./norm[1:step]
             z = z[1:step]./norm[1:step]
             plDDT[1:step] = plDDT[1:step]./norm[1:step]
-            ConstraintDict[Prot] = []
-            BackboneCorrectionDict[Prot] = []
             pae =JSON.parsefile(ProteinJSON[Prot])["pae"]
             for i in 1:step-1 # up to NAtom-1
                 #in_any_domain = false
@@ -268,11 +268,10 @@ function GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
     UnfoldedDict= Dict{String, Vector{Tuple{Int64, Int64}}}()
 
     for Prot in Set(Proteins)
+        UnfoldedDomains = []
+        N = ProtLength[Prot]
         if length(DomainDict[Prot])>0
-            N = ProtLength[Prot]
-
             FoldedDomains = sort(DomainDict[Prot])
-            UnfoldedDomains = []
             if FoldedDomains[1][1]!=1
                 push!(UnfoldedDomains, (1, FoldedDomains[1][1]))
             end
@@ -282,8 +281,10 @@ function GenerateUnfoldedRegions(Proteins, DomainDict, Sequences)
             if FoldedDomains[end][2]!=N
                 push!(UnfoldedDomains, (FoldedDomains[end][2], N))
             end
-            UnfoldedDict[Prot] = UnfoldedDomains
+        else 
+            push!(UnfoldedDomains, (1, N))
         end
+        UnfoldedDict[Prot] = UnfoldedDomains
     end
     return UnfoldedDict
 end

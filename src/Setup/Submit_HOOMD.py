@@ -203,6 +203,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     logger = hoomd.logging.Logger(categories=['scalar', 'string'])
     #logger.add(thermodynamic_properties)
 
+    write_mode  ='wb'
     if prerun:
         filename = FolderPath+"/prerun_"+Params["Trajectory"]
         gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
@@ -253,7 +254,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         state_box = [Params["Lx"], Ly_start , Params["Lz"], 0, 0, 0]
         goalbox = [Params["Lx"], L , Params["Lz"], 0, 0, 0]
 
-        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+Params["resizeSteps"]))
+        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+resizeSteps))
         sim.operations.updaters.append(box_resize)
 
 

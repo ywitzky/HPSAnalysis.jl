@@ -4,7 +4,7 @@
 
 include("./Plot/Comp_Plots.jl")
 
-using Plots, Printf, Measures
+using Plots, Printf, Measures, LinearAlgebra, ColorSchemes, LaTeXStrings
 #
 
 #=
@@ -145,7 +145,7 @@ function plotMSDofChains(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     avg_err .= sqrt.(avg_err./N)/sqrt(N-1)
     diff_avg_err .= sqrt.(diff_avg_err./N)/sqrt(N-1)
 
-    MaxVal = maximum(avg[1: ceil(I,Sim.NSteps*0.75)])
+    MaxVal = maximum(avg[1: ceil(I,Sim.NSteps*0.95)])
     ylims = [0, MaxVal]
 
     width=avg_err[:,1].+avg_err[:,2].+avg_err[:,3]
@@ -177,7 +177,7 @@ function plotMSDofChains(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         Plots.plot!(axes(data,1), data[:,3], label="") #data[:,2]+
     end
     Plots.plot!(axes(avg,1), avg[:,3]+avg_err[:,3],fillrange=avg[:,3]-avg_err[:,3], color=:gray, label="")
-    MSD_YZ = Plots.plot!(axes(avg,1), avg[:,3], color=:black, title="X-component" , label="" , ylim=ylims)
+    MSD_YZ = Plots.plot!(axes(avg,1), avg[:,3], color=:black, title="Z-component" , label="" , ylim=ylims)
     MSD_Plot = Plots.plot(MSD_all, MSD_XY,MSD_XZ,MSD_YZ, layout=4, plot_title="MSD") # xscale=:log, yscale=:log,
 
 
@@ -359,7 +359,7 @@ end
 
 Plots the average slab histogram of the frames in range Sim.NSteps-Windowlength:Sim.NSteps. Result is empty if the Windowlength is larger then the step size at which histgrams here computed.
 """
-function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real, I<:Integer}
+function plotAvgSlabDensity(Sim::SimData{R,I}; IndexDict=Dict(1=>"all"), Windowlength=100) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
@@ -370,7 +370,9 @@ function plotAvgSlabDensity(Sim::SimData{R,I}; Windowlength=100) where {R<:Real,
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
     fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 
-    Plots.plot!(xaxis, AvgHist[:,1,1], color=:black, label="",  title=Sim.SimulationName)
+    for (index, label) in IndexDict
+        Plots.plot!(xaxis, AvgHist[:,1,index],  label=label, title=Sim.SimulationName) # color=:black,
+    end
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.pdf")
@@ -432,6 +434,18 @@ function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100, dilute
 
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution.pdf")
+
+    if dilute_pos!=0
+        pos = (center-dilute_pos, center+dilute_pos)
+        start = ceil(-dilute_pos/100)*100
+        xval= start:100:dilute_pos
+        xticks = (xval.-Sim.BoxSize[Sim.SlabAxis,1], [@sprintf("%.0f", val) for val in xval])
+        Plots.plot!(xlim=pos, xticks=xticks, xminorticks=10, grid=true, minorgrid=true, gridalpha=0.8, minorgridalpha=0.4)#, xrotation=90)
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution_zoom.png")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_$(Sim.TargetTemp)_AvgSlabHist_Evolution_zoom.pdf")
+    end
+
+
     return fig
 end
 
@@ -482,6 +496,18 @@ function plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainScaling.pdf")
 end
 
+function plotHOOMDTemperature(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    file = h5open("$(Sim.BasePath)pressure.h5", "r")
+    temperature = collect(file["hoomd-data"]["md"]["compute"]["ThermodynamicQuantities"]["kinetic_temperature"])
+    timestep = collect(file["hoomd-data"]["Simulation"]["timestep"])
+    close(file)
+    kb = 0.00831446262
+    fig = Plots.plot(timestep, temperature/kb, xlabel="step", ylabel="temperature", ylim=(Sim.TargetTemp*0.95, Sim.TargetTemp*1.05), label="Sim. Temp.")
+    Plots.hline!([Sim.TargetTemp], label="Target Temp.")
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.png")
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.pdf")
+end
+
 function plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     N = ceil(Int32, sqrt(Sim.NChains))
     fig=Plots.plot(layout=(N,N), xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]")
@@ -492,4 +518,77 @@ function plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integ
     
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainContactMatrix.png")
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainContactMatrix.pdf")
+end
+
+
+function get_color(value, clims, scheme)
+    norm_val = clamp((value - clims[1]) / (clims[2] - clims[1]), 0.0, 1.0)
+    return colorschemes[scheme][norm_val]
+end
+
+function compute_submatrix(matrix::Matrix{R}, ranges) where {R<:Real}
+    N = size(matrix, 1)
+    N_sub = length(ranges)
+    small_matrix = zeros(R, (N_sub,N_sub))
+    large_matrix = zeros(R, (N,N))
+
+    for (i,range_i) in enumerate(ranges)
+        for (j, range_j) in enumerate(ranges)
+            mean_val = mean(matrix[range_i, range_j])
+            large_matrix[range_i,range_j] .= mean_val
+            small_matrix[i,j] = mean_val
+        end
+    end
+    return small_matrix, large_matrix
+end
+
+function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}()) where {R<:Real, I<:Integer}
+
+    avg = sum(Sim.IntraChainContactMatrix)./length(Sim.IntraChainContactMatrix)
+    
+    ### replace IntraChainContactMatrix in case that 
+    
+    color_inter=:thermal
+    color_intra=:viridis
+
+    ly = @layout([a{0.9w, 0.03h} b{0.1w, 0.03h}; c{0.95w, 0.95h} d{0.03w, 0.95h}])
+
+    ### plot once with errors and once with normal values
+    for (i, (InterChainMatrix, iserror)) in enumerate(zip([ Sim.ContactMatricesError, Sim.ContactMatrices], ["_Error", ""]))
+        fig=Plots.plot(xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", colorbar=:legend, legend=:outertop,)
+
+        addon=""
+        if length(ranges)>0
+            _, InterChainMatrix = compute_submatrix(InterChainMatrix, ranges)
+            addon ="_with_coarse"
+        end
+
+        clims_inter = (0,maximum(InterChainMatrix)) # a
+        clims_intra = extrema(avg) #b
+
+        matrix  = triu(InterChainMatrix)+tril(avg,-1);
+        is_triu = triu(trues(size(InterChainMatrix)), 1)
+        color_mat = [istriu ? get_color(val, clims_inter, color_inter) : get_color(val, clims_intra, color_intra) for (istriu, val) in zip(is_triu, matrix)]
+
+        data_inter = collect(range(clims_intra..., 100))
+        data_intra = collect(range(clims_inter..., 100))
+
+        clims = extrema(matrix)
+        NMat = size(matrix,1)
+        ticks = vcat([1], collect(0:50:NMat)[2:end])#, [NMat])
+
+        fig = plot(layout=ly, size=(Size,Size), margin=-2.5mm, AspectRatio=true)#, link=:y )
+
+        heatmap!(color_mat,yflip=false,lims=(0.5,NMat+0.5), ticks=ticks, colorbar=true, color = color_inter, clims=clims_intra, subplot=3, xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", AspectRatio=false,yrotation=90.0, fontsize=10)#, yaxis = :flip)
+        heatmap!(data_inter,[1],  transpose([data_inter;;]),color=color_intra,   colorbar=false, subplot=1, yaxis=nothing, xmirror=true, xlabel=L"\ln(<d_{ij}>)",labelfontsize=8)
+        heatmap!(subplot=2, framestyle=:none)
+        heatmap!([1], data_intra, [data_intra;;], colorbar=false, clims=clims_inter, color=color_inter, xlabel="",xticks=nothing,   ymirror=true,  yguide=nothing, subplot=4, labelfontsize=8, yrotation=90.0, ylabel=L"P(d_{ij}<1.1~σ~2^{(1/6)})")
+
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_InterChainContactMatrix$(addon)$(iserror).png")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_InterChainContactMatrix$(addon)$(iserror).pdf")
+        
+        if i==2
+            return fig
+        end
+    end
 end

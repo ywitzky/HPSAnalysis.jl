@@ -10,9 +10,9 @@ Sim.ChainLength=[12, 8]
 Sim.EquilibrationTime=1
 Sim.RGMeasureStep=1
 
-Sim.x_uw = zeros(Sim.NAtoms, Sim.NSteps) # rand(Float32, Sim.NAtoms, Sim.NSteps) .* 10 
-Sim.y_uw =  zeros(Sim.NAtoms, Sim.NSteps) #rand(Float32, Sim.NAtoms, Sim.NSteps) .* 10
-Sim.z_uw =  zeros(Sim.NAtoms, Sim.NSteps) #rand(Float32, Sim.NAtoms, Sim.NSteps) .* 10
+Sim.x_uw = zeros(Sim.NAtoms, Sim.NSteps)
+Sim.y_uw = zeros(Sim.NAtoms, Sim.NSteps)
+Sim.z_uw = zeros(Sim.NAtoms, Sim.NSteps)
 
 for i in 1:5
     Sim.x_uw[1:20, i] .= 1:20
