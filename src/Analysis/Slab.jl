@@ -1,4 +1,4 @@
-using Base.Iterators
+using Base.Iterators, HDF5
 
 function getSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
     if Sim.SlabAxis==1
@@ -369,4 +369,71 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
     Sim.SlabDiluteCumulantBoxes = DiluteCumulantBoxes.*conversion
 
     return Sim.SlabDenseCumulantBoxes, Sim.SlabDiluteCumulantBoxes
+end
+
+@doc raw"""
+    computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},start::I;filename::String = "pressure.h5",tau::I = I(1),NSub::I= I(10))
+
+Computes the **mechanical (pressure‑tensor) surface tension** of a slab
+simulation that has been written out by HOOMD‑Blue.  The routine reads the
+pressure‑tensor time series from an HDF5 file, extracts the normal and
+tangential components with respect to the slab normal (`Sim.SlabAxis`),
+applies the standard formula  
+
+\[
+\gamma = \frac{L_{\mathrm{slab}}}{2}\,
+\bigl\langle P_{norm.} - P_{tang.} \bigr\rangle ,
+\]
+
+and returns the mean value together with an estimate of its statistical
+uncertainty obtained by block‑averaging.
+
+**Arguments**
+
+- `Sim::HPSAnalysis.SimData{R,I}`:  A simulation data structure containing the Simulation information.
+- `start::I`: index (in multiples of `Sim.TrajWriteOutFreq`) of the  first frame to be included in the analysis.
+
+**Keyword arguments**
+
+- `filename::String = "pressure.h5"`: name of the HDF5 file that contains the pressure tensor (`hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor`).
+- `tau::I = I(1)`: stride for sub‑sampling the pressure‑tensor series
+  (e.g. `tau=10` uses every 10‑th stored frame).
+- `NSub::I = I(10)`: number of sub‑samples used for the block‑averaging
+  error estimate.
+
+**Returns**
+
+A tuple `(γ, Δγ)` where  
+
+- `γ` (`Sim.SurfaceTension`) is the mean surface tension,
+- `Δγ` (`Sim.SurfaceTensionError`) is the estimated statistical error."""
+function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},start::I;filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer}
+    longfilename = Sim.BasePath*filename 
+
+    file = h5open(longfilename) #isfile(longfilename) ? h5open(longfilename) : @error "$longfilename does not exist when using computeSurfaceTension(...). "
+    pressure_tensor = file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"]
+    timestep = file["hoomd-data/Simulation/timestep"]
+
+    ### start is assumed to be in multiples of the frequency of the frame outputs
+    ### pressure data is written out way more
+
+    start_time  = start * Sim.TrajWriteOutFreq
+    start_index = findfirst(x->(x)>=start_time, timestep[:] )
+    
+    #https://hoomd-blue.readthedocs.io/en/v6.0.0/hoomd/md/compute/thermodynamicquantities.html#hoomd.md.compute.ThermodynamicQuantities.pressure_tensor
+    p_xx = pressure_tensor[1, start_index:tau:end]
+    p_yy = pressure_tensor[4, start_index:tau:end]
+    p_zz = pressure_tensor[6, start_index:tau:end]
+
+    all_axis = [p_xx, p_yy, p_zz]
+    normal_p = all_axis[Sim.SlabAxis]
+    tangential_p = sum(deleteat!(all_axis,Sim.SlabAxis))./2.0
+    
+    γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
+    Sim.SurfaceTension = mean(γ)
+    n_measure = floor(I, length(normal_p)/NSub)
+    y_mean_sub = [mean(sub) for sub in Iterators.partition(γ, n_measure)][1:end-1] ### last partition is not full...
+    Sim.SurfaceTensionError = sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
+
+    return Sim.SurfaceTension, Sim.SurfaceTensionError
 end
