@@ -410,7 +410,7 @@ A tuple `(γ, Δγ)` where
 function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},start::I;filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer}
     longfilename = Sim.BasePath*filename 
 
-    file = h5open(longfilename) #isfile(longfilename) ? h5open(longfilename) : @error "$longfilename does not exist when using computeSurfaceTension(...). "
+    file = h5open(longfilename) 
     pressure_tensor = file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"]
     timestep = file["hoomd-data/Simulation/timestep"]
 

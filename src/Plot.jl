@@ -544,17 +544,17 @@ end
 
 function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}()) where {R<:Real, I<:Integer}
 
-    avg = sum(Sim.IntraChainContactMatrix)./length(Sim.IntraChainContactMatrix)
+    IntraChainMatrix = sum(Sim.IntraChainContactMatrix)./length(Sim.IntraChainContactMatrix)
     
     ### replace IntraChainContactMatrix in case that 
     
     color_inter=:thermal
-    color_intra=:viridis
 
     ly = @layout([a{0.9w, 0.03h} b{0.1w, 0.03h}; c{0.95w, 0.95h} d{0.03w, 0.95h}])
 
+    InterChainMatrix = Sim.ContactMatrices
     ### plot once with errors and once with normal values
-    for (i, (InterChainMatrix, iserror)) in enumerate(zip([ Sim.ContactMatricesError, Sim.ContactMatrices], ["_Error", ""]))
+    for (i, (avg, iserror)) in enumerate(zip([IntraChainMatrix , Sim.ContactMatricesError], ["", "_Error"]))
         fig=Plots.plot(xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", colorbar=:legend, legend=:outertop,)
 
         addon=""
@@ -564,7 +564,9 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
         end
 
         clims_inter = (0,maximum(InterChainMatrix)) # a
-        clims_intra = extrema(avg) #b
+        clims_intra = iserror=="_Error" ? clims_inter : extrema(avg) #b
+        toplabel = iserror=="_Error" ? L"ΔP(d_{ij}<1.1~σ~2^{(1/6)})" : L"\ln(<d_{ij}>)"
+        color_intra = iserror=="_Error" ? color_inter : :viridis
 
         matrix  = triu(InterChainMatrix)+tril(avg,-1);
         is_triu = triu(trues(size(InterChainMatrix)), 1)
@@ -580,7 +582,7 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
         fig = plot(layout=ly, size=(Size,Size), margin=-2.5mm, AspectRatio=true)#, link=:y )
 
         heatmap!(color_mat,yflip=false,lims=(0.5,NMat+0.5), ticks=ticks, colorbar=true, color = color_inter, clims=clims_intra, subplot=3, xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", AspectRatio=false,yrotation=90.0, fontsize=10)#, yaxis = :flip)
-        heatmap!(data_inter,[1],  transpose([data_inter;;]),color=color_intra,   colorbar=false, subplot=1, yaxis=nothing, xmirror=true, xlabel=L"\ln(<d_{ij}>)",labelfontsize=8)
+        heatmap!(data_inter,[1],  transpose([data_inter;;]),color=color_intra,   colorbar=false, subplot=1, yaxis=nothing, xmirror=true, xlabel=toplabel ,labelfontsize=8)
         heatmap!(subplot=2, framestyle=:none)
         heatmap!([1], data_intra, [data_intra;;], colorbar=false, clims=clims_inter, color=color_inter, xlabel="",xticks=nothing,   ymirror=true,  yguide=nothing, subplot=4, labelfontsize=8, yrotation=90.0, ylabel=L"P(d_{ij}<1.1~σ~2^{(1/6)})")
 
