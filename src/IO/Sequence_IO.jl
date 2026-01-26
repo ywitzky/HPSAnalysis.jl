@@ -32,32 +32,32 @@ function GenerateSubtableWrapper(text; Caption="")
 end
 
 function GenerateSequenceTables(Sequences, Names, Outpath;  LineMax=46)
-    TableContents = Vector{String}()
-    LinesPerTable=Vector{Int32}()
+    TableContents = Vector{String}([])
+    LinesPerTable=Vector{Int32}([])
     NSeq= length(Sequences)
-    for Seq in Sequences
+    for (cnt,Seq) in enumerate(Sequences)
         cont, lines= GenerateSequenceByLine(Seq)
-        append!(TableContents, cont)
+        push!(TableContents, cont)
         append!(LinesPerTable, lines)
     end
 
-    Pages =  Vector{Vector{String}}()
+    Pages = Vector{Vector{String}}([[]])
     cnt =0
     page_cnt=1
     for i in 1:NSeq
         if (cnt+ LinesPerTable[i])<=LineMax
-            append!(Pages[page_cnt], TableContents[i])
+            push!(Pages[page_cnt], TableContents[i])
             cnt +=  LinesPerTable[i]
         else
-            cnt = LinesPerTable[i]
+            cnt = 0 #LinesPerTable[i]
             page_cnt += 1
-            Pages[page_cnt] = TableContents[i]
+            push!(Pages,[TableContents[i]])
         end
     end
 
     cnt = 1
     for (PID, page) in enumerate(Pages)
-        out ="begin{table}[htb]\n
+        out ="\\begin{table}[htb]\n
         \\centering"
         for table in page
             out *= GenerateSubtableWrapper(table; Caption="\\textbf{$(Names[cnt]):}")
