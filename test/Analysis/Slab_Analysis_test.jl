@@ -79,7 +79,7 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
         Sim.SlabHistogramSeries[-10:10, step,1] .= values[step]
     end
 
-    ρ_dense, ρ_dilute, ind_dense, ind_dilute = HPSAnalysis.computeSlabDensities(Sim)
+    ρ_dense, ρ_dilute, ind_dense, ind_dilute = HPSAnalysis.computeSlabDensities(Sim; Windowlength=50, DiluteWidth=50)
 
     @test all(ρ_dense .≈ values)
     @test all(ρ_dilute .≈ 0.05)
@@ -90,14 +90,15 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
 
     ### vary the definitions of the surfaces
     for (MaxVal, Surface_fac) in zip([0.9, 0.8], [0.75, 0.5]) ### surface_fac relatively conservative here, such that analytical approximations in test case are valid;
-        width = 35.0.*(1.0.+collect(axes(Sim.SlabHistogramSeries,2))./100)*Surface_fac
-
+        
+        ### varying width feature was removed
+        width = 35.0 #.*(1.0.+collect(axes(Sim.SlabHistogramSeries,2))./100)*Surface_fac
         for (i,step) in enumerate(axes(Sim.SlabHistogramSeries,2))
-            bla = sigmoid_profile.(xaxis, width[i]).*values[step].+0.05
+            bla = sigmoid_profile.(xaxis, width).*values[step].+0.05
             Sim.SlabHistogramSeries[:, step,1] = bla
         end
         safety_ =25
-        ρ_dense, ρ_dilute, ind_dense, ind_dilute = HPSAnalysis.computeSlabDensities(Sim;Width=5,MaxVal=MaxVal, Surface_fac=Surface_fac, safety=safety_)
+        ρ_dense, ρ_dilute, ind_dense, ind_dilute = HPSAnalysis.computeSlabDensities(Sim;DenseWidth=5,MaxVal=MaxVal, Surface_fac=Surface_fac, safety=safety_, Windowlength=50, DiluteWidth=50)
 
         @test all(ρ_dense .≈ (values.+0.05))
         @test all(ρ_dilute.≈ 0.05)
@@ -108,9 +109,9 @@ sigmoid_profile(x, w) = sigmoid(x+w)-sigmoid(x-w)
 
         ### internal index starts at 1 compared to offset array used here.
         diff = (1-Surface_fac) .*(index_dense.-1)
-        index_dense = round.(Int32, (index_dense.-1).*Surface_fac).+1 
+        index_dense = round.(Int32, (index_dense.-1).*Surface_fac)
 
-        index_dilute = -width .- log.(values./((1.0.-MaxVal).*(ρ_dense.-0.05)).-1) 
+        index_dilute = -width .- log.(values./((1.0.-MaxVal).*(ρ_dense.-0.05))).-1
         index_dilute = floor.(Int32, floor.(Int32, index_dilute) ) #-abs.(diff))
 
         index_dense .= minimum(abs.(index_dense))

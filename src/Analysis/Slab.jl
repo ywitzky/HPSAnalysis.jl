@@ -208,13 +208,13 @@ function computeDensityHistogram(Sim::HPSAnalysis.SimData{R,I}, DivLength=I(10))
     Sim.DensityHist ./= length(Sim.EquilibrationTime:Sim.RGMeasureStep:Sim.NSteps)*prod(dims)
 end
 
-function computeSlabDensities_Help!(SlabHistogramSeries::OffsetArrays.OffsetArray{R, 3, Array{R, 3}}, density::Array{R},step::I) where {R<:Real, I<:Int}
+function computeSlabDensities_Help!(SlabHistogramSeries::OffsetArrays.OffsetArray{R, 1, Array{R, 1}}, density::Array{R}) where {R<:Real}
     fill!(density,zero(R))
     N = extrema(axes(SlabHistogramSeries,1))[2]-1
 
     for i in 0:N 
-        density[i+1] += SlabHistogramSeries[i, step,1]
-        density[i+1] += SlabHistogramSeries[-i, step,1]
+        density[i+1] += SlabHistogramSeries[i]
+        density[i+1] += SlabHistogramSeries[-i]
     end
     density ./= 2.0
     return density
@@ -223,13 +223,13 @@ end
 
 
 @doc raw"""
-    computeSlabHistogram(Sim::SimData; Width=25, MaxVal=0.9, Surface_fac=0.8)
+    computeSlabHistogram(Sim::SimData; Windowlength=200, DenseWidth=25, DiluteWidth=500, MaxVal=0.9, Surface_fac=0.8, safety=75)
 
 Computes average density within dense phase and dilute phase as well as the indices below/above which Sim.SlabHistogramSeries is in dense/dilute phase.
 
 A mirror symmetric density around zero is computed from which dense phase approximation ρ\_app is defined as the mean value of the first **Width** steps. The dense phase boundary is **Surface_fac** times the distance **r_dense** at which the density drops below **MaxVal** times ρ\_app. Similarly the dilute phase boundary is the distance at which the density drops below **1-MaxVal** times ρ\_app plus **r_dense** times (1-**Surface_fac**).
 """
-function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.9, Surface_fac=0.8, safety=75.0, global_inds=(nothing, nothing))  where {R<:Real, I<:Integer}
+function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Windowlength=200, DenseWidth=25, DiluteWidth=500, MaxVal=0.9, Surface_fac=0.8, safety=75)  where {R<:Real, I<:Integer}
 
     safety_ = ceil(Int32, safety/Sim.Resolution)
 
@@ -240,47 +240,30 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Width=25, MaxVal=0.
 
     ρ_dense  = zeros(R,NSteps)
     ρ_dilute = zeros(R, NSteps)
-    ind_dense  = zeros(I, NSteps)
-    ind_dilute = zeros(I, NSteps)
 
-    #if all(isnothing.(global_inds)) ### default automatic setting of dense/dilute phases
-        for step in axes(Sim.SlabHistogramSeries,2)
-            computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
+    ### newer iterations dont measure at every frame. Detect which frames actually contain data
+    NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
+    xaxis = axes(Sim.SlabHistogramSeries)[1]
+    AvgHist = (sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements))[:,1,1]
+    
+    computeSlabDensities_Help!(AvgHist, density)
 
-            avg = mean(density[1:Width])
+    ### take average at interval that is  certainly the center
+    avg_dense = mean(density[1:DenseWidth])
 
-            tmp = findlast(density.>avg*MaxVal)
-            diff = tmp *(1-Surface_fac)
-            ind_dense[step] = round(I, tmp*Surface_fac)
-            ρ_dense[step] = mean(density[1:ind_dense[step]]) ### will be overwritten later
+    tmp = findlast(density.>avg_dense*MaxVal)
+    ind_dense = round(I, tmp*Surface_fac)
+    ρ_dense_tmp = mean(density[1:ind_dense]) 
 
-            N_dilute = 2*ind_dense[step]*1/Surface_fac< N ? 2*ind_dense[step]*1/Surface_fac :  N-Width
-            N_dilute =  ceil(I, N_dilute)
-            avg = mean(density[N_dilute:end])
-
-            ind_dilute[step] = ceil(I,findfirst(density.-avg .<(1.0-MaxVal)*(ρ_dense[step]-avg)))
-        end
-
-        
-        global_ind_dilute = isnothing(global_inds[1]) ? min(maximum(ind_dilute)+safety_, N) : global_inds[1]
-        global_ind_dense  = isnothing(global_inds[2]) ? minimum(ind_dense) : global_inds[2]
-        
-    #else  ### manually set phase borders
-    #    global_ind_dilute = global_inds[1]
-    #    global_ind_dense  = global_inds[2]
-    #end
+    avg_dilute = mean(density[NSteps-DiluteWidth:end])
+    ind_dilute = ceil(I,findfirst(density.-avg_dilute .<(1.0-MaxVal)*(ρ_dense_tmp-avg_dilute)))+safety
 
     for step in axes(Sim.SlabHistogramSeries,2)
-        computeSlabDensities_Help!(Sim.SlabHistogramSeries, density, step)
-        ρ_dense[step] = mean(density[1:global_ind_dense]) 
-        ρ_dilute[step] = mean(density[global_ind_dilute:end])
+        d = @view Sim.SlabHistogramSeries[:, step, 1]
 
-        ### ### convert to indexing starting at 0 for usage in offset array of SlabHistogramSeries
-        #ind_dense[step] -= 1
-        #ind_dilute[step] -= 1 
-
-        ind_dense[step]  = global_ind_dense - 1
-        ind_dilute[step] = global_ind_dilute - 1 
+        computeSlabDensities_Help!(Sim.SlabHistogramSeries[:, step, 1], density)
+        ρ_dense[step] = mean(density[1:ind_dense]) 
+        ρ_dilute[step] = mean(density[ind_dilute:end])
     end
 
     return ρ_dense, ρ_dilute, ind_dense, ind_dilute
@@ -410,7 +393,7 @@ A tuple `(γ, Δγ)` where
 function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},start::I;filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer}
     longfilename = Sim.BasePath*filename 
 
-    file = h5open(longfilename) #isfile(longfilename) ? h5open(longfilename) : @error "$longfilename does not exist when using computeSurfaceTension(...). "
+    file = h5open(longfilename) 
     pressure_tensor = file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"]
     timestep = file["hoomd-data/Simulation/timestep"]
 
