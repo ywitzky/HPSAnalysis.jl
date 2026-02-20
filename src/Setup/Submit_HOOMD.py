@@ -55,6 +55,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
 
     if prerun:
         Params["NSteps"] = resizeSteps+8000
+        Params["Create_Start_Config"] = False
 
     if Restart:
         TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
@@ -65,7 +66,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
 
         Params["NSteps"] = Params["NSteps"]-NStepsOld if ExtendedSteps==0 else ExtendedSteps-NStepsOld ### Either extend to meet initial goal or extend simulations.
-        Params["NSteps"] = Params["NSteps"] if Params["NSteps"]>0 else 0
+        #Params["NSteps"] = Params["NSteps"] if Params["NSteps"]>0 else 0
 
         print(f"NSteps {Params['NSteps']}")
         #Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
@@ -254,7 +255,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         state_box = [Params["Lx"], Ly_start , Params["Lz"], 0, 0, 0]
         goalbox = [Params["Lx"], L , Params["Lz"], 0, 0, 0]
 
-        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+resizeSteps))
+        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=10000, t_ramp=10000+resizeSteps))
         sim.operations.updaters.append(box_resize)
 
 
@@ -329,7 +330,5 @@ if __name__ == '__main__':
     if len(sys.argv)<2:
         print("Need folder of input parameters as second argument.")
     else:
-        print(sys.argv[1])#, sys.argv[2])
-        run(sys.argv[1])#, int(sys.argv[2]))
-
- 
+        print(sys.argv[1],bool(sys.argv[2]), int(sys.argv[3]))
+        run(  sys.argv[1],bool(sys.argv[2]), int(sys.argv[3]))
