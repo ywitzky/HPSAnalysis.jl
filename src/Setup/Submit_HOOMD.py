@@ -151,8 +151,8 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
         cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'] )
     else:
-        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond'])
-        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )
+        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond','body'])
+        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond','body'])
 
 
     if Params["UseCharge"]:
@@ -262,10 +262,10 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     integrator.methods = [nvt]
     integrator.dt = Params["dt"]
 
-
+    ### apply increased friction to thermalized quicker in preruns as in HPS model
     for i in IDToResName.keys():
         name = IDToResName[i]
-        nvt.gamma[name] = IDToMass[i]*10.0**-5
+        nvt.gamma[name] = IDToMass[i]*10.0**-3
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
         
     sim.operations.integrator=integrator
@@ -277,14 +277,27 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     sim.operations.writers.append(hdf5_writer)
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
-    if not Restart:
-        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
+    if prerun:
+        for fac in [50.0, 10.0,5.0,2.0, 1.5, 1.0]:
             for i in range(10):
                 integrator.dt = Params["dt"]/fac
                 sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+    else:
+        if not Restart:
+            ### apply higher friction to thermalize quicker during the 0.1 mu s
+            ### the excess potential energy created by unraveling the 
+            ### proteins that cross the pbc from the prerun
+            integrator.dt = Params["dt"]
+            
+            sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+            sim.run(10_000_000)
 
+    ### apply friction as in HPS model
+    for i in IDToResName.keys():
+        name = IDToResName[i]
+        nvt.gamma[name] = IDToMass[i]*10.0**-5
+        nvt.gamma_r[name] = (0.0, 0.0, 0.0)
 
     ### optimise cell list buffer
     now = sim.timestep
