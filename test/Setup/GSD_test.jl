@@ -37,6 +37,7 @@ using GSDFormat
     snapshot.particles.mass = mass_charge
     snapshot.particles.charge = mass_charge
     snapshot.particles.diameter = [0.1, 0.3, 0.2, 0.1]
+    snapshot.particles.body = [-2,-2,-1,-1]
 
     snapshot.bonds.N=N-1
     snapshot.bonds.types = ["O-O"]
@@ -50,7 +51,7 @@ using GSDFormat
     GSDFormat.append(file, snapshot)
     GSDFormat.close(file)
 
-    HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,BoxSize,coor_notreshaped,AAToID,sequences,image_notreshaped,mass_charge,mass_charge,DiMap,DiList,AAToID,false, "test", [],[])
+    HPSAnalysis.Setup.writeGSDStartFile(filename,N,N-1,N-2,N-3,BoxSize,coor_notreshaped,AAToID,sequences,image_notreshaped,mass_charge,mass_charge,DiMap,DiList,AAToID,false, "test", [],[1:2])
 
     @test files_are_equal(filename_test,filename)
 end

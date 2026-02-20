@@ -201,5 +201,14 @@ function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,O
         WriteENM_HOOMD_Indices("$(BasePath)/HOOMD_Setup/ENM_indices.txt", ENM)
         InputMasses = [OneToMass[res] for res in join(Sequences)]
         InputCharges = [OneToCharge[res] for res in join(Sequences)]
-        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, domain, ENM)    
+
+        offset = 0
+        DomainRanges = []
+        @warn "Need to update Domain definitions for groups incase different proteins are simulated."
+        for Seq in Sequences
+            append!(DomainRanges, [(start+offset):(stop+offset) for (start, stop) in deepcopy(domain)])
+            offset += length(Seq)
+        end 
+
+        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, DomainRanges)    
 end

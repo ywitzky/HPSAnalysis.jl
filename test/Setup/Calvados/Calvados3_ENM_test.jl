@@ -267,4 +267,18 @@ types  = getindex.(data,2)
 @test [val != "O-O" ? parse(Int32,split(val,"_")[2]) : 0 for val in types] == ids ### test if id matches the one in type name
 @test ["$(Comb_harmonic[v])" for v in types] == ["$n, $m" for (n,m) in zip(getindex.(data, 6), getindex.(data, 7))]
 
+testpos = [ [1 0 0;], [0 2 0;], [0 0 3], [1 2 3;]]
+
+### rotate 90 degrees around x, rotate 180 around x and 270 around y
+RotMats= [ [1 0 0; 0 0 1; 0 -1 0],  [0 0 -1; 0 -1 0; -1 0 0]]
+
+solution = [[1 0 0;], [0 0 -1;], [0 0 2;], [0 -2 0;], [0 -3 0;], [-3 0 0;], [1 -3 2;], [-3 -2 -1]]
+
+test = [pos*mat for pos in testpos for mat in RotMats[1:1]]
+test_vals= [HPSAnalysis.Setup.rotate_randomly(pos, RotMats[1:1]) for pos in testpos]
+@test all(test_vals.≈solution[1:2:end])
+
+test = [pos*mat for pos in testpos for mat in RotMats[2:2]]
+test_vals= [HPSAnalysis.Setup.rotate_randomly(pos, RotMats[2:2]) for pos in testpos]
+@test all(test_vals.≈solution[2:2:end])
 end

@@ -4,7 +4,7 @@ module Setup
 
 export createDenseStartingPosition, writeCollectedSlurmScript
 
-using GSDFormat, HPSAnalysis, JSON, Printf, Mmap
+using GSDFormat, HPSAnalysis, JSON, Printf, Mmap, LinearAlgebra, Random
 
 include("../data/BioData.jl")
 include("Setup/HOOMD_Setup.jl")
@@ -273,13 +273,13 @@ A GSD data file is written, that include the parameters for the Simulation witch
 - `AaToSigma::Dict{Char, <:Real}`: A dictionary mapping amino acid types to their Lennard-Jones σ-parameter (used in force field calculations).
 - `UseAngles::Bool`: If `true`, angle and dihedral interactions are included in the GSD file.
 - `SimulationType::String`: Type of simulation.
-- `Domains::List(Int)`: Domains in which the ENM is active.
 - `ENM::Tuple`: Data that are nessesary for ENM (bond name, id, group).
+- `DomainRanges`::Vector{UnitRange}: Range of ENMs
 
 **Creates**:
 * Writes the GSD data files.
 """
-function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool, SimulationType::String, Domains, ENM) where {I<:Integer, R<:Real, I2<:Integer}
+function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool, SimulationType::String,  ENM, DomainRanges) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSDFormat.Frame()    
     snapshot.configuration.step = 1 
@@ -296,6 +296,13 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     snapshot.particles.mass = InputMasses
     snapshot.particles.charge = InputCharges
     snapshot.particles.diameter =  [Float32(AaToSigma[AA])/10.0  for AA in join(Sequences)]
+
+    ### use unofficial feature "floppy boddies" to group enms and turn off their interactions
+    groups = fill(-1, NAtoms)
+    for (i, range) in enumerate(DomainRanges)
+        groups[range] .= -i-1
+    end
+    snapshot.particles.body = groups
 
     ### Bond_data.group = (self.N, getM(data)
     B_N, B_types, B_typeid, B_group_matrix = NBonds, ["O-O"], zeros(Int32, NBonds), getBonds(Sequences, M=2)
@@ -331,6 +338,29 @@ function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, N
     file = GSDFormat.open(FileName, 'w')
     GSDFormat.append(file, snapshot)
     GSDFormat.close(file)
+end
+
+"""
+    rotate_randomly(pos:, ROTATION_MATRICES_90, rng)
+
+The function picks a random 90°‑multiple rotation from the 24 predefined rotationmatrices,
+returns the according rotated positions of the (N,3) input position 
+
+**Arguments**
+- `pos::Matrix{R}`: Positions to be rotated.
+- `ROTATION_MATRICES_90::Vector{Matrix{R}}`: Predefined vector of 3x3 rotation matrices.
+- `rng::AbstractRNG=Random.GLOBAL_RNG`: Random number generator.
+
+**Returns**
+- Rotated positions.
+"""
+@inline function rotate_randomly(pos::Matrix{R}, ROTATION_MATRICES_90::Vector{Matrix{R}},
+                         rng::AbstractRNG=Random.GLOBAL_RNG) where {R<:Real}
+    # Pick a random rotation matrix (stored as Int8)
+    RotMat = rand(rng, ROTATION_MATRICES_90)   # 3×3
+
+    # Pick a random rotation matrix (stored as Int8)
+    return copy(pos) * RotMat
 end
 
 @doc raw"""
@@ -437,6 +467,10 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
     InitFiles= "$(Data.BasePath)/InitFiles/"
     mkpath(InitFiles)
 
+    ### all possible rotation matrixes by 90 degrees
+    ROTATION_MATRICES_90 = Vector{Matrix{R}}([[-1 0 0; 0 -1 0; 0 0 1], [-1 0 0; 0 1 0; 0 0 -1], [1 0 0; 0 -1 0; 0 0 -1], [1 0 0; 0 1 0; 0 0 1], [-1 0 0; 0 0 -1; 0 -1 0], [-1 0 0; 0 0 1; 0 1 0], [1 0 0; 0 0 -1; 0 1 0], [1 0 0; 0 0 1; 0 -1 0], [0 -1 0; -1 0 0; 0 0 -1], [0 -1 0; 1 0 0; 0 0 1], [0 1 0; -1 0 0; 0 0 1], [0 1 0; 1 0 0; 0 0 -1], [0 -1 0; 0 0 -1; 1 0 0], [0 -1 0; 0 0 1; -1 0 0], [0 1 0; 0 0 -1; -1 0 0], [0 1 0; 0 0 1; 1 0 0], [0 0 -1; -1 0 0; 0 1 0], [0 0 -1; 1 0 0; 0 -1 0], [0 0 1; -1 0 0; 0 -1 0], [0 0 1; 1 0 0; 0 1 0], [0 0 -1; 0 -1 0; -1 0 0], [0 0 -1; 0 1 0; 1 0 0], [0 0 1; 0 -1 0; 1 0 0], [0 0 1; 0 1 0; -1 0 0]])
+    rng = MersenneTwister()
+
     if SimulationType=="Calvados3"
         if Regenerate
             if Axis != "y"
@@ -449,12 +483,12 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             PositionDict, LengthDict = HPSAnalysis.AlphaFold_startpos(ProteinToCif, Proteins, Sequences) 
             min_vals, max_vals = HPSAnalysis.getLargestBoundingbox(PositionDict)
 
-            max_length = max_vals .- min_vals
+            max_length = maximum(max_vals .- min_vals .+ 20.0) ### add 20 Angstrom padding for excluded volume
             max_N = div.(Data.BoxLength, max_length)
 
             count = 0
             NLayers = div(Data.NChains, max_N[3]*max_N[1])+1
-            yoffset = ( (NLayers-1)*max_length[2])/2.0 
+            yoffset = ( (NLayers-1)*max_length)/2.0 
             old = 1
             for iy in 0:max_N[2]-1 ### Y is the typicall slab axis
                 for iz in 0:max_N[3]-1
@@ -466,11 +500,13 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
                         pos = PositionDict[Proteins[count]]
                         proteinlength = LengthDict[Proteins[count]]
 
-                        offset = [(ix+0.5)*max_length[1], (iy+0.5)*max_length[2]-yoffset, (iz+0.5)*max_length[3]]
+                        offset = [(ix+0.5)*max_length, (iy+0.5)*max_length-yoffset, (iz+0.5)*max_length] .+10.0
 
-                        Data.x[old:old+proteinlength-1, 1] = pos[:, 1] .+ offset[1]
-                        Data.y[old:old+proteinlength-1, 1] = pos[:, 2] .+ offset[2] 
-                        Data.z[old:old+proteinlength-1, 1] = pos[:, 3] .+ offset[3]
+                        tmp_pos = rotate_randomly(pos, ROTATION_MATRICES_90, rng)
+
+                        Data.x[old:old+proteinlength-1, 1] = tmp_pos[:, 1] .+ offset[1]
+                        Data.y[old:old+proteinlength-1, 1] = tmp_pos[:, 2] .+ offset[2] 
+                        Data.z[old:old+proteinlength-1, 1] = tmp_pos[:, 3] .+ offset[3]
                         old += proteinlength
                     end
                 end

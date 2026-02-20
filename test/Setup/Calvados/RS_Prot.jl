@@ -105,12 +105,12 @@ for (protID, protein) in enumerate(ToCreate)
 
         SimulName = "$(protein)_$temp"
 
-        (_, Data) = HPSAnalysis.Setup.CreateStartConfiguration(SimulName,Path , Float32.([BoxLS,BoxLS , BoxLS]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains,ProteinToCif=ProteinToCif)
+        (_, Data) = HPSAnalysis.Setup.CreateStartConfiguration(SimulName,Path , Float32.([BoxLS,BoxLS , BoxLS]), Proteins, Sequences, Regenerate=true; Axis="y", SimulationType="Calvados3",ProteinToDomain=FoldedDomains[protein],ProteinToCif=ProteinToCif)
 
         pos = readPositionFromCif(ProteinToCif["RS31"])
         local ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
-        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 1, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains,Device="CPU",WriteOutFreq=100, ENM)
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 1, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains[protein],Device="CPU",WriteOutFreq=100, ENM)
 
         ### test if it crashes
         if PythonTests
