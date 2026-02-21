@@ -97,18 +97,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
             B_typeid = np.zeros(B_N, dtype=np.int32)
             B_group = InputBonds#.astype(np.uint32)
 
-            if Params["SimulationType"]=="Calvados3":
-                ### Harmonic bonds
-                harmonic = hoomd.md.bond.Harmonic()
-
-                ## read the ENM_indice and backbone data
-                B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
-                
-                for typ in B_types: 
-                    harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"])
-
-                forces.append(harmonic)
-
 
             snapshot.bonds.N = B_N
             snapshot.bonds.types = list(B_types)
@@ -146,6 +134,17 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         ### Harmonic bonds
         harmonic = hoomd.md.bond.Harmonic()
         harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
+        forces.append(harmonic)
+    if Params["SimulationType"]=="Calvados3":
+        ### Harmonic bonds
+        harmonic = hoomd.md.bond.Harmonic()
+
+        ## read the ENM_indice and backbone data
+        B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
+        
+        for typ in B_types: 
+            harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"])
+
         forces.append(harmonic)
 
     if Params["UseAngles"]:
@@ -207,7 +206,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     write_mode  ='wb'
     if prerun:
         filename = FolderPath+"/prerun_"+Params["Trajectory"]
-        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
+        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(int(Params["NOut"])), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
         gsd_writer.log = logger
 
         #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
@@ -224,7 +223,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
         table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
         sim.operations.writers.append(table)
-        
 
     hdf5_writer=[]
     if True:
@@ -251,11 +249,11 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         # dalton /((dalton / nm^3) * nm^2) = nm 
         L = TotalMass / (A*rho) # nm
 
-        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])*1.3
+        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])*1.
         state_box = [Params["Lx"], Ly_start , Params["Lz"], 0, 0, 0]
         goalbox = [Params["Lx"], L , Params["Lz"], 0, 0, 0]
 
-        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=10000, t_ramp=10000+resizeSteps))
+        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=resizeSteps))
         sim.operations.updaters.append(box_resize)
 
 
@@ -281,6 +279,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     if prerun:
         for fac in [50.0, 10.0,5.0,2.0, 1.5, 1.0]:
             for i in range(10):
+                print(f"fac {fac} i {i}")
                 integrator.dt = Params["dt"]/fac
                 sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
