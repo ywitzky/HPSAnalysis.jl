@@ -15,14 +15,14 @@ Sim.ChainMasses = [10.0,10.0,10.0,10.0,10.0]
 Sim.x_uw = rand(Sim.NAtoms, Sim.NSteps)*1.4.-0.7
 Sim.y_uw = rand(Sim.NAtoms, Sim.NSteps)*1.2.-0.6
 Sim.z_uw = rand(Sim.NAtoms, Sim.NSteps).-0.5
-Sim.BoxSize = transpose([-0.7; 0.7;; -0.6; 0.6;; -0.5; 0.5])
+Sim.BoxSize = transpose([-0.7; 0.7;; -0.6; 0.6;; -0.5; 0.5]) 
 
 
 Sim.x = Sim.x_uw
 Sim.y = Sim.y_uw
 Sim.z = Sim.z_uw
 
-Sim.BoxLength = [1.4,1.2,1.0] #.*10.0
+Sim.BoxLength = [1.4,1.2,1.0]
 
 
 HPSAnalysis.computeCOM!(Sim)
@@ -83,6 +83,32 @@ end
 
 error = sqrt.(error)./sqrt(5)
 @test all(error .≈ fast_error)
+
+### check if positions which are exactly at the BoxLength and are therefore not wrapped
+### get a hash which is still "inside" the box
+CL_sizes = extrema.(axes(Sim.CellList))### get the first hashes outside the box
+Sim.x_uw[1,1]=Sim.BoxSize[1,1]
+Sim.x_uw[2,2]=Sim.BoxSize[1,2]
+Sim.y_uw[3,3]=Sim.BoxSize[2,1]
+Sim.y_uw[4,4]=Sim.BoxSize[2,2]
+Sim.x_uw[5,5]=Sim.BoxSize[3,1]
+Sim.x_uw[6,6]=Sim.BoxSize[3,2]
+
+res = []
+for step in 1:6
+    Sim.CellStep[1] = step
+    tuples = HPSAnalysis.getUniqueCellsOfChain(Sim, 1)
+    x_ex =  extrema(getindex.(tuples, 1))
+    y_ex =  extrema(getindex.(tuples, 2))
+    z_ex =  extrema(getindex.(tuples, 3))
+
+    ### true if any of hashes is "outside" the box
+    val= any(map(x->x∈CL_sizes[1],x_ex)) || any(map(x->x∈CL_sizes[2],y_ex)) || any(map(x->x∈CL_sizes[3],z_ex))
+    push!(res, val)
+end
+
+@test all( .!(res)) ### 
+### get getUniqueCellsOfChain test with x=BoxLength
 
 
 

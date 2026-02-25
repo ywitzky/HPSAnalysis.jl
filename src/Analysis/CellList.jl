@@ -1,3 +1,5 @@
+const SCALE_FACTOR=1+10^-6
+
 function initCellLists(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.CellStep = zeros(I, 1)
     Sim.CellDimensions= zeros(3,2)
@@ -7,13 +9,13 @@ function initCellLists(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer
             end
             ### increase CellResolution slightly such that boxes always end at multiple of box size
             n = floor(I, Sim.BoxSize[i,2]/Sim.CellResolution[i])
-            Sim.CellResolution[i] =  Sim.BoxSize[i,2]/n
+            Sim.CellResolution[i] =  Sim.BoxSize[i,2]*SCALE_FACTOR/n ### increase ever so slightly such that hash(BoxSize) lands in the correct cell.
             Sim.CellDimensions[i,1] = -n+1 ### hash function is assymetric
             Sim.CellDimensions[i,2] = n
     end
 
     CellVolume=prod(Sim.CellResolution)
-    Sim.MaxParticlesPerCell= Int32(ceil(CellVolume/(4/3*pi*(4.5/2.)^3) )+1)# volume of the smallest residues
+    Sim.MaxParticlesPerCell= I(ceil(CellVolume/(4/3*pi*(4.5/2.)^3) )+1)# volume of the smallest residues
 
     xrange = (Sim.CellDimensions[1,1]-1):(Sim.CellDimensions[1,2]+1) 
     yrange = (Sim.CellDimensions[2,1]-1):(Sim.CellDimensions[2,2]+1)
@@ -22,10 +24,10 @@ function initCellLists(Sim::HPSAnalysis.SimData{R,I}) where {R<:Real, I<:Integer
     ydim = length(yrange)
     zdim = length(zrange)
 
-    Sim.CellList         = OffsetArray(Array{Vector{eltype(Sim.NSteps)}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
-    Sim.PositiveCellList = OffsetArray(Array{Vector{eltype(Sim.NSteps)}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
-    Sim.NegativeCellList = OffsetArray(Array{Vector{eltype(Sim.NSteps)}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
-    Sim.ChainNumCellList = OffsetArray(Array{Vector{eltype(Sim.NSteps)}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
+    Sim.CellList         = OffsetArray(Array{Vector{I}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
+    Sim.PositiveCellList = OffsetArray(Array{Vector{I}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
+    Sim.NegativeCellList = OffsetArray(Array{Vector{I}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
+    Sim.ChainNumCellList = OffsetArray(Array{Vector{I}}(undef, xdim, ydim, zdim), xrange , yrange, zrange)
 
     resetCellLists(Sim)
 end
@@ -44,7 +46,7 @@ function resetCellLists(Sim::SimData{T,I}) where {T<:Real, I<:Integer}
 end
 
 function destroyCellLists(Sim::SimData{T,I}) where {T<:Real, I<:Integer}
-    Sim.CellList        = zeros(0)
+    Sim.CellList         = zeros(0)
     Sim.PositiveCellList = zeros(0)
     Sim.NegativeCellList = zeros(0)
     Sim.ChainNumCellList = zeros(0)
@@ -193,12 +195,12 @@ function computeCellLists(Sim::SimData{T,I}; ComputeCharges=true::Bool, ComputeC
 end
 
 function computeCellMaxima(Sim::SimData{T,I}) where {T<:Real, I<:Integer}
-    x_low  = ceil(I,Sim.BoxSize[1,1]/Sim.CellResolution[1])+1
-    x_high = ceil(I,Sim.BoxSize[1,2]/Sim.CellResolution[1]) 
-    y_low  = ceil(I,Sim.BoxSize[2,1]/Sim.CellResolution[2])+1
-    y_high = ceil(I,Sim.BoxSize[2,2]/Sim.CellResolution[2]) 
-    z_low  = ceil(I,Sim.BoxSize[3,1]/Sim.CellResolution[3])+1
-    z_high = ceil(I,Sim.BoxSize[3,2]/Sim.CellResolution[3]) 
+    x_low  = ceil(I,Sim.BoxSize[1,1]/Sim.CellResolution[1])#+1
+    x_high = ceil(I,Sim.BoxSize[1,2]/Sim.CellResolution[1])
+    y_low  = ceil(I,Sim.BoxSize[2,1]/Sim.CellResolution[2])#+1
+    y_high = ceil(I,Sim.BoxSize[2,2]/Sim.CellResolution[2])
+    z_low  = ceil(I,Sim.BoxSize[3,1]/Sim.CellResolution[3])#+1
+    z_high = ceil(I,Sim.BoxSize[3,2]/Sim.CellResolution[3])
 
     return x_low, x_high, y_low, y_high, z_low, z_high
 end
@@ -297,6 +299,7 @@ function getUniqueCellsOfChain(Sim::SimData{T,I}, Chain::I2)where {T<:Real, I<:I
     start = Sim.ChainStart[Chain]
     stop  = Sim.ChainStop[Chain]
     step = Sim.CellStep[1]
+    ### results in out of bounds if  Sim.x[i,s]==Sim.BoxLength[..]
     @views xind_arr = ceil.(I,Sim.x[start:stop,step]/Sim.CellResolution[1])
     @views yind_arr = ceil.(I,Sim.y[start:stop,step]/Sim.CellResolution[2])
     @views zind_arr = ceil.(I,Sim.z[start:stop,step]/Sim.CellResolution[3])
