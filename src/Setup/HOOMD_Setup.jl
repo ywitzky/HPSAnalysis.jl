@@ -86,6 +86,14 @@ function WriteDihedrals(filename, dihedral_map, dihedral_eps)
     close(io)
 end
 
+function WriteGroups(filename, groups)
+    io = open(filename, "w");
+    for val in groups
+        write(io, "$(val)\n")
+    end
+    close(io)
+end
+
 @doc raw"""
     WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed; Minimise=true, TrajectoryName="traj.gsd", UseAngles=true, UseCharge=true, Alt_GSD_Start="-", Create_Start_Config=false, ϵ_r=1.73136, κ=1.0, Device="GPU", yk_cut=4.0, ah_cut=2.0, ionic=0.1, pH=7.0, SimType="Calvados2",domain=Array([[0,0]]))
 
@@ -208,7 +216,13 @@ function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,O
         for Seq in Sequences
             append!(DomainRanges, [(start+offset):(stop+offset) for (start, stop) in deepcopy(domain)])
             offset += length(Seq)
+        end
+        ### use unofficial feature "floppy boddies" to group ENMs and turn off their interactions
+        groups = fill(-1, NAtoms)
+        for (i, range) in enumerate(DomainRanges)
+            groups[range] .= -i-1
         end 
+        WriteGroups("$(BasePath)/HOOMD_Setup/Groups.txt" ,groups)
 
-        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, DomainRanges)    
+        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, groups)    
 end

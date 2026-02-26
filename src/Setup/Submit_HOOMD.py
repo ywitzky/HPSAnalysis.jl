@@ -92,6 +92,9 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
 
+            ### use undocumented feature to use "floppy bodies"
+            snapshot.particles.body = np.genfromtxt(f"{FolderPath}/HOOMD_Setup/Groups.txt") 
+
             B_N = NBeads-NChains
             B_types = ['O-O']
             B_typeid = np.zeros(B_N, dtype=np.int32)
