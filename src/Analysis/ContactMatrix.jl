@@ -93,6 +93,14 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
     ContactMatrices = [Matrix(zeros(R, Sim.ChainLength[1], Sim.ChainLength[1])) for _ in 1:NSubMatrices]
     UsedChains = zeros(NSubMatrices)
 
+    chain_of_atom = zeros(I, Sim.NAtoms)
+    for C in 1:Sim.NChains
+        for atom in Sim.ChainStart[C]:Sim.ChainStop[C]
+            chain_of_atom[atom] = C
+        end
+    end
+
+
     ### allocate square cutoffs, indexed by id 
     cutoffs = [CutoffDict[id]*rel_cutoff for id in sort(collect(keys(CutoffDict)))]
 
@@ -106,18 +114,29 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
     ChainAtomsNeighbour = zeros(I, 27*Sim.MaxParticlesPerCell)
     ChainsNeighbour     = zeros(I, 27*Sim.MaxParticlesPerCell)
 
+    ChainAtomsInCenter  = zeros(I, 5*27*Sim.MaxParticlesPerCell)
+
     COM=zeros(R, 3)
     AxisCOM = computeCOMOfLargestCluster(Sim)
 
+    max_id = maximum(values(Sim.IDs))  # Assuming IDs are integers
+    cutoff_combinations = zeros(R, max_id, max_id)
+    for i in 1:max_id
+        for j in 1:max_id
+            cutoff_combinations[i,j] = ((cutoffs[i] + cutoffs[j])/2)^2
+        end
+    end
+
+    invBoxLength= R.(1.0./Sim.BoxLength)
     println("Range $(Sim.ClusterRange)")
     for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
         if step < Sim.EquilibrationTime || step %Sim.RGMeasureStep != 0
             continue 
         end ### ensures that there exist a clustering and while downsampling the evaluated frames
-        println("Step $k of $(length(Sim.ClusterRange))")
+        #println("Step $k of $(length(Sim.ClusterRange))")
 
         COM[Sim.SlabAxis] = AxisCOM[k]
-        chains = isnothing(bounds) ? collect(1:Sim.NChains) : getChainsInBounds(Sim, bounds,COM, step, Sim.BoxLength, R.(1.0./Sim.BoxLength))
+        chains = isnothing(bounds) ? collect(1:Sim.NChains) : getChainsInBounds(Sim, bounds,COM, step, Sim.BoxLength, invBoxLength)
 
         #UsedChains += length(chains)
 
@@ -135,34 +154,60 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
 
             ### iterate over all cell lists where chain C is present
             for (xind, yind, zind) in getUniqueCellsOfChain(Sim, C)
-                ChainAtomsInCenter = [id for id in Sim.CellList[xind, yind, zind] if id>=start && id <= stop]
-                IMax = length(ChainAtomsInCenter)
+                IMax = 0
+                @inbounds for id in Sim.CellList[xind, yind, zind]
+                    if start <= id <= stop
+                        IMax += 1
+                        ChainAtomsInCenter[IMax] = id
+                        Sim.CenterBox[IMax,1] = Sim.x[id, step]
+                        Sim.CenterBox[IMax,2] = Sim.y[id, step]
+                        Sim.CenterBox[IMax,3] = Sim.z[id, step]
+                    end
+                end
+                #ChainAtomsInCenter = [id for id in Sim.CellList[xind, yind, zind] if id>=start && id <= stop]
+                #IMax = length(ChainAtomsInCenter)
                 if IMax ==0 continue end
                 ### get positions for center box
-                Sim.CenterBox[1:IMax,1] .= Sim.x[ChainAtomsInCenter, step]
-                Sim.CenterBox[1:IMax,2] .= Sim.y[ChainAtomsInCenter, step]
-                Sim.CenterBox[1:IMax,3] .= Sim.z[ChainAtomsInCenter, step]
+                #Sim.CenterBox[1:IMax,1] .= Sim.x[ChainAtomsInCenter[1:IMax], step]
+                #Sim.CenterBox[1:IMax,2] .= Sim.y[ChainAtomsInCenter[1:IMax], step]
+                #Sim.CenterBox[1:IMax,3] .= Sim.z[ChainAtomsInCenter[1:IMax], step]
+
 
                 ### have to compute all octants since we do not count all chains; aggregating all of them at once is quicker than individual computation -> SIMD 
-                JMax = 1
-                for xi in -1:1
-                    xi_res = xind+xi
+                JMax = 0
+                for zi in -1:1
+                    zi_res = zind+zi
                     for yi in -1:1
                         yi_res = yind+yi
-                        for zi in -1:1
-                            zi_res = zind+zi
+                        for xi in -1:1
+                            xi_res = xind+xi
                             ### filter all particles that dont belong to chain C
+                            #=
                             for (i,id) in enumerate(Sim.CellList[xi_res, yi_res, zi_res])
                                 if id<start || id > stop
                                     ChainAtomsNeighbour[JMax] = id 
-                                    ChainsNeighbour[JMax] = Sim.ChainNumCellList[xi_res, yi_res, zi_res][i]
+                                    ChainsNeighbour[JMax] = chain_of_atom[id]#Sim.ChainNumCellList[xi_res, yi_res, zi_res][i]
                                     JMax += 1
+                                end
+                            end
+                            =#
+                            cell   = Sim.CellList[xi_res, yi_res, zi_res]          # Vector{I}
+                            chainv = Sim.ChainNumCellList[xi_res, yi_res, zi_res] # Vector{I} (same length)
+
+                            # ---- fast loop over the cell (no enumerate, no bounds checks) -----
+                            @simd for i in eachindex(cell)
+                                id = cell[i]               # atom index
+                                # “id not belonging to the current chain”
+                                if id < start || id > stop
+                                    JMax += 1
+                                    ChainAtomsNeighbour[JMax] = id
+                                    #ChainsNeighbour[JMax]    = chainv[id]   # or Sim.chain_of_atom[id] if you stored it globally
+                                    
                                 end
                             end
                         end
                     end
                 end
-                JMax -= 1
                             
                 if JMax ==0 continue end
 
@@ -172,19 +217,26 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
                 Sim.NeighBox[1:JMax,3] .= Sim.z[ChainAtomsNeighbour[1:JMax], step]
 
                 ### compute distances in an optimized manor-> saved in Sim.CL_Dist[:,1]
-                computeDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax)
+                #CB_tmp = @views Sim.CenterBox[1:IMax,:]
+                #NB_tmp = @views Sim.NeighBox[1:JMax,:]
+                computeSqrDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax)
 
                 cnt = 1
                 for i in 1:IMax
                     atom_i = ChainAtomsInCenter[i]
                     rel_i = atom_i - start+1
                     cutoff_i = cutoffs[Sim.IDs[atom_i]]
+                    id_i = Sim.IDs[ChainAtomsInCenter[i]]
+
                     #res_i = Sim.IDs[atom_i]
                     for j in 1:JMax
                         atom_j = ChainAtomsNeighbour[j] ### here we take neighbour cell
+                        id_j = Sim.IDs[ChainAtomsNeighbour[j]]
+                        #cutoff_combinations[id_i,id_j]  #
+                        if Sim.CL_Dist[cnt,1]< cutoff_combinations[id_i,id_j]  #((cutoff_i+ cutoffs[Sim.IDs[atom_j]])/2.0)^2
+                            #rel_j = atom_j - Sim.ChainStart[ChainsNeighbour[j]] +1
+                            rel_j = atom_j - Sim.ChainStart[chain_of_atom[atom_j]] +1
 
-                        if Sim.CL_Dist[cnt,1]< (cutoff_i+ cutoffs[Sim.IDs[atom_j]])/2.0
-                            rel_j = atom_j - Sim.ChainStart[ChainsNeighbour[j]] +1
                             ContactMatrices[C_subMatId][rel_i, rel_j] += 1
                         end
                         cnt += 1
@@ -216,21 +268,38 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
 end
 
 
-function computeInterChainMatrixHelper(Sim::SimData{R,I}, xind::I2, yind::I2, zind::I2, border::Bool, cutoffs::Vector{R2}, ValidChain::Vector{Bool}, maxcutff::R2) where {R<:Real,R2<:Real, I<:Integer,I2<:Integer}
+function computeInterChainMatrixHelper(Sim::SimData{R,I}, xind::I2, yind::I2, zind::I2, border::Bool, cutoffs::Vector{R2}, SqrCutoffMatrix::Matrix{R}, ValidChain::Vector{Bool}, maxcutff::R2,chain_of_atom::Vector{I}, ChainAtomsInCenter::Vector{I},ChainsInCenter::Vector{I}, ChainAtomsNeighbour::Vector{I}) where {R<:Real,R2<:Real, I<:Integer,I2<:Integer}
 
-    ChainAtomsInCenter =  [id for (C,id) in zip(Sim.ChainNumCellList[xind, yind, zind], Sim.CellList[xind,yind,zind]) if ValidChain[C]]
-    ChainsInCenter     =  [C  for (C,id) in zip(Sim.ChainNumCellList[xind, yind, zind], Sim.CellList[xind,yind,zind]) if ValidChain[C]]
+    #ChainAtomsInCenter =  [id for (C,id) in zip(Sim.ChainNumCellList[xind, yind, zind], Sim.CellList[xind,yind,zind]) if ValidChain[C]]
+    #ChainsInCenter     =  [C  for (C,id) in zip(Sim.ChainNumCellList[xind, yind, zind], Sim.CellList[xind,yind,zind]) if ValidChain[C]]
+    step = Sim.CellStep[1]
 
-    IMax = length(ChainAtomsInCenter)
+
+    cell_chains = Sim.ChainNumCellList[xind, yind, zind]
+    cell_atoms  = Sim.CellList[xind,yind,zind]
+    IMax=0
+    @inbounds @simd for i in eachindex(cell_atoms)   # avoids bounds checks & enables SIMD
+        c = cell_chains[i]               # chain number of the i‑th atom in the cell
+        if ValidChain[c]                # branch is SIMD‑friendly (mask)
+            IMax += 1
+            id = cell_atoms[i]
+            ChainAtomsInCenter[IMax] = id    # atom id
+            ChainsInCenter[IMax] = c         # chain id (you could also use `Sim.chain_of_atom[atom]`)
+            Sim.CenterBox[IMax,1] = Sim.x[id, step]
+            Sim.CenterBox[IMax,2] = Sim.y[id, step]
+            Sim.CenterBox[IMax,3] = Sim.z[id, step]
+        end
+    end
+
+    #IMax = length(ChainAtomsInCenter)
     if IMax ==0
         return
     end
-    step = Sim.CellStep
 
     ### get positions for center box
-    Sim.CenterBox[1:IMax,1] .= Sim.x[ChainAtomsInCenter[1:IMax], Sim.CellStep[1]]
-    Sim.CenterBox[1:IMax,2] .= Sim.y[ChainAtomsInCenter[1:IMax], Sim.CellStep[1]]
-    Sim.CenterBox[1:IMax,3] .= Sim.z[ChainAtomsInCenter[1:IMax], Sim.CellStep[1]]
+    #Sim.CenterBox[1:IMax,1] .= Sim.x[ChainAtomsInCenter[1:IMax], Sim.CellStep[1]]
+    #Sim.CenterBox[1:IMax,2] .= Sim.y[ChainAtomsInCenter[1:IMax], Sim.CellStep[1]]
+    #Sim.CenterBox[1:IMax,3] .= Sim.z[ChainAtomsInCenter[1:IMax], Sim.CellStep[1]]
 
     JMax =0
     atom_i = 0
@@ -247,40 +316,59 @@ function computeInterChainMatrixHelper(Sim::SimData{R,I}, xind::I2, yind::I2, zi
                 zi_res = zind+zi
                 cnt = 1
 
-                ChainAtomsNeighbour = Sim.CellList[xi_res,yi_res,zi_res]  #[id for (i,(C,id)) in enumerate(zip(Sim.ChainNumCellList[xi_res, yi_res, zi_res], Sim.CellList[xi_res,yi_res,zi_res])) ]
-                JMax = length(ChainAtomsNeighbour)
+                #ChainAtomsNeighbour = Sim.CellList[xi_res,yi_res,zi_res]  #[id for (i,(C,id)) in enumerate(zip(Sim.ChainNumCellList[xi_res, yi_res, zi_res], Sim.CellList[xi_res,yi_res,zi_res])) ]
+                #JMax = length(ChainAtomsNeighbour)
 
-                if JMax == 0 continue end
+                #if JMax == 0 continue end
                 ### get positions for center box
-                Sim.NeighBox[1:JMax,1] .= Sim.x[ChainAtomsNeighbour, step]
-                Sim.NeighBox[1:JMax,2] .= Sim.y[ChainAtomsNeighbour, step]
-                Sim.NeighBox[1:JMax,3] .= Sim.z[ChainAtomsNeighbour, step]
+                #Sim.NeighBox[1:JMax,1] .= Sim.x[ChainAtomsNeighbour, step]
+                #Sim.NeighBox[1:JMax,2] .= Sim.y[ChainAtomsNeighbour, step]
+                #Sim.NeighBox[1:JMax,3] .= Sim.z[ChainAtomsNeighbour, step]
 
-                ### compute distances in an optimized manor
-                computeDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax)
+                cell   = Sim.CellList[xi_res, yi_res, zi_res]          # Vector{I}
+                chainv = Sim.ChainNumCellList[xi_res, yi_res, zi_res] # Vector{I} (same length)
 
-                for i in 1:IMax
-                    for j in 1:JMax
-                        if Sim.CL_Dist[cnt,1] <  maxcutff
-                            atom_j = ChainAtomsNeighbour[j] ### here we take neighbour cell
-                            C_j = Sim.ChainNumCellList[xi_res, yi_res, zi_res][j]
-                            if ChainsInCenter[i] != C_j
-                                atom_i = ChainAtomsInCenter[i]
-                                rel_i = atom_i - Sim.ChainStart[ChainsInCenter[i]]+1
-                                cutoff_i = cutoffs[Sim.IDs[atom_i]]
-                                if Sim.CL_Dist[cnt,1]< (cutoff_i+ cutoffs[Sim.IDs[atom_j]])/2.0
-                                    rel_j = atom_j - Sim.ChainStart[C_j]+1
+                # ---- fast loop over the cell (no enumerate, no bounds checks) -----
+                @simd for i in eachindex(cell)
+                    id = cell[i]               # atom index
 
-                                    Sim.ContactMatrices[rel_i, rel_j] += 1
-                                end
-                            end
-                        end
-                        cnt += 1
+                        JMax += 1
+                        ChainAtomsNeighbour[JMax] = id
+                end
+            end
+        end
+    end
+    Sim.NeighBox[1:JMax,1] .= Sim.x[ChainAtomsNeighbour[1:JMax], step]
+    Sim.NeighBox[1:JMax,2] .= Sim.y[ChainAtomsNeighbour[1:JMax], step]
+    Sim.NeighBox[1:JMax,3] .= Sim.z[ChainAtomsNeighbour[1:JMax], step]
+
+    ### compute distances in an optimized manor
+    computeSqrDistancesForCellNeighbour(Sim.BoxLength, Sim.CenterBox, Sim.NeighBox, Sim.CL_Dist,IMax, JMax)
+
+    cnt=0
+    for i in 1:IMax
+        @inbounds @simd  for j in 1:JMax
+            cnt += 1
+            if Sim.CL_Dist[cnt,1] <  maxcutff
+                atom_j = ChainAtomsNeighbour[j] ### here we take neighbour cell
+                C_j= chain_of_atom[atom_j]
+                #C_j = Sim.ChainNumCellList[xi_res, yi_res, zi_res][j]
+                if ChainsInCenter[i] != C_j
+                    atom_i = ChainAtomsInCenter[i]
+                    id_i= Sim.IDs[atom_i]
+                    rel_i = atom_i - Sim.ChainStart[ChainsInCenter[i]]+1
+                    cutoff_i = cutoffs[Sim.IDs[atom_i]]
+                    id_j= Sim.IDs[atom_j]
+                    if Sim.CL_Dist[cnt,1]< SqrCutoffMatrix[id_j,id_i] #(cutoff_i+ cutoffs[Sim.IDs[atom_j]])/2.0
+                        rel_j = atom_j - Sim.ChainStart[C_j]+1
+
+                        Sim.ContactMatrices[rel_i, rel_j] += 1
                     end
                 end
             end
         end
     end
+
     return nothing
 end
 
@@ -295,24 +383,47 @@ function computeInterChainContactMatrix_fast(Sim::SimData{R,I}; bounds::Union{No
     ### allocate square cutoffs, indexed by id 
     cutoffs = [CutoffDict[id]*rel_cutoff for id in sort(collect(keys(CutoffDict)))]
 
+    chain_of_atom = zeros(I, Sim.NAtoms)
+    for C in 1:Sim.NChains
+        for atom in Sim.ChainStart[C]:Sim.ChainStop[C]
+            chain_of_atom[atom] = C
+        end
+    end
+
     UsedChains = 0
-    Sim.CellResolution = maximum(cutoffs)
+    Sim.CellResolution = ones(R,3).*maximum(cutoffs)
     initCellLists(Sim)
     Sim.CenterBox = zeros(R, (Sim.MaxParticlesPerCell,3))
-    Sim.NeighBox  = zeros(R, (Sim.MaxParticlesPerCell,3))
-    Sim.CL_Dist   = zeros(R, (Sim.MaxParticlesPerCell^2,3)) ### 3 rows intermediate steps, first row contains the results
+    Sim.NeighBox  = zeros(R, (27*Sim.MaxParticlesPerCell,3))
+    Sim.CL_Dist   = zeros(R, (27*Sim.MaxParticlesPerCell^2,3)) ### 3 rows intermediate steps, first row contains the results
 
-    x_low  = ceil(I,bounds[1][1]/Sim.CellResolution)
-    x_high = ceil(I,bounds[1][2]/Sim.CellResolution) 
-    y_low  = ceil(I,bounds[2][1]/Sim.CellResolution)
-    y_high = ceil(I,bounds[2][2]/Sim.CellResolution) 
-    z_low  = ceil(I,bounds[3][1]/Sim.CellResolution)
-    z_high = ceil(I,bounds[3][2]/Sim.CellResolution) 
+    x_low  = ceil(I,bounds[1][1]/Sim.CellResolution[1])
+    x_high = ceil(I,bounds[1][2]/Sim.CellResolution[1]) 
+    y_low  = ceil(I,bounds[2][1]/Sim.CellResolution[2])
+    y_high = ceil(I,bounds[2][2]/Sim.CellResolution[2]) 
+    z_low  = ceil(I,bounds[3][1]/Sim.CellResolution[3])
+    z_high = ceil(I,bounds[3][2]/Sim.CellResolution[3]) 
 
-    ChainAtomsInCenter = Vector{I}(zeros(Sim.MaxParticlesPerCell))
-    ChainsInCenter     = Vector{I}(zeros(Sim.MaxParticlesPerCell))
+    ChainAtomsInCenter  = Vector{I}(zeros(I,Sim.MaxParticlesPerCell))
+    ChainsInCenter      = Vector{I}(zeros(I,Sim.MaxParticlesPerCell))
+    ChainAtomsNeighbour = Vector{I}(zeros(I,27*Sim.MaxParticlesPerCell))
 
     chains = Vector{Bool}([true for _ in 1:Sim.NChains])
+
+    COM=zeros(R, 3)
+    AxisCOM = computeCOMOfLargestCluster(Sim)
+
+    #ChainAtomsInCenter  = zeros(I, 5*27*Sim.MaxParticlesPerCell)
+    #ChainAtomsInCenter  = zeros(I, 5*27*Sim.MaxParticlesPerCell)
+
+    max_id = maximum(values(Sim.IDs))  # Assuming IDs are integers
+    cutoff_combinations = zeros(R, max_id, max_id)
+    for i in 1:max_id
+        for j in 1:max_id
+            cutoff_combinations[i,j] = ((cutoffs[i] + cutoffs[j])/2)^2
+        end
+    end
+
 
     for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
         println("Step $k of $(length(Sim.ClusterRange))")
@@ -330,7 +441,7 @@ function computeInterChainContactMatrix_fast(Sim::SimData{R,I}; bounds::Union{No
         computeCellLists(Sim; ComputeCharges=false, ComputeChains=true) 
 
         ### iterate over all pairs of chains
-        computeInterChainMatrixHelper_(Sim::SimData{R,I}, xind::I2, yind::I2, zind::I2, border::Bool) where {R<:Real, I<:Integer,I2<:Integer}  = computeInterChainMatrixHelper(Sim, xind, yind, zind, border, cutoffs, chains, maximum(cutoffs))#, ChainAtomsInCenter, ChainsInCenter)
+        computeInterChainMatrixHelper_(Sim::SimData{R,I}, xind::I2, yind::I2, zind::I2, border::Bool) where {R<:Real, I<:Integer,I2<:Integer}  = computeInterChainMatrixHelper(Sim, xind, yind, zind, border, cutoffs,cutoff_combinations, chains, maximum(cutoffs),chain_of_atom, ChainAtomsInCenter, ChainsInCenter,ChainAtomsNeighbour )#, ChainAtomsInCenter, ChainsInCenter)
 
         iterateThroughCellList(Sim, computeInterChainMatrixHelper_; CellMaxima=[x_low+1, x_high, y_low+1, y_high, z_low+1, z_high])
     end

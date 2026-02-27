@@ -84,6 +84,15 @@ end
 error = sqrt.(error)./sqrt(5)
 @test all(error .≈ fast_error)
 
+### this version isnt really faster, but it was thought to be
+HPSAnalysis.computeInterChainContactMatrix(Sim;CutoffDict=CutoffDict, rel_cutoff=1.1)
+faster_solution = deepcopy(Sim.ContactMatrices)
+faster_error = deepcopy(Sim.ContactMatricesError)
+
+@test all(naiv_solution .≈ faster_solution)
+@test all(error .≈ faster_error)
+
+
 ### check if positions which are exactly at the BoxLength and are therefore not wrapped
 ### get a hash which is still "inside" the box
 CL_sizes = extrema.(axes(Sim.CellList))### get the first hashes outside the box
