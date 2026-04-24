@@ -224,5 +224,5 @@ function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,O
         end 
         WriteGroups("$(BasePath)/HOOMD_Setup/Groups.txt" ,groups)
 
-        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, pos, AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, groups)    
+        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, Float32.(pos), AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, groups)    
 end

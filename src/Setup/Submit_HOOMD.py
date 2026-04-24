@@ -1,7 +1,7 @@
 import time
 
 import os
-
+import argparse, sys
 import numpy as np
 
 import gsd.hoomd
@@ -99,6 +99,10 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
             B_types = ['O-O']
             B_typeid = np.zeros(B_N, dtype=np.int32)
             B_group = InputBonds#.astype(np.uint32)
+
+            if Params["SimulationType"]=="Calvados3":
+                ## read the ENM_indice and backbone data
+                B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
 
 
             snapshot.bonds.N = B_N
@@ -322,15 +326,24 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
-def preRun(FolderPath, prerunSteps=100_000):
-    run(FolderPath, Restart=False, ExtendedSteps=prerunSteps, prerun=True, resizeSteps=prerunSteps)
+def str2bool(v):
+    v = v.lower()
+    if v in ('yes','true','t','y','1'):  return True
+    if v in ('no','false','f','n','0'):  return False
+    raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def restart(FolderPath, ExtendedSteps=0):
-    run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)
+#def run(folder, flag, steps):
+#    print(f'>>> run(folder={folder!r}, flag={flag}, steps={steps})')
+#    # … your actual work …
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('folder')
+    p.add_argument('flag', type=str2bool)
+    p.add_argument('steps', type=int)
+    a = p.parse_args()
+    print(a.folder, a.flag, a.steps)   # echo for debugging
+    run(a.folder, a.flag, a.steps)
 
 if __name__ == '__main__':
-    if len(sys.argv)<2:
-        print("Need folder of input parameters as second argument.")
-    else:
-        print(sys.argv[1],bool(sys.argv[2]), int(sys.argv[3]))
-        run(  sys.argv[1],bool(sys.argv[2]), int(sys.argv[3]))
+    sys.exit(main())

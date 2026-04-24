@@ -435,6 +435,7 @@ def CopyLastFrameToRestartFile(TrajectoryPath, RestartPath):
         snapshot.particles.image    = frame.particles.image
         snapshot.particles.mass     = frame.particles.mass
         snapshot.particles.charge   = frame.particles.charge 
+        snapshot.particles.body     = frame.particles.body
 
         ### Configure box
         snapshot.configuration.box  = frame.configuration.box
