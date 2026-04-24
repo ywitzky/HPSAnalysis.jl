@@ -43,6 +43,26 @@ end
     return chains
 end
 
+function getTimeStepsWhereChainsInBounds(Sim::SimData{R,I}, bounds::Vector{Tuple{R, R}}) where {R<:Real, I<:Integer} 
+
+    N = length(Sim.ClusterRange)
+    ranges = sizehint!([Vector{I}() for _ in 1:Sim.NChains],N)
+    COM=zeros(R, 3)
+    AxisCOM = computeCOMOfLargestCluster(Sim)
+    invBoxLength= R.(1.0./Sim.BoxLength)
+
+    for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
+        COM[Sim.SlabAxis] = AxisCOM[k]
+
+        chains = getChainsInBounds(Sim, bounds,COM, step, Sim.BoxLength, invBoxLength)
+
+        for c in chains
+            push!(ranges[c],step)
+        end
+    end
+    return ranges
+end
+
 @doc raw"""
     computeSlabHistogram(Sim::SimData{R,I}; Use_Alpha=false, Use_Types=false) where {R<:Real, I<:Integer}
 Computes centered slab histograms along Sim.SlabAxis.
@@ -255,6 +275,7 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Windowlength=200, D
     ind_dense = round(I, tmp*Surface_fac)
     ρ_dense_tmp = mean(density[1:ind_dense]) 
 
+    DiluteWidth = DiluteWidth >= NSteps ? NSteps-1 : DiluteWidth ### avoid negative start index <= 0
     avg_dilute = mean(density[NSteps-DiluteWidth:end])
     ind_dilute = ceil(I,findfirst(density.-avg_dilute .<(1.0-MaxVal)*(ρ_dense_tmp-avg_dilute)))+safety
 
@@ -390,23 +411,27 @@ A tuple `(γ, Δγ)` where
 
 - `γ` (`Sim.SurfaceTension`) is the mean surface tension,
 - `Δγ` (`Sim.SurfaceTensionError`) is the estimated statistical error."""
-function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},start::I;filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer}
+function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},Ranges::Vector{<:AbstractRange{I2}};filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer,I2<:Integer}
     longfilename = Sim.BasePath*filename 
 
     file = h5open(longfilename) 
-    pressure_tensor = file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"]
-    timestep = file["hoomd-data/Simulation/timestep"]
+    pressure_tensor = collect(file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"])
+    timestep = collect(file["hoomd-data/Simulation/timestep"])
+
+    pressure_tensor = reshape(pressure_tensor, (6,I(length(pressure_tensor)/6)))
 
     ### start is assumed to be in multiples of the frequency of the frame outputs
     ### pressure data is written out way more
 
-    start_time  = start * Sim.TrajWriteOutFreq
-    start_index = findfirst(x->(x)>=start_time, timestep[:] )
-    
+    #start_time  = start * Sim.TrajWriteOutFreq
+    conv_steps(time) = findfirst(x->x>=time* Sim.TrajWriteOutFreq, timestep)
+    indices = vcat(collect.([conv_steps(first(range)):tau:conv_steps(last(range)) for range in Ranges])...)
+
+    #start_index = findfirst(x->(x)>=start_time, timestep[:] )
     #https://hoomd-blue.readthedocs.io/en/v6.0.0/hoomd/md/compute/thermodynamicquantities.html#hoomd.md.compute.ThermodynamicQuantities.pressure_tensor
-    p_xx = pressure_tensor[1, start_index:tau:end]
-    p_yy = pressure_tensor[4, start_index:tau:end]
-    p_zz = pressure_tensor[6, start_index:tau:end]
+    p_xx = [pressure_tensor[1,i] for i in  indices]
+    p_yy = [pressure_tensor[4,i] for i in  indices]
+    p_zz = [pressure_tensor[6,i] for i in  indices]
 
     all_axis = [p_xx, p_yy, p_zz]
     normal_p = all_axis[Sim.SlabAxis]
