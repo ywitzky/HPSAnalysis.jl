@@ -68,12 +68,13 @@ NameToSeq["RS31_PHOS_OUTSIDEBOX"] = Phosphorylate(NameToSeq["RS31"], PhosSites["
 NameToSeq["RS31a_PHOS_BOX"] = Phosphorylate(NameToSeq["RS31a"], PhosSites["RS31a_Box"])
 NameToSeq["RS31a_PHOS_OUTSIDEBOX"] = Phosphorylate(NameToSeq["RS31a"], PhosSites["RS31a_OUTSIDEBOX"])
 
-### historical error at 157?
-NameToSeq["RS41_PHOSALL_IDR2"] = NameToSeq["RS41_PHOSALL"][157:357]### according to Alpha-Fold 157-356 on mobiDB
-NameToSeq["RS41_IDR2"] = NameToSeq["RS41"][157:357]### according to Alpha-Fold 157-356 on mobiDB
-NameToSeq["RS41_PHOS6_IDR2"] = NameToSeq["RS41_PHOS6"][157:357]
+NameToSeq["RS41_PHOSALL_IDR2"] = NameToSeq["RS41_PHOSALL"][167:357]### according to Alpha-Fold 167-356 on mobiDB
+NameToSeq["RS41_IDR2"] = NameToSeq["RS41"][167:357]### according to Alpha-Fold 167-356 on mobiDB
+NameToSeq["RS41_PHOS6_IDR2"] = NameToSeq["RS41_PHOS6"][167:357]
 NameToSeq["RS41_RRM"] = NameToSeq["RS41"][1:167] ### RS41_PHOS6_RRM is the same as RS41_RRM
 
+NameToSeq["RS40_RRM"] = NameToSeq["RS40"][1:166]
+NameToSeq["RS40_IDR2"] = NameToSeq["RS40"][167:end]
 
 NameToSeq["RS31a_PHOSALL_IDR2"] = NameToSeq["RS31a_PHOSALL"][167:end] ### according to Alpha-Fold 167-356 on mobiDB
 NameToSeq["RS31_PHOSALL_IDR2"] = NameToSeq["RS31_PHOSALL"][167:end] ### according to Alpha-Fold 167-356 on mobiDB
