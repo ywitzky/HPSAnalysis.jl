@@ -195,8 +195,7 @@ function writeStartConfiguration(BasePath, fileName, StartFileName, Info, Sequen
         #By getting Initial Positions
         cnt = 1
         pos_init = Pos
-
-        pos = zeros(length(Sequences), maximum(length.(Sequences)), 3)
+        pos = zeros(eltype(Pos),length(Sequences), maximum(length.(Sequences)), 3)
         for (Seqindex, Seq) in enumerate(Sequences)
             for (Aaid,_) in enumerate(Seq)
                 pos[Seqindex, Aaid, 1] = pos_init[cnt,1]
@@ -279,7 +278,7 @@ A GSD data file is written, that include the parameters for the Simulation witch
 **Creates**:
 * Writes the GSD data files.
 """
-function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{R}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool, SimulationType::String,  ENM, groups) where {I<:Integer, R<:Real, I2<:Integer}
+function writeGSDStartFile(FileName::String, NAtoms::I, NBonds::I, NAngles::I, NDihedrals::I,Box::Vector{R}, Positions::Array{R}, AaToId::Dict{Char, <:Integer},Sequences,  InputImage::Array{I2}, InputMasses::Array{<:Real}, InputCharges::Array{<:Real}, DihedralMap::Dict, DihedralList::Matrix{<:Integer}, AaToSigma::Dict{Char, <:Real}, UseAngles::Bool, SimulationType::String,  ENM, groups) where {I<:Integer, R<:Real, I2<:Integer}
  
     snapshot = GSDFormat.Frame()    
     snapshot.configuration.step = 1 
@@ -442,7 +441,7 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
             continue
         end
         Data.ChainStart[i] = Data.ChainStart[i-1]+length(Seq)
-        Data.ChainStop[i] = Data.ChainStop[i-1]+length(Seq)
+        Data.ChainStop[i]  = Data.ChainStop[i-1] +length(Seq)
     end
 
     ### allocate disk space for X
@@ -606,7 +605,6 @@ function CreateStartConfiguration(SimulationName::String, Path::String, BoxSize:
 
     return (pos, Data) 
 end
-
 
 end #module Setup
 
