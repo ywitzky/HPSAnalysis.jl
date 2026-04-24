@@ -89,7 +89,7 @@ Computes the inter chain contact histrogram at each step of the *ClusterRange* b
 **Create**:
 * Sim.ContactMatrices
 """
-function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing, Vector{Tuple{R, R}}}=nothing, CutoffDict=Sim.IDToSigmas, rel_cutoff=1.0, NSubMatrices=5)::Matrix{R}  where {R<:Real, I<:Integer}
+function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing, Vector{Tuple{R, R}}}=nothing, CutoffDict=Sim.IDToSigmas, rel_cutoff=1.0, NSubMatrices=5,fac=5)::Matrix{R}  where {R<:Real, I<:Integer}
     ContactMatrices = [Matrix(zeros(R, Sim.ChainLength[1], Sim.ChainLength[1])) for _ in 1:NSubMatrices]
     UsedChains = zeros(NSubMatrices)
 
@@ -107,14 +107,14 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
     Sim.CellResolution = ones(3).*maximum(cutoffs)
     initCellLists(Sim)
     ### Elastic Network models screw up the estimation for the MaxParticlesPerCell
-    Sim.CenterBox = zeros(R, (3 *Sim.MaxParticlesPerCell,3))
-    Sim.NeighBox  = zeros(R, (27*Sim.MaxParticlesPerCell,3))
-    Sim.CL_Dist   = zeros(R, (27*Sim.MaxParticlesPerCell^2,3)) ### 3 rows intermediate steps, first row contains the results
+    Sim.CenterBox = zeros(R, (fac*3 *Sim.MaxParticlesPerCell,3))
+    Sim.NeighBox  = zeros(R, (fac*27*Sim.MaxParticlesPerCell,3))
+    Sim.CL_Dist   = zeros(R, (fac*27*Sim.MaxParticlesPerCell^2,3)) ### 3 rows intermediate steps, first row contains the results
 
-    ChainAtomsNeighbour = zeros(I, 27*Sim.MaxParticlesPerCell)
-    ChainsNeighbour     = zeros(I, 27*Sim.MaxParticlesPerCell)
+    ChainAtomsNeighbour = zeros(I, fac*27*Sim.MaxParticlesPerCell)
+    ChainsNeighbour     = zeros(I, fac*27*Sim.MaxParticlesPerCell)
 
-    ChainAtomsInCenter  = zeros(I, 5*27*Sim.MaxParticlesPerCell)
+    ChainAtomsInCenter  = zeros(I, fac*5*27*Sim.MaxParticlesPerCell)
 
     COM=zeros(R, 3)
     AxisCOM = computeCOMOfLargestCluster(Sim)
@@ -128,7 +128,6 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
     end
 
     invBoxLength= R.(1.0./Sim.BoxLength)
-    println("Range $(Sim.ClusterRange)")
     for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
         if step < Sim.EquilibrationTime || step %Sim.RGMeasureStep != 0
             continue 
@@ -145,15 +144,21 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
         resetCellLists(Sim)
         computeCellLists(Sim; ComputeCharges=false, ComputeChains=true) 
 
+        #println("ASDFGH")
         ### iterate naively over all pairs of chains
+        #chains=[471]
         for (Cid, C) in enumerate(chains)
+          #  println("Cid $Cid, C $C")
             C_subMatId = mod1(Cid, NSubMatrices)
             UsedChains[C_subMatId] += 1
             start = Sim.ChainStart[C]
             stop  = Sim.ChainStop[C]
 
             ### iterate over all cell lists where chain C is present
+           # println("A")
+           # println(length(getUniqueCellsOfChain(Sim, C)))
             for (xind, yind, zind) in getUniqueCellsOfChain(Sim, C)
+              #  println("xinds = $(xind) , $yind, $zind")
                 IMax = 0
                 @inbounds for id in Sim.CellList[xind, yind, zind]
                     if start <= id <= stop
@@ -208,7 +213,8 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
                         end
                     end
                 end
-                            
+                #println("B")
+
                 if JMax ==0 continue end
 
                 ### get positions for comparison box
@@ -223,6 +229,7 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
 
                 cnt = 1
                 for i in 1:IMax
+                    #println("i $i")
                     atom_i = ChainAtomsInCenter[i]
                     rel_i = atom_i - start+1
                     cutoff_i = cutoffs[Sim.IDs[atom_i]]
@@ -230,18 +237,20 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
 
                     #res_i = Sim.IDs[atom_i]
                     for j in 1:JMax
+                        #println("j $j")
                         atom_j = ChainAtomsNeighbour[j] ### here we take neighbour cell
                         id_j = Sim.IDs[ChainAtomsNeighbour[j]]
                         #cutoff_combinations[id_i,id_j]  #
+                        #println("$j, $id_i, $id_j, $cnt")
                         if Sim.CL_Dist[cnt,1]< cutoff_combinations[id_i,id_j]  #((cutoff_i+ cutoffs[Sim.IDs[atom_j]])/2.0)^2
                             #rel_j = atom_j - Sim.ChainStart[ChainsNeighbour[j]] +1
                             rel_j = atom_j - Sim.ChainStart[chain_of_atom[atom_j]] +1
-
                             ContactMatrices[C_subMatId][rel_i, rel_j] += 1
                         end
                         cnt += 1
                     end
                 end
+                #println("D")
 
             end
         end
