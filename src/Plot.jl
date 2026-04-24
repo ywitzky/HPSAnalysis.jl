@@ -497,15 +497,19 @@ function plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 end
 
 function plotHOOMDTemperature(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-    file = h5open("$(Sim.BasePath)pressure.h5", "r")
-    temperature = collect(file["hoomd-data"]["md"]["compute"]["ThermodynamicQuantities"]["kinetic_temperature"])
-    timestep = collect(file["hoomd-data"]["Simulation"]["timestep"])
-    close(file)
-    kb = 0.00831446262
-    fig = Plots.plot(timestep, temperature/kb, xlabel="step", ylabel="temperature", ylim=(Sim.TargetTemp*0.95, Sim.TargetTemp*1.05), label="Sim. Temp.")
-    Plots.hline!([Sim.TargetTemp], label="Target Temp.")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.png")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.pdf")
+    try
+        file = h5open("$(Sim.BasePath)pressure.h5", "r")
+        temperature = collect(file["hoomd-data"]["md"]["compute"]["ThermodynamicQuantities"]["kinetic_temperature"])
+        timestep = collect(file["hoomd-data"]["Simulation"]["timestep"])
+        close(file)
+        kb = 0.00831446262
+        fig = Plots.plot(timestep, temperature/kb, xlabel="step", ylabel="temperature", ylim=(Sim.TargetTemp*0.95, Sim.TargetTemp*1.05), label="Sim. Temp.")
+        Plots.hline!([Sim.TargetTemp], label="Target Temp.")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.png")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.pdf")
+    catch e 
+        println(e)
+    end
 end
 
 function plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
