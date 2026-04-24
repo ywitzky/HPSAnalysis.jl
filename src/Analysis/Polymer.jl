@@ -261,7 +261,7 @@ function computeInertiaTensor(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
-function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100) where {R<:Real, I<:Integer}
+function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100; Range::Union{Nothing,Vector{Vector{I2}}}=nothing) where {R<:Real, I<:Integer, I2<:Integer}
     λ = Sim.InertiaTensorEigVals
     Sim.ShapeAsymmetry =  1.0 .-3.0.*(λ[1,:,:].*λ[2,:,:].+λ[1,:,:].*λ[3,:,:].+λ[2,:,:].*λ[3,:,:])./(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]).^2 ### arash + janka
     Sim.ParallelInertiaTensor = @. (λ[1,:,:]+λ[2,:,:])/2.0
@@ -269,19 +269,20 @@ function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100) where {R<:R
     Sim.Asphericity = @. (λ[3,:,:]-0.5*(λ[1,:,:]+λ[2,:,:]))/(λ[1,:,:]+λ[2,:,:]+λ[3,:,:]) ### wikipedia + own norm
     Sim.Acylindricity = @. (λ[2,:,:] - λ[1,:,:])/(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]) ### https://journals.aps.org/pre/pdf/10.1103/PhysRevE.106.064606
 
+    Range = isnothing(Range) ? [Start:Sim.RGMeasureStep:Sim.NSteps for _ in 1:Sim.NChains] :  Range
     NDataPoints = convert(eltype(Sim.x), (Sim.NSteps-Start+1)÷Sim.RGMeasureStep)
-    Sim.MeanShapeAsymmetry = sum(Sim.ShapeAsymmetry[:,Start:Sim.RGMeasureStep:Sim.NSteps], dims=2)./NDataPoints
-    Sim.MeanAspectRatio =  sum(Sim.AspectRatio[:,Start:Sim.RGMeasureStep:Sim.NSteps], dims=2)./NDataPoints
-    Sim.MeanAsphericity =  sum(Sim.Asphericity[:,Start:Sim.RGMeasureStep:Sim.NSteps], dims=2)./NDataPoints
-    Sim.MeanAcylindricity =  sum(Sim.Acylindricity[:,Start:Sim.RGMeasureStep:Sim.NSteps], dims=2)./NDataPoints
+    Sim.MeanShapeAsymmetry = [sum(Sim.ShapeAsymmetry[i,Range[i]])./NDataPoints for i in 1:Sim.NChains]
+    Sim.MeanAspectRatio    = [sum(Sim.AspectRatio[   i,Range[i]])./NDataPoints for i in 1:Sim.NChains]
+    Sim.MeanAsphericity    = [sum(Sim.Asphericity[   i,Range[i]])./NDataPoints for i in 1:Sim.NChains] 
+    Sim.MeanAcylindricity  = [sum(Sim.Acylindricity[ i,Range[i]])./NDataPoints for i in 1:Sim.NChains]
 end
 
 function computeRG(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-    Sim.RGMeanByChain = zeros(eltype(Sim.RGSeries), Sim.NChains)
-    Sim.RGErrByChain = zeros(eltype(Sim.RGSeries), Sim.NChains)
+    Sim.RGMeanByChain = zeros(R, Sim.NChains)
+    Sim.RGErrByChain  = zeros(R, Sim.NChains)
     cnt = 0
-    Sim.RGMean = zero(eltype(Sim.RGSeries))
-    Sim.RGErr = zero(eltype(Sim.RGSeries))
+    Sim.RGMean = zero(R)
+    Sim.RGErr  = zero(R)
 
     for chain in 1:Sim.NChains
         cnt =0
@@ -298,7 +299,7 @@ function computeRG(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
         Sim.RGErr += Sim.RGErrByChain[chain]
     end
     Sim.RGMean/=Sim.NChains
-    Sim.RGErr/=Sim.NChains
+    Sim.RGErr /=Sim.NChains
 end
 
 
