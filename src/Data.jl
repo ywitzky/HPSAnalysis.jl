@@ -75,6 +75,7 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     IDToResName::Dict{IntType, String}
     IDToMasses::Vector{FloatType}
     IDToSigmas::Vector{FloatType}
+    IDToLambdas::Vector{FloatType}
     ChainStart::Vector{IntType}
     ChainStop::Vector{IntType}
     ChainLength::Vector{IntType}
@@ -182,19 +183,24 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     SurfaceTension::FloatType
     SurfaceTensionError::FloatType
 
+    MeanYukawaEnergy::Matrix{FloatType}
+    MeanYukawaEnergy_perAA::Matrix{FloatType}
+    MeanAshbaughHatchEnergy::Matrix{FloatType}
+    MeanAshbaughHatchEnergy_perAA::Matrix{FloatType}
+
 
     function SimData()
         return new{ChoosenFloatType, ChoosenIntType}(false,"",1,0, 0,0,0,0,0,0,0,0,0,0,0.0,2,zeros(3,2), zeros(3),[""],
         
         Dict{String,Any}(),0, Dict{String,ChoosenIntType}(),zeros((0,0)),0,0,
         
-        "","","",nothing,nothing,nothing,zeros( (0,0)), zeros((0,0)),zeros((0,0)),1,1, 
+        "","","",nothing,nothing,nothing,zeros((0,0)), zeros((0,0)),zeros((0,0)),1,1, 
 
         "","","",nothing,nothing,nothing,zeros((0,0)), zeros((0,0)),zeros((0,0)),
 
         "","","","","","",[],
 
-        zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),Dict(), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), 0,
+        zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),Dict(), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), 0,
         
         0,0,0,zeros(0),zeros(0),zeros(0), zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0),zeros(0), 
         1,zeros(0),zeros(0),zeros(0), zeros(0),zeros(0),
@@ -221,7 +227,9 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
         
         zeros(0), zeros(0), zeros(0),
         
-        0,0) 
+        0,0,
+        
+        zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0))) 
     end
 end
 

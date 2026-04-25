@@ -7,4 +7,5 @@
     include("./IntraChainContactMatrix_test.jl")
     include("./InterChainContactMatrix_test.jl")
     include("./SurfaceTension_test.jl")
+    include("./MeanPairEnergyMatrix_test.jl")
 end
