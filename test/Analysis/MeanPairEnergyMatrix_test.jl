@@ -7,7 +7,7 @@ mkpath("$(TestPath)/HOOMD_Setup/")
 ### test parameter reader before manipulating it for test purposes; data in files is always in nm wheres analysis works in Angstroem -> conversion
 function write_param(yu_pref, κ,rcut_yu, rcut_ah)
     file=open("$(TestPath)/HOOMD_Setup/Params.txt","w")
-    write(file,"yk_prefactor: $(yu_pref)\n")
+    write(file,"yk_prefactor: $(yu_pref/10.0)\n")
     write(file,"kappa: $(κ*10.0)\n")
     write(file,"YukawaCutoff: $(rcut_yu/10.0)\n")
     write(file,"AHCutoff: $(rcut_ah/10.0)\n")

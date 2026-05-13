@@ -598,3 +598,55 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
         end
     end
 end
+
+zerotonan(x) = isapprox(x,0,atol=10^-7,rtol=10^-7) ? NaN : x
+
+function getTypeNameDictWithEndingNames(Sim::SimData{R,I}; RenamePhosAA=Dict('#'=>"pS",'&'=> "pT", '@'=>"pY"))::Dict{I,String} where {R<:Real,I<:Integer} 
+    NIds = maximum(keys(Sim.IDToResName))
+    local_IDToResName = copy(Sim.IDToResName)
+    non_real_aa = [id for id in 1:NIds if islowercase(Sim.IDToResName[id][1])]
+    NIds_total = BioData.AaToWeight
+    types =collect(keys(BioData.AaToWeight))
+    for aa in non_real_aa      
+        key = findfirst(x->(BioData.AaToWeight[x]+2≈Sim.IDToMasses[aa] || BioData.AaToWeight[x]+16≈Sim.IDToMasses[aa]) ,types)
+        if !(key ∈ ['#','&','@'])
+            local_IDToResName[aa] = lowercase("$(types[key])")
+        end
+        if key ∈ ['#','&','@']
+            local_IDToResName[aa] = RenamePhosAA[aa]
+        end
+    end
+    return local_IDToResName
+end
+
+function plotMeanEnergyPerID(Sim::SimData{R,I})::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+    fig =  Plots.plot(xlabel="amino acid i", ylabel="amino acid j",title=L"\langle E \rangle~per~Protein\quad[J/mol]")
+
+    matrix  = (triu(Sim.MeanYukawaEnergy)+tril(Sim.MeanAshbaughHatchEnergy,-1)).*1000
+    max = maximum(abs.(matrix))
+    NMat = size(matrix,1)
+    ticks = vcat([1], collect(0:50:NMat)[2:end])
+    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),size=(400,400), ticks=ticks, AspectRatio=true)
+    return fig
+end
+
+function plotMeanEnergyPerType(Sim::SimData{R,I})::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+    IDToResNames = getTypeNameDictWithEndingNames(Sim)
+
+    NIds = maximum(keys(IDToResNames))
+    ticks= [IDToResNames[id] for id in 1:NIds ]
+
+    fig =  Plots.plot(title=L"\langle E \rangle~per~Amino~Acid\quad[J/mol]", ticks=(1:NIds, ticks)) 
+    matrix  = (triu(Sim.MeanYukawaEnergy_perAA)+tril(Sim.MeanAshbaughHatchEnergy_perAA,-1)).*1000
+    max = maximum(abs.(matrix))
+    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),AspectRatio=true, size=(400,400),right_margin=1mm,colorbar_title_location=:right,colorbar_tickfontrotation=0)
+    return fig
+end
+
+function plotMeanEnergies(Sim::SimData{R,I}) where {R<:Real,I<:Integer} 
+    fig  = Plots.plot(plotMeanEnergyPerID(Sim),plotMeanEnergyPerType(Sim) , size=(800,400), bottom_margin=2mm, left_margin=2mm)
+
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies.png" )
+    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies.pdf" )
+    return fig
+end

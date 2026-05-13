@@ -523,7 +523,7 @@ end
     return ah
 end
 
-function relative_distance(dx::Vector{R}, dy::Vector{R}, dz::Vector{R}, Sim::SimData{R,I}, C2::Int64, step::I, xi::R, yi::R, zi::R,dist_sqr::Vector{R})::Nothing where {R<:Real, I<:Integer} 
+function relative_distance(dx::Vector{R}, dy::Vector{R}, dz::Vector{R}, Sim::SimData{R,I}, C2::I2, step::I, xi::R, yi::R, zi::R,dist_sqr::Vector{R})::Nothing where {R<:Real, I<:Integer, I2<:Integer} 
     @inbounds @fastmath for (i, idx) in enumerate(Sim.ChainStart[C2] : Sim.ChainStop[C2])
         dx[i] = abs(Sim.x[idx, step] - xi)
         dy[i] = abs(Sim.y[idx, step] - yi)
@@ -533,7 +533,7 @@ function relative_distance(dx::Vector{R}, dy::Vector{R}, dz::Vector{R}, Sim::Sim
     nothing
 end
 
-function apply_periodic!(dist::Vector{R}, dist_sqr::Vector{R},inv_bl::R, bl::R, half=R(0.5))::Nothing where {R<:Real} 
+function apply_periodic!(dist::Vector{R}, dist_sqr::Vector{R},inv_bl::R, bl::R, half=R(0.5))::Vector{R} where {R<:Real} 
     @inbounds @fastmath  @simd for i in eachindex(dist)
         n = floor( dist[i] * inv_bl + half)
         dist[i] -= n * bl
@@ -624,9 +624,7 @@ function computeMeanPairEnergyMatrix_naiv(Sim::SimData{R,I}, bounds::Vector{Tupl
     AxisCOM = computeCOMOfLargestCluster(Sim)
     
     chain_count = 0
-    @inbounds for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
-        println("Step $k/$NClusterSteps")
-
+    @inbounds for (k,step) in enumerate(Sim.ClusterRange) ### ≈ startstep:stepwidth:NSteps
         ### check which chains are within bounds at the current step
         COM[Sim.SlabAxis] = AxisCOM[k]
         chains = isnothing(bounds) ? collect(1:Sim.NChains) : getChainsInBounds(Sim, bounds,COM, step, Sim.BoxLength, inv_box_length)
@@ -637,7 +635,7 @@ function computeMeanPairEnergyMatrix_naiv(Sim::SimData{R,I}, bounds::Vector{Tupl
             for (i1_rel,i1) in enumerate(Sim.ChainStart[C1]:Sim.ChainStop[C1])
                 ### do the particle look ups once
                 i1_id  = Sim.IDs[i1]
-                i1_σ   = sigmas[i1]
+                i1_σ   = sigmas[ i1]
                 i1_λ   = lambdas[i1]
                 q1 = Sim.Charges[i1]
                 xi1= Sim.x[i1,step]
@@ -652,9 +650,9 @@ function computeMeanPairEnergyMatrix_naiv(Sim::SimData{R,I}, bounds::Vector{Tupl
                     relative_distance(dist_x, dist_y, dist_z, Sim, C2, step, xi1, yi1, zi1,dist_sqr)
 
                     ### wraps back to minimal distance and sums up in dist_sq;,no allocations
-                    apply_periodic!(dist_x,dist_sqr,inv_x, bl_x)
-                    apply_periodic!(dist_y,dist_sqr,inv_y, bl_y)
-                    apply_periodic!(dist_z,dist_sqr,inv_z, bl_z)
+                    dist_sqr = apply_periodic!(dist_x,dist_sqr,inv_x, bl_x)
+                    dist_sqr = apply_periodic!(dist_y,dist_sqr,inv_y, bl_y)
+                    dist_sqr = apply_periodic!(dist_z,dist_sqr,inv_z, bl_z)
         
                     range = Sim.ChainStart[C2]:Sim.ChainStop[C2]
                     @fastmath @simd for i2_rel in eachindex(dist_sqr)
