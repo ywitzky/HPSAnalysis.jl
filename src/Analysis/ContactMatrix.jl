@@ -144,21 +144,15 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
         resetCellLists(Sim)
         computeCellLists(Sim; ComputeCharges=false, ComputeChains=true) 
 
-        #println("ASDFGH")
         ### iterate naively over all pairs of chains
-        #chains=[471]
         for (Cid, C) in enumerate(chains)
-          #  println("Cid $Cid, C $C")
             C_subMatId = mod1(Cid, NSubMatrices)
             UsedChains[C_subMatId] += 1
             start = Sim.ChainStart[C]
             stop  = Sim.ChainStop[C]
 
             ### iterate over all cell lists where chain C is present
-           # println("A")
-           # println(length(getUniqueCellsOfChain(Sim, C)))
             for (xind, yind, zind) in getUniqueCellsOfChain(Sim, C)
-              #  println("xinds = $(xind) , $yind, $zind")
                 IMax = 0
                 @inbounds for id in Sim.CellList[xind, yind, zind]
                     if start <= id <= stop
@@ -229,7 +223,6 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
 
                 cnt = 1
                 for i in 1:IMax
-                    #println("i $i")
                     atom_i = ChainAtomsInCenter[i]
                     rel_i = atom_i - start+1
                     cutoff_i = cutoffs[Sim.IDs[atom_i]]
@@ -250,8 +243,6 @@ function computeInterChainContactMatrix(Sim::SimData{R,I}; bounds::Union{Nothing
                         cnt += 1
                     end
                 end
-                #println("D")
-
             end
         end
     end
@@ -539,6 +530,7 @@ function apply_periodic!(dist::Vector{R}, dist_sqr::Vector{R},inv_bl::R, bl::R, 
         dist[i] -= n * bl
         dist_sqr[i] += dist[i]^2
     end
+    return dist_sqr
 end
 
 function read_FF_Interaction_Parameters(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
@@ -548,7 +540,7 @@ function read_FF_Interaction_Parameters(Sim::SimData{R,I}) where {R<:Real, I<:In
         line = readline(file)  
         split = Base.split(line)
         if split[1] == "yk_prefactor:"
-            yu_pref = parse(R,split[2])
+            yu_pref = parse(R,split[2])*R(10.0) #convert from nm to Å
         end
         if split[1] == "kappa:"
             κ = parse(R,split[2])*R(1/10) #convert from nm^-1 to Å^-1 
@@ -563,6 +555,66 @@ function read_FF_Interaction_Parameters(Sim::SimData{R,I}) where {R<:Real, I<:In
     close(file)
 
     return yu_pref, κ, rcut_yu, rcut_ah
+end
+
+function allocateEnergyMaps(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+    # energy maps (initially zero)
+    numTypes = maximum(collect(keys(Sim.IDToResName)))
+    emap_inter_YU  = zeros(R, Sim.ChainLength[1], Sim.ChainLength[1])
+    emap_inter_AH  = zeros(R, Sim.ChainLength[1], Sim.ChainLength[1])
+    emap_inter_AA_YU = zeros(R,numTypes, numTypes)
+    emap_inter_AA_AH = zeros(R,numTypes, numTypes)
+
+    sigmas  = [Sim.IDToSigmas[id]  for id in Sim.IDs]
+    lambdas = [Sim.IDToLambdas[id] for id in Sim.IDs]
+
+    dist_x   = zeros(R, Sim.ChainLength[1])
+    dist_y   = zeros(R, Sim.ChainLength[1])
+    dist_z   = zeros(R, Sim.ChainLength[1])
+    dist_sqr           = zeros(R, Sim.ChainLength[1])
+
+    inv_box_length = R.(1.0./Sim.BoxLength)
+    inv_x = inv_box_length[1]
+    inv_y = inv_box_length[2]
+    inv_z = inv_box_length[3]
+
+    bl_x = R(Sim.BoxLength[1])
+    bl_y = R(Sim.BoxLength[2])
+    bl_z = R(Sim.BoxLength[3])
+
+    return emap_inter_YU,emap_inter_AH,emap_inter_AA_YU,emap_inter_AA_AH,sigmas, lambdas, dist_x,dist_y,dist_z, dist_sqr, inv_x,inv_y,inv_z, bl_x, bl_y,bl_z
+end
+
+function symmetrizeEMaps(Sim::SimData{R,I},emap_YU::Matrix{R},emap_AH::Matrix{R},emap_AA_YU::Matrix{R},emap_AA_AH::Matrix{R}, chain_count::I2;diagonal=true) where {R<:Real, I<:Integer, I2<:Integer}
+    chain_count = chain_count == 0 ? 1 : chain_count
+    #  Average over frames
+    emap_YU    ./= R(chain_count)
+    emap_AH    ./= R(chain_count)
+    emap_AA_YU ./= R(chain_count)
+    emap_AA_AH ./= R(chain_count)
+
+    #  Symmetrize (add transpose)
+    emap_YU    .+= transpose(emap_YU)
+    emap_AH    .+= transpose(emap_AH)
+    emap_AA_YU .+= transpose(emap_AA_YU)
+    emap_AA_AH .+= transpose(emap_AA_AH)
+
+    if diagonal
+        #  Halve the diagonal entries (counted twice)
+        for i in 1:Sim.ChainLength[1]
+            emap_YU[i, i] /= 2.0
+            emap_AH[i, i] /= 2.0
+        end
+        for i in axes(emap_AA_YU,1)
+            emap_AA_YU[i, i] /= 2.0
+            emap_AA_AH[i, i] /= 2.0
+        end
+    end
+
+    #normalize by the number of chain pairs
+    emap_AA_YU = normalize_energy_CMs(Sim, emap_AA_YU)
+    emap_AA_AH = normalize_energy_CMs(Sim, emap_AA_AH)
+    return emap_YU,emap_AH,emap_AA_YU,emap_AA_AH
 end
 
 @doc raw"""
@@ -595,30 +647,8 @@ function computeMeanPairEnergyMatrix_naiv(Sim::SimData{R,I}, bounds::Vector{Tupl
     rcut_yu_sqr = rcut_yu^2 ### precompute sqr cutoff
     rcut_ah_sqr = rcut_ah^2 ### precompute sqr cutoff
 
-    # energy maps (initially zero)
-    numTypes = maximum(collect(keys(Sim.IDToResName)))
-    emap_inter_YU  = zeros(R, Sim.ChainLength[1], Sim.ChainLength[1])
-    emap_inter_AH  = zeros(R, Sim.ChainLength[1], Sim.ChainLength[1])
-    emap_inter_AA_YU = zeros(R,numTypes, numTypes)
-    emap_inter_AA_AH = zeros(R,numTypes, numTypes)
-
-    sigmas  = [Sim.IDToSigmas[id]  for id in Sim.IDs]
-    lambdas = [Sim.IDToLambdas[id] for id in Sim.IDs]
-
-    NClusterSteps = length(Sim.ClusterRange)
-    dist_x   = zeros(R, Sim.ChainLength[1])
-    dist_y   = zeros(R, Sim.ChainLength[1])
-    dist_z   = zeros(R, Sim.ChainLength[1])
-    dist_sqr           = zeros(R, Sim.ChainLength[1])
-
+    emap_inter_YU,emap_inter_AH,emap_inter_AA_YU,emap_inter_AA_AH,sigmas, lambdas, dist_x,dist_y,dist_z, dist_sqr, inv_x,inv_y,inv_z, bl_x, bl_y,bl_z = allocateEnergyMaps(Sim::SimData{R,I})
     inv_box_length = R.(1.0./Sim.BoxLength)
-    inv_x = inv_box_length[1]
-    inv_y = inv_box_length[2]
-    inv_z = inv_box_length[3]
-
-    bl_x = R(Sim.BoxLength[1])
-    bl_y = R(Sim.BoxLength[2])
-    bl_z = R(Sim.BoxLength[3])
 
     COM=zeros(R, 3)
     AxisCOM = computeCOMOfLargestCluster(Sim)
@@ -631,7 +661,6 @@ function computeMeanPairEnergyMatrix_naiv(Sim::SimData{R,I}, bounds::Vector{Tupl
         chain_count+= length(chains)
 
         for (C_count,C1) in enumerate(chains)
-
             for (i1_rel,i1) in enumerate(Sim.ChainStart[C1]:Sim.ChainStop[C1])
                 ### do the particle look ups once
                 i1_id  = Sim.IDs[i1]
@@ -684,32 +713,7 @@ function computeMeanPairEnergyMatrix_naiv(Sim::SimData{R,I}, bounds::Vector{Tupl
         end
     end
 
-    chain_count = chain_count == 0 ? 1 : chain_count
-    #  Average over frames
-    emap_inter_YU  ./= R(chain_count)
-    emap_inter_AH  ./= R(chain_count)
-    emap_inter_AA_YU ./= R(chain_count)
-    emap_inter_AA_AH ./= R(chain_count)
-
-    #  Symmetrize (add transpose)
-    emap_inter_YU  .+= transpose(emap_inter_YU)
-    emap_inter_AH  .+= transpose(emap_inter_AH)
-    emap_inter_AA_YU .+= transpose(emap_inter_AA_YU)
-    emap_inter_AA_AH .+= transpose(emap_inter_AA_AH)
-
-    #  Halve the diagonal entries (counted twice)
-    for i in 1:Sim.ChainLength[1]
-        emap_inter_YU[i, i] /= 2.0
-        emap_inter_AH[i, i] /= 2.0
-    end
-    for i in 1:numTypes
-        emap_inter_AA_YU[i, i] /= 2.0
-        emap_inter_AA_AH[i, i] /= 2.0
-    end
-
-    #normalize by the number of chain pairs
-    emap_inter_AA_YU = normalize_energy_CMs(Sim, emap_inter_AA_YU)
-    emap_inter_AA_AH = normalize_energy_CMs(Sim, emap_inter_AA_AH)
+    emap_inter_YU,emap_inter_AH,emap_inter_AA_YU,emap_inter_AA_AH = symmetrizeEMaps(Sim,emap_inter_YU,emap_inter_AH,emap_inter_AA_YU,emap_inter_AA_AH, chain_count)
 
     Sim.MeanYukawaEnergy = emap_inter_YU
     Sim.MeanYukawaEnergy_perAA = emap_inter_AA_YU
@@ -757,4 +761,114 @@ function volumeNorm_matrix(Sim::SimData{R,I}; contact_cutoff=1.5) where {R<:Real
 
     volume_matrix = R.((4.0/3.0 * π) .* ( (contact_cutoff * 2^(1/6)) .* sigma_matrix).^3)
     return volume_matrix
+end
+
+function getHOOMDBody(Sim::SimData{R,I})::Vector{I} where {R<:Real, I<:Integer}
+    traj = GSDFormat.open(Sim.TrajectoryFile,"r")[1]
+    return Vector{I}(traj.particles.body)
+end
+
+
+@doc raw"""
+    getIntraChainEnergyMap(Sim::SimData{R,I}, bounds; ϵ_ah)
+
+Computes the mean yukawa and ashbaugh hatch interaction energy within each chain that is within the bounds at each step in the Sim.ClusterRange. Also returns the mean interaction energy per amino acids for both interactions.
+
+**Arguments**:
+- `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
+- `bounds`::Vector{Tuple{Float32, Float32}}: Vector with the upper and lower bounds accept as bulk for each dimension.
+- `ϵ_ah` = 0.8368: interaction prefactor for the ashbaugh hatch potential 
+
+**Create**:
+- Sim.MeanIntraYukawaEnergy
+- Sim.MeanIntraYukawaEnergy_perAA
+- Sim.MeanIntraAshbaughHatchEnergy
+- Sim.MeanIntraAshbaughHatchEnergy_perAA
+
+**Returns**:
+- Sim.MeanIntraYukawaEnergy
+- Sim.MeanIntraYukawaEnergy_perAA
+- Sim.MeanIntraAshbaughHatchEnergy
+- Sim.MeanIntraAshbaughHatchEnergy_perAA
+"""
+function getIntraChainEnergyMap(Sim::SimData{R,I}, bounds::Vector{Tuple{Float32, Float32}}; ϵ_ah = R(0.8368)) where {R<:Real, I<:Integer}
+    body = getHOOMDBody(Sim)
+    mask = body .== -1 ### particles in body -1 interact via LJ and Yukawa potentials
+    mask_rel = mask[Sim.ChainStart[1]:Sim.ChainStop[1]]
+
+    ### energies in KJ
+    yu_pref, yu_κ, rcut_yu, rcut_ah = read_FF_Interaction_Parameters(Sim)
+
+    rcut_yu_sqr = rcut_yu^2 ### precompute sqr cutoff
+    rcut_ah_sqr = rcut_ah^2 ### precompute sqr cutoff
+
+    emap_YU,emap_AH,emap_AA_YU,emap_AA_AH,sigmas, lambdas, dist_x,dist_y,dist_z, dist_sqr, inv_x,inv_y,inv_z, bl_x, bl_y,bl_z = allocateEnergyMaps(Sim)
+    inv_box_length = R.(1.0./Sim.BoxLength)
+
+    COM=zeros(R, 3)
+    AxisCOM = computeCOMOfLargestCluster(Sim)
+    
+    chain_count = 0
+    @inbounds for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
+        ### check which chains are within bounds at the current step
+        COM[Sim.SlabAxis] = AxisCOM[k]
+        chains = isnothing(bounds) ? collect(1:Sim.NChains) : getChainsInBounds(Sim, bounds,COM, step, Sim.BoxLength, inv_box_length)
+        chain_count+= length(chains)
+        for (C_count,C1) in enumerate(chains) ### only take chains which are fully in the bounds
+            for (i1_rel,i1) in enumerate(Sim.ChainStart[C1]:Sim.ChainStop[C1])
+                if !mask[i1] continue end ### skip amino acids that are part of RRM
+                ### do the particle look ups once
+                i1_id  = Sim.IDs[i1]
+                i1_σ   = sigmas[i1]
+                i1_λ   = lambdas[i1]
+                q1 = Sim.Charges[i1]
+                xi1= Sim.x[i1,step]
+                yi1= Sim.y[i1,step]
+                zi1= Sim.z[i1,step]
+
+                ### computes relative distance dist_x,... and zeros dist_sqr
+                relative_distance(dist_x, dist_y, dist_z, Sim, C1, step, xi1, yi1, zi1,dist_sqr)
+
+                ### wraps back to minimal distance and sums up in dist_sq;,no allocations
+                dist_sqr = apply_periodic!(dist_x,dist_sqr,inv_x, bl_x)
+                dist_sqr = apply_periodic!(dist_y,dist_sqr,inv_y, bl_y)
+                dist_sqr = apply_periodic!(dist_z,dist_sqr,inv_z, bl_z)
+    
+                range = Sim.ChainStart[C1]:Sim.ChainStop[C1]
+                @fastmath @simd for i2_rel in eachindex(dist_sqr)
+                    if (dist_sqr[i2_rel] < rcut_yu_sqr && i2_rel>i1_rel) && mask_rel[i2_rel]
+                        r_sqr = dist_sqr[i2_rel]
+                        r = sqrt(r_sqr)
+                        
+                        q2 = Sim.Charges[range[i2_rel]]
+                        en_yu = yukawa_potential(r, q1, q2, yu_κ, yu_pref)
+                        i2_id = Sim.IDs[range[i2_rel]]
+
+                        emap_YU[i2_rel, i1_rel]  += en_yu
+                        emap_AA_YU[i2_id, i1_id] += en_yu
+                        
+                        # Branch-free Ashbaugh-Hatch condition (using squared distance)
+                        if r_sqr < rcut_ah_sqr
+                            σ = (i1_σ + sigmas[ range[i2_rel]]) * R(0.5)
+                            λ = (i1_λ + lambdas[range[i2_rel]]) * R(0.5)
+
+                            en_ah = ashbaugh_hatch_potential_fast(r, σ,λ, ϵ_ah)
+
+                            emap_AH[i2_rel, i1_rel]  += en_ah
+                            emap_AA_AH[i2_id, i1_id] += en_ah
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    emap_YU,emap_AH,emap_AA_YU,emap_AA_AH = symmetrizeEMaps(Sim,emap_YU,emap_AH,emap_AA_YU,emap_AA_AH, chain_count;diagonal=false)
+
+    Sim.MeanIntraYukawaEnergy = emap_YU
+    Sim.MeanIntraYukawaEnergy_perAA = emap_AA_YU
+    Sim.MeanIntraAshbaughHatchEnergy = emap_AH
+    Sim.MeanIntraAshbaughHatchEnergy_perAA = emap_AA_AH
+
+    return emap_YU, emap_AA_YU, emap_AH, emap_AA_AH
 end

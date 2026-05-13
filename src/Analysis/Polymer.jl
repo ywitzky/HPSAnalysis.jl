@@ -261,7 +261,7 @@ function computeInertiaTensor(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
-function computePolymerCharacteristics(Sim::SimData{R,I}, Start::I=100; Range::Union{Nothing,Vector{Vector{I2}}}=nothing) where {R<:Real, I<:Integer, I2<:Integer}
+function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100; Range::Union{Nothing,Vector{Vector{I2}}}=nothing) where {R<:Real, I<:Integer, I2<:Integer}
     λ = Sim.InertiaTensorEigVals
     Sim.ShapeAsymmetry =  1.0 .-3.0.*(λ[1,:,:].*λ[2,:,:].+λ[1,:,:].*λ[3,:,:].+λ[2,:,:].*λ[3,:,:])./(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]).^2 ### arash + janka
     Sim.ParallelInertiaTensor = @. (λ[1,:,:]+λ[2,:,:])/2.0

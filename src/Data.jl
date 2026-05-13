@@ -187,6 +187,10 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
     MeanYukawaEnergy_perAA::Matrix{FloatType}
     MeanAshbaughHatchEnergy::Matrix{FloatType}
     MeanAshbaughHatchEnergy_perAA::Matrix{FloatType}
+    MeanIntraYukawaEnergy::Matrix{FloatType}
+    MeanIntraYukawaEnergy_perAA::Matrix{FloatType}
+    MeanIntraAshbaughHatchEnergy::Matrix{FloatType}
+    MeanIntraAshbaughHatchEnergy_perAA::Matrix{FloatType}
 
 
     function SimData()
@@ -229,7 +233,7 @@ mutable struct SimData{FloatType<:AbstractFloat,IntType<:Integer}
         
         0,0,
         
-        zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0))) 
+        zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0)),zeros((0,0))) 
     end
 end
 

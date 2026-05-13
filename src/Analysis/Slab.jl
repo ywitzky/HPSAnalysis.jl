@@ -26,17 +26,16 @@ end
     chains = Vector{I}()
     if !isnothing(bounds)
         for (C, (start, stop)) in enumerate(zip(Sim.ChainStart, Sim.ChainStop))
-            (x_min, x_max) = getRecenteredPositions.(extrema(Sim.x_uw[start:stop, step]), COM[1], Len[1], Len_inv[1])
-            (y_min, y_max) = getRecenteredPositions.(extrema(Sim.y_uw[start:stop, step]), COM[2], Len[2], Len_inv[2])
-            (z_min, z_max) = getRecenteredPositions.(extrema(Sim.z_uw[start:stop, step]), COM[3], Len[3], Len_inv[3])
+            ### computing the extrema first works only most of the times...
+            (x_min, x_max) = extrema(getRecenteredPositions.(Sim.x_uw[start:stop, step], COM[1], Len[1], Len_inv[1]))
+            (y_min, y_max) = extrema(getRecenteredPositions.(Sim.y_uw[start:stop, step], COM[2], Len[2], Len_inv[2]))
+            (z_min, z_max) = extrema(getRecenteredPositions.(Sim.z_uw[start:stop, step], COM[3], Len[3], Len_inv[3]))
 
             if  x_min>bounds[1][1] && x_max < bounds[1][2] && 
                 y_min>bounds[2][1] && y_max < bounds[2][2] && 
                 z_min>bounds[3][1] && z_max < bounds[3][2] 
 
                 push!(chains,C)
-            #else 
-            #    println("$y_min, $y_max, $(bounds[2])")
             end
         end
     end
