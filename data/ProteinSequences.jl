@@ -78,8 +78,8 @@ NameToSeq["RS40_IDR2"] = NameToSeq["RS40"][167:end]
 
 NameToSeq["RS31a_PHOSALL_IDR2"] = NameToSeq["RS31a_PHOSALL"][167:end] ### according to Alpha-Fold 167-356 on mobiDB
 NameToSeq["RS31_PHOSALL_IDR2"] = NameToSeq["RS31_PHOSALL"][167:end] ### according to Alpha-Fold 167-356 on mobiDB
-NameToSeq["RS31_IDR2"] = NameToSeq["RS31"][167:length(NameToSeq["RS31"])] ### according to Alpha-Fold 167-356 on mobiDB
-NameToSeq["RS31a_IDR2"] = NameToSeq["RS31a"][167:length(NameToSeq["RS31a"])] ### according to Alpha-Fold 167-356 on mobiDB
+NameToSeq["RS31_IDR2"]  = NameToSeq["RS31" ][167:end] ### according to Alpha-Fold 167-356 on mobiDB
+NameToSeq["RS31a_IDR2"] = NameToSeq["RS31a"][167:end] ### according to Alpha-Fold 167-356 on mobiDB
 
 NameToSeq["RS31_PHOS_BOX_IDR2"] = NameToSeq["RS31_PHOS_BOX"][167:end]
 NameToSeq["RS31_PHOS_OUTSIDEBOX_IDR2"] = NameToSeq["RS31_PHOS_OUTSIDEBOX"][167:end]
