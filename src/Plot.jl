@@ -526,6 +526,9 @@ end
 
 
 function get_color(value, clims, scheme)
+    if isnan(value)
+        return RGBA(0.0, 0.0, 0.0, 0.0)
+    end
     norm_val = clamp((value - clims[1]) / (clims[2] - clims[1]), 0.0, 1.0)
     return colorschemes[scheme][norm_val]
 end
@@ -566,10 +569,14 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
             _, InterChainMatrix = compute_submatrix(InterChainMatrix, ranges)
             addon ="_with_coarse"
         end
+        if any(isnan.(InterChainMatrix)) || any(isnan.(avg))
+            println("Skip plot.")
+            continue
+        end
 
         clims_inter = (0,maximum(InterChainMatrix)) # a
         clims_intra = iserror=="_Error" ? clims_inter : extrema(avg) #b
-        toplabel = iserror=="_Error" ? L"ΔP(d_{ij}<1.1~σ~2^{(1/6)})" : L"\ln(<d_{ij}>)"
+        toplabel    = iserror=="_Error" ? L"ΔP(d_{ij}<1.1~σ~2^{(1/6)})" : L"\ln(<d_{ij}>)"
         color_intra = iserror=="_Error" ? color_inter : :viridis
 
         matrix  = triu(InterChainMatrix)+tril(avg,-1);
@@ -623,7 +630,8 @@ function plotMeanEnergyPerID(Sim::SimData{R,I})::Plots.Plot{Plots.GRBackend} whe
     fig =  Plots.plot(xlabel="amino acid i", ylabel="amino acid j",title=L"\langle E \rangle~per~Protein\quad[J/mol]")
 
     matrix  = (triu(Sim.MeanYukawaEnergy)+tril(Sim.MeanAshbaughHatchEnergy,-1)).*1000
-    max = maximum(abs.(matrix))
+    max = maximum(abs.(matrix); init=0.0)
+    if max==0 return fig end
     NMat = size(matrix,1)
     ticks = vcat([1], collect(0:50:NMat)[2:end])
     Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),size=(400,400), ticks=ticks, AspectRatio=true)
@@ -638,7 +646,9 @@ function plotMeanEnergyPerType(Sim::SimData{R,I})::Plots.Plot{Plots.GRBackend} w
 
     fig =  Plots.plot(title=L"\langle E \rangle~per~Amino~Acid\quad[J/mol]", ticks=(1:NIds, ticks)) 
     matrix  = (triu(Sim.MeanYukawaEnergy_perAA)+tril(Sim.MeanAshbaughHatchEnergy_perAA,-1)).*1000
-    max = maximum(abs.(matrix))
+    max = maximum(abs.(matrix); init=0.0)
+    if max==0 return fig end
+
     Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),AspectRatio=true, size=(400,400),right_margin=1mm,colorbar_title_location=:right,colorbar_tickfontrotation=0)
     return fig
 end
