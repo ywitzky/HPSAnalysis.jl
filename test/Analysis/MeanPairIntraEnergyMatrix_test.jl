@@ -353,8 +353,6 @@ isinbounds(x,y,z, bounds)=(bounds[1][1] ≤ x ≤ bounds[1][2]) && (bounds[2][1]
     # -----------------------------------------------------------------
     #   Final assertions
     # -----------------------------------------------------------------
-    display(yu_ref)
-    display(yu_fast)
     @test all(isapprox.(yu_ref  ,   yu_fast ; rtol=1e-6, atol=1e-10))
     @test all(isapprox.(ah_ref  ,   ah_fast ; rtol=1e-6, atol=1e-10))
     @test all(isapprox.(yu_refAA, yuAA_fast ; rtol=1e-6, atol=1e-4 ))

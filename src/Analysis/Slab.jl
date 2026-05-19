@@ -413,34 +413,43 @@ A tuple `(γ, Δγ)` where
 function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},Ranges::Vector{<:AbstractRange{I2}};filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer,I2<:Integer}
     longfilename = Sim.BasePath*filename 
 
-    file = h5open(longfilename) 
-    pressure_tensor = collect(file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"])
-    timestep = collect(file["hoomd-data/Simulation/timestep"])
+    if isfile(longfilename)
+        file = h5open(longfilename) 
+        pressure_tensor = collect(file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"])
+        timestep = collect(file["hoomd-data/Simulation/timestep"])
 
-    pressure_tensor = reshape(pressure_tensor, (6,I(length(pressure_tensor)/6)))
+        pressure_tensor = reshape(pressure_tensor, (6,I(length(pressure_tensor)/6)))
 
-    ### start is assumed to be in multiples of the frequency of the frame outputs
-    ### pressure data is written out way more
+        ### start is assumed to be in multiples of the frequency of the frame outputs
+        ### pressure data is written out way more
 
-    #start_time  = start * Sim.TrajWriteOutFreq
-    conv_steps(time) = findfirst(x->x>=time* Sim.TrajWriteOutFreq, timestep)
-    indices = vcat(collect.([conv_steps(first(range)):tau:conv_steps(last(range)) for range in Ranges])...)
+        #start_time  = start * Sim.TrajWriteOutFreq
+        conv_steps(time) = findfirst(x->x>=time* Sim.TrajWriteOutFreq, timestep)
+        indices = vcat(collect.([conv_steps(first(range)):tau:conv_steps(last(range)) for range in Ranges])...)
 
-    #start_index = findfirst(x->(x)>=start_time, timestep[:] )
-    #https://hoomd-blue.readthedocs.io/en/v6.0.0/hoomd/md/compute/thermodynamicquantities.html#hoomd.md.compute.ThermodynamicQuantities.pressure_tensor
-    p_xx = [pressure_tensor[1,i] for i in  indices]
-    p_yy = [pressure_tensor[4,i] for i in  indices]
-    p_zz = [pressure_tensor[6,i] for i in  indices]
+        #start_index = findfirst(x->(x)>=start_time, timestep[:] )
+        #https://hoomd-blue.readthedocs.io/en/v6.0.0/hoomd/md/compute/thermodynamicquantities.html#hoomd.md.compute.ThermodynamicQuantities.pressure_tensor
+        p_xx = [pressure_tensor[1,i] for i in  indices]
+        p_yy = [pressure_tensor[4,i] for i in  indices]
+        p_zz = [pressure_tensor[6,i] for i in  indices]
 
-    all_axis = [p_xx, p_yy, p_zz]
-    normal_p = all_axis[Sim.SlabAxis]
-    tangential_p = sum(deleteat!(all_axis,Sim.SlabAxis))./2.0
-    
-    γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
-    Sim.SurfaceTension = mean(γ)
-    n_measure = floor(I, length(normal_p)/NSub)
-    y_mean_sub = [mean(sub) for sub in Iterators.partition(γ, n_measure)][1:end-1] ### last partition is not full...
-    Sim.SurfaceTensionError = sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
+        all_axis = [p_xx, p_yy, p_zz]
+        normal_p = all_axis[Sim.SlabAxis]
+        tangential_p = sum(deleteat!(all_axis,Sim.SlabAxis))./2.0
+        
+        γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
+        Sim.SurfaceTension = mean(R.(γ))
+        n_measure = floor(I, length(normal_p)/NSub)
+        if n_measure==0
+            Sim.SurfaceTensionError=R(0)
+        else
+            y_mean_sub = [mean(sub) for sub in Iterators.partition(γ, n_measure)][1:end-1] ### last partition is not full...
+            Sim.SurfaceTensionError = sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
+        end
+    else
+        Sim.SurfaceTension =0.0
+        Sim.SurfaceTensionError=0.0
+    end
 
     return Sim.SurfaceTension, Sim.SurfaceTensionError
 end
