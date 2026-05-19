@@ -69,6 +69,7 @@ function computeInterChainContactMatrix_Naiv(Sim::SimData{R,I}; bounds::Union{No
     end
     println("UsedChains $UsedChains")
     Sim.ContactMatrices = (Sim.ContactMatrices.+transpose(Sim.ContactMatrices))./2.0
+    UsedChains = isnan(UsedChains) ? R(1) : UsedChains ### zeros cause nans in the following
     Sim.ContactMatrices ./= UsedChains
 
     return Sim.ContactMatrices
@@ -836,7 +837,7 @@ function getIntraChainEnergyMap(Sim::SimData{R,I}, bounds::Vector{Tuple{Float32,
     
                 range = Sim.ChainStart[C1]:Sim.ChainStop[C1]
                 @fastmath @simd for i2_rel in eachindex(dist_sqr)
-                    if (dist_sqr[i2_rel] < rcut_yu_sqr && i2_rel>i1_rel) && mask_rel[i2_rel]
+                    if (dist_sqr[i2_rel] < rcut_yu_sqr && i2_rel>i1_rel+1) && mask_rel[i2_rel]
                         r_sqr = dist_sqr[i2_rel]
                         r = sqrt(r_sqr)
                         
