@@ -1,4 +1,4 @@
-using Base.Iterators, HDF5
+using Base.Iterators, HDF5, LsqFit, LaTeXStrings,Integrals
 
 function getSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
     if Sim.SlabAxis==1
@@ -239,6 +239,36 @@ function computeSlabDensities_Help!(SlabHistogramSeries::OffsetArrays.OffsetArra
     return density
 end
 
+function tanh_profile(z, params)
+    ρ_l, ρ_v, W, z0 = params
+    Δρ = ρ_l - ρ_v
+    return (ρ_l + ρ_v)/2 .- (Δρ/2) .* tanh.((z .- z0) ./ W)
+end
+
+function determineSurfaceWidth(Sim::HPSAnalysis.SimData{R,I}; Windowlength=300, size=(400,300)) where{R<:Real, I<:Integer} 
+    N = extrema(axes(Sim.SlabHistogramSeries,1))[2]-1
+    density = zeros(R,N+1)
+    NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
+
+    xaxis = axes(Sim.SlabHistogramSeries)[1]
+    AvgHist = (sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements))[:,1,1]
+
+    HPSAnalysis.computeSlabDensities_Help!(AvgHist,density);
+
+    xvals = collect(xaxis[1:1000])
+    yvals = collect(density[1:1000])
+    fig = Plots.plot(xvals,yvals, size=size,label="sim. data", xlabel=L"|z-z_\textrm{drop.}|\quad[\AA]", ylabel=L"\rho(z)\quad[\textrm{kg/L}]", minorticks=10,gridalpha=1.0)
+
+    W0 = xvals[findfirst(x->x<0.2,yvals)] ### rough guess where the center of the tanh is
+    model = curve_fit(tanh_profile, xvals, yvals, [0.5, 0.0,30.0, W0])
+    Plots.plot!(xvals,tanh_profile(xvals, model.param),label="tanh. fit", xlim=(0,2*model.param[4]))
+
+    Plots.savefig(fig, Sim.PlotPath*"SurfaceWidthFit.png" )
+    Plots.savefig(fig, Sim.PlotPath*"SurfaceWidthFit.pdf" )
+
+    return model.param[3]
+end
+
 
 
 @doc raw"""
@@ -452,4 +482,83 @@ function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},Ranges::Vector{<:Ab
     end
 
     return Sim.SurfaceTension, Sim.SurfaceTensionError
+end
+
+
+"""
+    computeSurfaceTensionCorrection(Sim::HPS.SimData{R,I}, Δρ::R2, W::R2, λ_eff::R2, charge_frac::R2) where {R<:Real, I<:Integer, R2<:Real}
+
+Compute surface tension correction terms (AH and YK) from simulation data.
+
+# Arguments
+- `Sim`: Simulation data object (contains force field parameters).
+- `Δρ`: Density difference in **kg/L**.
+- `W`: Interfacial width in **Å**.
+- `λ_eff`: Effective length scale, **unitless**.
+- `charge_frac`: Fraction of charge contributing to YK term, **unitless**.
+
+# Returns
+- `Δγ_AH`, `Δγ_YK`: Surface tension corrections in units of **10⁻³ kJ/mol/Å²**.
+
+# Notes
+Internally calls `computeSurfaceTensionCorrection(...)` with derived parameters from `Sim`.
+"""
+function computeSurfaceTensionCorrection(Sim::SimData{R,I},Δρ::R2, W::R2, λ_eff::R2,charge_frac::R2) where {R<:Real,I<:Integer, R2<:Real}
+    yu_pref, κ, rcut_yu, rcut_ah = read_FF_Interaction_Parameters(Sim)
+
+    m_monomer = sum(Sim.ChainMasses)./Sim.NAtoms
+
+    Δγ_AH, Δγ_YK = computeSurfaceTensionCorrection(R(Δρ), R(W), κ,m_monomer,R(λ_eff), yu_pref, R(charge_frac); r_c_AH=rcut_ah,r_c_DH=rcut_yu)
+
+    return Δγ_AH,Δγ_YK
+end
+
+"""
+    computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_eff::R, yk_prefactor::R, charge_frac::R; r_c_AH=R(20.0), r_c_DH=R(40), ϵ_AH=R(0.8368)) where {R<:Real}
+
+Compute surface tension corrections (AH and YK) using integral formulations.
+
+# Arguments
+- `Δρ`: Density difference in **kg/L**.
+- `W`: Interfacial width in **Å**.
+- `κ`: Inverse Debye length in **1/Å**.
+- `m_monomer`: Monomer mass in **atomic mass units (Da)**.
+- `λ_eff`: Effective length scale, **unitless**.
+- `yk_prefactor`: YK prefactor in **kJ/mol·Å**.
+- `charge_frac`: Fraction of charge contributing to YK term, **unitless**.
+- `r_c_AH`: Cutoff for AH term in **Å** (default: 20.0).
+- `r_c_DH`: Cutoff for DH term in **Å** (default: 40.0).
+- `ϵ_AH`: AH energy parameter in **kJ/mol** (default: 0.8368).
+
+# Returns
+- `Δγ_AH`, `Δγ_YK`: Surface tension corrections in units of **10⁻³ kJ/mol/Å²**.
+
+# Notes
+- Integrals are evaluated in reduced coordinates.
+- AH term uses Lennard-Jones-like kernel; YK term uses Yukawa-like kernel.
+"""
+function computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_eff::R, yk_prefactor::R, charge_frac::R; r_c_AH=R(20.0), r_c_DH=R(40), ϵ_AH=R(0.8368)) where {R<:Real}
+    ### integrals in reduced coordinates
+    Δγ_AH((s,r),(W   )) = (r^-3 -2*r^-9)        *(3*s^3-s)*coth(s*r/W)
+    Δγ_DH((s,r),(W,D))  = r^2*(D+r)/D*exp(-r/D) *(3*s^3-s)*coth(s*r/W)
+
+    σ=5.0
+    domain = ([0,r_c_AH/σ], [1,Inf]) # (lb, ub)
+    prob = IntegralProblem(Δγ_AH, domain,(W/σ))
+    integral_AH =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
+
+    l = 1.0 # Angstroem
+    prob = IntegralProblem(Δγ_DH, ([0,r_c_DH/l], [1,Inf]) ,(W/l,1.0/κ/l))
+    integral_DH =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
+
+    conv_to_number_density = 1.0/(m_monomer*1.6605) ### converts to number density per Å^3
+    Δn = Δρ * conv_to_number_density
+    #println("density $(Δρ),  number density: $(Δn)")
+
+    Δγ_AH = Δn^2 * 12.0*π* λ_eff*ϵ_AH*σ^4*integral_AH[1]*1000.0
+    Δγ_YK = Δn^2 *charge_frac^2*yk_prefactor*π/2.0*l^3 *integral_DH[1]*1000.0
+    #println("$(Δγ_AH) 10^-3 kJ/mol/A^2")
+    #println("$(Δγ_YK) 10^-3 kJ/mol/A^2")
+
+    return Δγ_AH,Δγ_YK
 end
