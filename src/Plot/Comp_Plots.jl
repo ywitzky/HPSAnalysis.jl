@@ -81,7 +81,7 @@ function computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.SimData{R,I}},
 
 end
 
-function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{Any}}=Vector{Vector{Any}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm) where {R<:Real, I<:Integer,I2<:Integer}
+function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
 
     nSims = length(Sims) # how many simulations we have
 
@@ -98,16 +98,19 @@ function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::Stri
     inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace)
 
     # Figure and colour‑bars
-    fig = plot(layout = comb_layout,margins = -3mm, left_margin = 0mm, right_margin = 0mm,size = Size, top_margin=0mm, bottom_margin=0mm)
+    fig = plot(layout = comb_layout,margins = -3mm, left_margin = 0mm, right_margin = 0mm,size = Size, top_margin=0mm, bottom_margin=0mm, minorticks=10)
 
     # intra‑chain colour bar (left)
-    heatmap!(data_intra, [1],transpose([data_intra;;]),color = color_intra,colorbar = false,subplot = 1,yaxis = nothing,xmirror = true,xlabel = L"\ln(<d_{ij}>)",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=topsepspace, clims=clims_intra,top_margin=tspace)
+    heatmap!(data_intra, [1],transpose([data_intra;;]),color = color_intra,colorbar = false,subplot = 1,yaxis = nothing,xmirror = true,xlabel = L"\ln(\langle d_{ij}\rangle/\AA)",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=topsepspace, clims=clims_intra,top_margin=tspace)
 
     # empty placeholder (keeps the left bar thin)
     plot!(subplot = 2, framestyle = :none, bottom_margin=topsepspace, left_margin=rightsepspace,right_margin=2mm)
 
+    ylabel_ = inPercent ?  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad [\%]" :  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})" 
     # inter‑chain colour bar (right)
-    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = nGrid + 3,yrotation = 90.0,xmirror = true,ylabel = L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})",xlabel = nothing,yticks = true,tick_direction = :out,right_margin = 2mm,labelfontsize = LabelSize, left_margin=rightsepspace,yminorticks=10)
+    clims_inter = inPercent ? clims_inter.*100.0 : clims_inter
+    data_inter .*= inPercent ? 100.0 : 1.0
+    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = nGrid + 3,yrotation = 90.0,xmirror = true,ylabel = ylabel_,xlabel = nothing,yticks = true,tick_direction = :out,right_margin = 2.5mm,labelfontsize = LabelSize, left_margin=rightsepspace,yminorticks=10)
 
     # Plot the heat‑maps - one subplot per simulation
     for i in 1:nSims
@@ -131,8 +134,8 @@ function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::Stri
     for i in 3+nSims:2+nGrid
         row = ((i - 1) ÷ ncols) + 1
         col = ((i - 1) % ncols) + 1
-        xlbl = (row == nrows) ? "Amino Acids i [-]" : ""
-        ylbl = (col == 1)     ? "Amino Acids j [-]" : ""
+        xlbl = (row == nrows) ? "Amino Acids i " : ""
+        ylbl = (col == 1)     ? "Amino Acids j " : ""
         plot!(subplot=i, xlabel = xlbl,framestyle = :none,)
     end
 
@@ -140,17 +143,13 @@ function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::Stri
     if length(Points) > 0
         cnt = nSims + 4
         for (i, j) in enumerate(3:(nSims + 2))   # `j` is the heat‑map subplot index
+            len = NMats[i]
             if length(Points) > 0 && length(Points[i]) > 0
                 # Create twin axes that share the limits of the heat‑map
-                plot!(twinx(fig[j]))
-                plot!(twiny(fig[j]))
-
-                # Empty tick‑labels – we only want the tick marks at the positions
-                empty_labels = fill("", length(Points[i]))
-
-                plot!(yticks = (Points[i], empty_labels),yforeground_color_axis = :red,tick_direction = :out,foreground_color_border = :white,lims = Lims[i], subplot = cnt,)
-                plot!(xticks = (Points[i], empty_labels),xforeground_color_axis = :red,tick_direction = :out,foreground_color_border = :white,lims = Lims[i], subplot = cnt + 1)
-                cnt += 2
+                for point in Points[i]
+                    plot!([point,point],[floor(I,len*0.975), len], label="", c=:red, subplot=j, linewidth=2.0)
+                    plot!([floor(I,len*0.975), len],[point,point], label="", c=:red, subplot=j, linewidth=2.0)
+                end
             end
         end
     end
