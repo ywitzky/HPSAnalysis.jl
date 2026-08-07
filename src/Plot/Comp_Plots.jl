@@ -160,7 +160,7 @@ function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::Stri
 end
 
 
-function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""]) where {R<:Real, I<:Integer,I2<:Integer}
+function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true) where {R<:Real, I<:Integer,I2<:Integer}
     @assert length(Sims)>=2 "Number of Simulations needs to be atleast 2"
 
      inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = computeContactMatrixColorMatrix(Sims,Vector{Vector{UnitRange{Int32}}}(),color_inter,color_intra, xspace)
@@ -180,8 +180,8 @@ function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, fil
 
     heatmap!(data_inter, [1],transpose([data_inter;;]),color = color_inter,colorbar = false,subplot = 2,yaxis = nothing,xmirror = true,xlabel = L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=bspace, clims = clims_inter, top_margin=tspace)
 
-    xlbl = "Amino Acids i [-]"#(row == nrows) ? "Amino Acids i [-]" : ""
-    ylbl = "Amino Acids j [-]"#(col == 1)     ? "Amino Acids j [-]" : ""
+    xlbl = "Amino Acids i "
+    ylbl = "Amino Acids j "
 
     Plots.heatmap!(Color_Mats[1], subplot=3,yflip = false,lims = Lims[1],ticks = Ticks[1], xlabel = xlbl, ylabel = ylbl, AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,left_margin=4mm)
 
@@ -199,7 +199,9 @@ function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, fil
 
     ranges = length(ranges) > 0 ? ranges :  [1:size(inter_CMs[1])[1], 1:size(inter_CMs[2])[1]]
     @assert length(ranges[1]) == length(ranges[2]) "Matrix areas specified with arguemtns \"ranges\" need to be of same size"
-    @assert Sims[1].Sequences[1][ranges[1]]==Sims[2].Sequences[1][ranges[2]] "Ranges do not contain the same sequence"
+    if CheckSequence
+        @assert Sims[1].Sequences[1][ranges[1]]==Sims[2].Sequences[1][ranges[2]] "Ranges do not contain the same sequence"
+    end
 
     inter_A = inter_CMs[1][ranges[1],ranges[1]]
     inter_B = inter_CMs[2][ranges[2],ranges[2]]
@@ -241,7 +243,7 @@ function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, fil
     plot!(subplot = 2, framestyle = :none, bottom_margin=bspace, left_margin=lspace,right_margin=rspace, top_margin=tspace)
 
 
-    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = 4,yrotation = 90.0,xmirror = true,ylabel = L"\Delta P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})",xlabel = nothing,yticks = 5,tick_direction = :out,labelfontsize = LabelSize, left_margin=lspace,yminorticks=10,right_margin=rspace,)
+    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = 4,yrotation = 90.0,xmirror = true,ylabel = L"\Delta P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})",xlabel = nothing,tick_direction = :out,labelfontsize = LabelSize, left_margin=lspace,yminorticks=10,right_margin=rspace,)
 
     for (i,range) in zip([3,4],ranges)
         low  = first(range)
