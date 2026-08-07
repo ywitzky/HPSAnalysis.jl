@@ -151,7 +151,7 @@ For the algorithm to work, it is important that the dense phase of the first fra
 - `Coms::Vector{Float}`: COM of largest cluster along the Sim.SlabAxis for each step.
 """
 function computeCOMOfLargestCluster(Sim::SimData{T,I} ) where {I<:Integer, T<:Real}
-    Coms= zeros(T, length(Sim.Clusters))#Vector{Int}
+    Coms= zeros(T, length(Sim.ClusterRange))#Vector{Int}
     LClustID = getLargestClusterIDs(Sim)
 
     Len = Sim.BoxLength[Sim.SlabAxis]

@@ -1,4 +1,4 @@
-using Base.Iterators, HDF5
+using Base.Iterators, HDF5, LsqFit, LaTeXStrings,Integrals, Statistics 
 
 function getSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
     if Sim.SlabAxis==1
@@ -26,21 +26,40 @@ end
     chains = Vector{I}()
     if !isnothing(bounds)
         for (C, (start, stop)) in enumerate(zip(Sim.ChainStart, Sim.ChainStop))
-            (x_min, x_max) = getRecenteredPositions.(extrema(Sim.x_uw[start:stop, step]), COM[1], Len[1], Len_inv[1])
-            (y_min, y_max) = getRecenteredPositions.(extrema(Sim.y_uw[start:stop, step]), COM[2], Len[2], Len_inv[2])
-            (z_min, z_max) = getRecenteredPositions.(extrema(Sim.z_uw[start:stop, step]), COM[3], Len[3], Len_inv[3])
+            ### computing the extrema first works only most of the times...
+            (x_min, x_max) = extrema(getRecenteredPositions.(Sim.x_uw[start:stop, step], COM[1], Len[1], Len_inv[1]))
+            (y_min, y_max) = extrema(getRecenteredPositions.(Sim.y_uw[start:stop, step], COM[2], Len[2], Len_inv[2]))
+            (z_min, z_max) = extrema(getRecenteredPositions.(Sim.z_uw[start:stop, step], COM[3], Len[3], Len_inv[3]))
 
             if  x_min>bounds[1][1] && x_max < bounds[1][2] && 
                 y_min>bounds[2][1] && y_max < bounds[2][2] && 
                 z_min>bounds[3][1] && z_max < bounds[3][2] 
 
                 push!(chains,C)
-            #else 
-            #    println("$y_min, $y_max, $(bounds[2])")
             end
         end
     end
     return chains
+end
+
+function getTimeStepsWhereChainsInBounds(Sim::SimData{R,I}, bounds::Vector{Tuple{R, R}}) where {R<:Real, I<:Integer} 
+
+    N = length(Sim.ClusterRange)
+    ranges = sizehint!([Vector{I}() for _ in 1:Sim.NChains],N)
+    COM=zeros(R, 3)
+    AxisCOM = computeCOMOfLargestCluster(Sim)
+    invBoxLength= R.(1.0./Sim.BoxLength)
+
+    for (k,step) in enumerate(Sim.ClusterRange)### ≈ startstep:stepwidth:NSteps
+        COM[Sim.SlabAxis] = AxisCOM[k]
+
+        chains = getChainsInBounds(Sim, bounds,COM, step, Sim.BoxLength, invBoxLength)
+
+        for c in chains
+            push!(ranges[c],step)
+        end
+    end
+    return ranges
 end
 
 @doc raw"""
@@ -220,6 +239,36 @@ function computeSlabDensities_Help!(SlabHistogramSeries::OffsetArrays.OffsetArra
     return density
 end
 
+function tanh_profile(z, params)
+    ρ_l, ρ_v, W, z0 = params
+    Δρ = ρ_l - ρ_v
+    return (ρ_l + ρ_v)/2 .- (Δρ/2) .* tanh.((z .- z0) ./ W)
+end
+
+function determineSurfaceWidth(Sim::HPSAnalysis.SimData{R,I}; Windowlength=300, size=(400,300)) where{R<:Real, I<:Integer} 
+    N = extrema(axes(Sim.SlabHistogramSeries,1))[2]-1
+    density = zeros(R,N+1)
+    NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
+
+    xaxis = axes(Sim.SlabHistogramSeries)[1]
+    AvgHist = (sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements))[:,1,1]
+
+    HPSAnalysis.computeSlabDensities_Help!(AvgHist,density);
+
+    xvals = collect(xaxis[1:1000])
+    yvals = collect(density[1:1000])
+    fig = Plots.plot(xvals,yvals, size=size,label="sim. data", xlabel=L"|z-z_\textrm{drop.}|\quad[\AA]", ylabel=L"\rho(z)\quad[\textrm{kg/L}]", minorticks=10,gridalpha=1.0)
+
+    W0 = xvals[findfirst(x->x<0.2,yvals)] ### rough guess where the center of the tanh is
+    model = curve_fit(tanh_profile, xvals, yvals, [0.5, 0.0,30.0, W0])
+    Plots.plot!(xvals,tanh_profile(xvals, model.param),label="tanh. fit", xlim=(0,2*model.param[4]))
+
+    Plots.savefig(fig, Sim.PlotPath*"SurfaceWidthFit.png" )
+    Plots.savefig(fig, Sim.PlotPath*"SurfaceWidthFit.pdf" )
+
+    return model.param[3]
+end
+
 
 
 @doc raw"""
@@ -255,6 +304,7 @@ function computeSlabDensities(Sim::HPSAnalysis.SimData{R,I}; Windowlength=200, D
     ind_dense = round(I, tmp*Surface_fac)
     ρ_dense_tmp = mean(density[1:ind_dense]) 
 
+    DiluteWidth = DiluteWidth >= NSteps ? NSteps-1 : DiluteWidth ### avoid negative start index <= 0
     avg_dilute = mean(density[NSteps-DiluteWidth:end])
     ind_dilute = ceil(I,findfirst(density.-avg_dilute .<(1.0-MaxVal)*(ρ_dense_tmp-avg_dilute)))+safety
 
@@ -333,20 +383,24 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
             ### recenter histogram according to Cluster COMs
             pos = getRecenteredPositions(SlabCoord, atom ,j, step, AxisCOM, Len, Len_inv)
 
-            if abs(pos)< dense_cutoff[step]
+            if abs(pos)< dense_cutoff
                 ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
                 ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
-                DenseCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                if ind1 ∈ 1:12 && ind2 ∈ 1:12 ### catch exceptions where position is exactly a boundary
+                    DenseCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                end
             end
 
-            if abs(pos)> dilute_cutoff[step]
+            if abs(pos)> dilute_cutoff
                 ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
                 ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
-                DiluteCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                if ind1 ∈ 1:12 && ind2 ∈ 1:12 ### catch exceptions where position is exactly a boundary
+                    DiluteCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                end 
             end
         end
-        DenseCumulantBoxes[:,:,j] /= dense_cutoff[step]*2 
-        DiluteCumulantBoxes[:,:,j] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff[step]*2 )
+        DenseCumulantBoxes[:,:,j] /= dense_cutoff*2 
+        DiluteCumulantBoxes[:,:,j] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff*2 )
     end
     Sim.SlabDenseCumulantBoxes  = DenseCumulantBoxes .*conversion
     Sim.SlabDiluteCumulantBoxes = DiluteCumulantBoxes.*conversion
@@ -390,33 +444,129 @@ A tuple `(γ, Δγ)` where
 
 - `γ` (`Sim.SurfaceTension`) is the mean surface tension,
 - `Δγ` (`Sim.SurfaceTensionError`) is the estimated statistical error."""
-function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},start::I;filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer}
+function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},Ranges::Vector{<:AbstractRange{I2}};filename::String="pressure.h5", tau::I=I(1), NSub::I=I(10)) where {R<:Real, I<:Integer,I2<:Integer}
     longfilename = Sim.BasePath*filename 
 
-    file = h5open(longfilename) 
-    pressure_tensor = file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"]
-    timestep = file["hoomd-data/Simulation/timestep"]
+    if isfile(longfilename)
+        file = h5open(longfilename) 
+        pressure_tensor = collect(file["hoomd-data/md/compute/ThermodynamicQuantities/pressure_tensor"])
+        timestep = collect(file["hoomd-data/Simulation/timestep"])
 
-    ### start is assumed to be in multiples of the frequency of the frame outputs
-    ### pressure data is written out way more
+        pressure_tensor = reshape(pressure_tensor, (6,I(length(pressure_tensor)/6)))
 
-    start_time  = start * Sim.TrajWriteOutFreq
-    start_index = findfirst(x->(x)>=start_time, timestep[:] )
-    
-    #https://hoomd-blue.readthedocs.io/en/v6.0.0/hoomd/md/compute/thermodynamicquantities.html#hoomd.md.compute.ThermodynamicQuantities.pressure_tensor
-    p_xx = pressure_tensor[1, start_index:tau:end]
-    p_yy = pressure_tensor[4, start_index:tau:end]
-    p_zz = pressure_tensor[6, start_index:tau:end]
+        ### start is assumed to be in multiples of the frequency of the frame outputs
+        ### pressure data is written out way more
 
-    all_axis = [p_xx, p_yy, p_zz]
-    normal_p = all_axis[Sim.SlabAxis]
-    tangential_p = sum(deleteat!(all_axis,Sim.SlabAxis))./2.0
-    
-    γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
-    Sim.SurfaceTension = mean(γ)
-    n_measure = floor(I, length(normal_p)/NSub)
-    y_mean_sub = [mean(sub) for sub in Iterators.partition(γ, n_measure)][1:end-1] ### last partition is not full...
-    Sim.SurfaceTensionError = sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
+        #start_time  = start * Sim.TrajWriteOutFreq
+        conv_steps(time) = findfirst(x->x>=time* Sim.TrajWriteOutFreq, timestep)
+        indices = vcat(collect.([conv_steps(first(range)):tau:conv_steps(last(range)) for range in Ranges])...)
+
+        #start_index = findfirst(x->(x)>=start_time, timestep[:] )
+        #https://hoomd-blue.readthedocs.io/en/v6.0.0/hoomd/md/compute/thermodynamicquantities.html#hoomd.md.compute.ThermodynamicQuantities.pressure_tensor
+        p_xx = [pressure_tensor[1,i] for i in  indices]
+        p_yy = [pressure_tensor[4,i] for i in  indices]
+        p_zz = [pressure_tensor[6,i] for i in  indices]
+
+        all_axis = [p_xx, p_yy, p_zz]
+        normal_p = all_axis[Sim.SlabAxis]
+        tangential_p = sum(deleteat!(all_axis,Sim.SlabAxis))./2.0
+        
+        n_measure = floor(I, length(normal_p)/NSub)
+        if n_measure==0
+            Sim.SurfaceTension =R(0)
+            Sim.SurfaceTensionError=R(0)
+        else
+            γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
+            Sim.SurfaceTension = mean(R.(γ)) 
+            y_mean_sub = [mean(sub) for sub in Iterators.partition(γ, n_measure)][1:end-1] ### last partition is not full...
+            Sim.SurfaceTensionError = Statistics.std(y_mean_sub, mean=Sim.SurfaceTension)
+            #sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
+        end
+    else
+        Sim.SurfaceTension =0.0
+        Sim.SurfaceTensionError=0.0
+    end
 
     return Sim.SurfaceTension, Sim.SurfaceTensionError
+end
+
+
+"""
+    computeSurfaceTensionCorrection(Sim::HPS.SimData{R,I}, Δρ::R2, W::R2, λ_eff::R2, charge_frac::R2) where {R<:Real, I<:Integer, R2<:Real}
+
+Compute surface tension correction terms (AH and YK) from simulation data.
+
+# Arguments
+- `Sim`: Simulation data object (contains force field parameters).
+- `Δρ`: Density difference in **kg/L**.
+- `W`: Interfacial width in **Å**.
+- `λ_eff`: Effective length scale, **unitless**.
+- `charge_frac`: Fraction of charge contributing to YK term, **unitless**.
+
+# Returns
+- `Δγ_AH`, `Δγ_YK`: Surface tension corrections in units of **10⁻³ kJ/mol/Å²**.
+
+# Notes
+Internally calls `computeSurfaceTensionCorrection(...)` with derived parameters from `Sim`.
+"""
+function computeSurfaceTensionCorrection(Sim::SimData{R,I},Δρ::R2, W::R2, λ_eff::R2,charge_frac::R2,Δf::R2) where {R<:Real,I<:Integer, R2<:Real}
+    yu_pref, κ, rcut_yu, rcut_ah = read_FF_Interaction_Parameters(Sim)
+
+    m_monomer = sum(Sim.ChainMasses)./Sim.NAtoms
+
+    Δγ_AH, Δγ_YK, Δγ_ExQ  = computeSurfaceTensionCorrection(R(Δρ), R(W), κ,m_monomer,R(λ_eff), yu_pref, R(charge_frac), R(Δf); r_c_AH=rcut_ah,r_c_DH=rcut_yu)
+
+    return Δγ_AH,Δγ_YK, Δγ_ExQ
+end
+
+"""
+    computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_eff::R, yk_prefactor::R, charge_frac::R; r_c_AH=R(20.0), r_c_DH=R(40), ϵ_AH=R(0.8368)) where {R<:Real}
+
+Compute surface tension corrections (AH and YK) using integral formulations.
+
+# Arguments
+- `Δρ`: Density difference in **kg/L**.
+- `W`: Interfacial width in **Å**.
+- `κ`: Inverse Debye length in **1/Å**.
+- `m_monomer`: Monomer mass in **atomic mass units (Da)**.
+- `λ_eff`: Effective length scale, **unitless**.
+- `yk_prefactor`: YK prefactor in **kJ/mol·Å**.
+- `charge_frac`: Fraction of charge contributing to YK term, **unitless**.
+- `r_c_AH`: Cutoff for AH term in **Å** (default: 20.0).
+- `r_c_DH`: Cutoff for DH term in **Å** (default: 40.0).
+- `ϵ_AH`: AH energy parameter in **kJ/mol** (default: 0.8368).
+
+# Returns
+- `Δγ_AH`, `Δγ_YK`: Surface tension corrections in units of **10⁻³ kJ/mol/Å²**.
+
+# Notes
+- Integrals are evaluated in reduced coordinates.
+- AH term uses Lennard-Jones-like kernel; YK term uses Yukawa-like kernel.
+"""
+function computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_eff::R, yk_prefactor::R, charge_frac::R, Δf::R; r_c_AH=R(20.0), r_c_DH=R(40), ϵ_AH=R(0.8368)) where {R<:Real}
+    ### integrals in reduced coordinates
+    Δγ_AH((s,r),(W   )) = (r^-3 -2*r^-9)        *(3*s^3-s)*coth(s*r/W)
+    Δγ_DH((s,r),(W,D))  = r^2*(D+r)/D*exp(-r/D) *(3*s^3-s)*coth(s*r/W)
+
+    σ=5.0
+    domain = ([0,r_c_AH/σ], [1,Inf]) # (lb, ub)
+    prob = IntegralProblem(Δγ_AH, domain,(W/σ))
+    integral_AH =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
+
+    l = 1.0 # Angstroem
+    prob = IntegralProblem(Δγ_DH, ([0,r_c_DH/l], [1,Inf]) ,(W/l,1.0/κ/l))
+    integral_DH =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
+
+    l = 1.0 # Angstroem
+    prob = IntegralProblem(Δγ_DH, ([0,σ/l], [1,Inf]) ,(W/l,1.0/κ/l))
+    integral_ExQ =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
+
+    conv_to_number_density = 1.0/(m_monomer*1.6605) ### converts to number density per Å^3
+    Δn = Δρ * conv_to_number_density
+
+    Δγ_AH  = Δn^2 * 12.0*π* λ_eff*ϵ_AH*σ^4*integral_AH[1]*1000.0
+    Δγ_YK  = Δn^2 *charge_frac^2*yk_prefactor*π/2.0*l^3 *integral_DH[1]*1000.0
+    Δγ_ExQ = Δn^2 *Δf           *yk_prefactor*π/2.0*l^3 *integral_ExQ[1]*1000.0
+    
+    return Δγ_AH,Δγ_YK,Δγ_ExQ
 end

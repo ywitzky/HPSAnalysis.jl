@@ -4,7 +4,6 @@ function getGSDTrajectoryFiles(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 end
 
 function read_HOOMD_GSD!(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-
     N = Sim.NAtoms
     image_old = zeros(R, (N, 3))
 
@@ -85,14 +84,16 @@ end
 
 function read_HOOMD_Dictionaries(Sim::SimData{R,I}, File::String) where {R<:Real, I<:Integer}
     lines = readlines(File)
-    Sim.IDToMasses = zeros(R, length(lines)-1)
-    Sim.IDToSigmas = zeros(R, length(lines)-1)
+    Sim.IDToMasses  = zeros(R, length(lines)-1)
+    Sim.IDToSigmas  = zeros(R, length(lines)-1)
+    Sim.IDToLambdas = zeros(R, length(lines)-1)
     for line in lines[2:end]
         split = Base.split(line, ",")
         id       = parse(I, split[1])
         Sim.IDToResName[id] = strip(split[2])
         Sim.IDToMasses[id]  = parse(R, split[4])
         Sim.IDToSigmas[id]  = parse(R, split[5])
+        Sim.IDToLambdas[id] = parse(R, split[6])
     end
     Sim.NAtomTypes= length(lines)-1
     Sim.NBondTypes=1

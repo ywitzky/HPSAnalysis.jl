@@ -359,23 +359,38 @@ end
 
 Plots the average slab histogram of the frames in range Sim.NSteps-Windowlength:Sim.NSteps. Result is empty if the Windowlength is larger then the step size at which histgrams here computed.
 """
-function plotAvgSlabDensity(Sim::SimData{R,I}; IndexDict=Dict(1=>"all"), Windowlength=100) where {R<:Real, I<:Integer}
+function plotAvgSlabDensity(Sim::HPSAnalysis.SimData{R,I};size=(400, 400), IndexDict=Dict(1=>"all"), Windowlength=100, title=nothing, normalize=false,xlims=nothing, filename=nothing) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
+
+    filename = isnothing(filename) ?  Sim.SimulationName : filename
 
     xaxis = axes(Sim.SlabHistogramSeries)[1]
     ### newer iterations dont measure at every frame. Detect which frames actually contain data
     NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
-    fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 
-    for (index, label) in IndexDict
-        Plots.plot!(xaxis, AvgHist[:,1,index],  label=label, title=Sim.SimulationName) # color=:black,
+    if isnothing(title)
+        split_ =  split(Sim.SimulationName[3:end],"_")
+        title= "$(split_[1]) @ $(split_[2])"
     end
 
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.png")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.pdf")
+    ylabel_ = normalize ?  L"\langle \rho(z)\rangle/\langle \rho(z=0)\rangle" : L"\langle \rho(z)\rangle\quad[\textrm{kg/L}]"
+    fig = Plots.plot(dpi=300, size=size, ylabel= ylabel_ , xlabel= L"z\quad[\textrm{Å}]", minorticks=10, gridalpha=1.0) 
+    for (index, label) in IndexDict
+        mean_ = normalize ? mean(AvgHist[-10:10,1,index]) : 1
+        Plots.plot!(xaxis,AvgHist[:,1,index]./mean_,  label=label, title= title, legendtitlefontsize=9, c= index==1 ? :black : index, legend= normalize ? :bottom : :best, legend_column= normalize ?  2 : 1) # color=:black,
+    end
+
+    addon= normalize ?  "_normed" : ""
+    if !isnothing(xlims)
+        Plots.plot!(xlims=xlims,xticks=xlims[1]:100:xlims[2])
+        addon *= "_lims"
+    end
+
+    Plots.savefig(fig, Sim.PlotPath*filename*"_AvgSlabHist_$(Windowlength)$(addon)_LastFrames.png")
+    Plots.savefig(fig, Sim.PlotPath*filename*"_AvgSlabHist_$(Windowlength)$(addon)_LastFrames.pdf")
     return fig
 end
 
@@ -497,15 +512,19 @@ function plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 end
 
 function plotHOOMDTemperature(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
-    file = h5open("$(Sim.BasePath)pressure.h5", "r")
-    temperature = collect(file["hoomd-data"]["md"]["compute"]["ThermodynamicQuantities"]["kinetic_temperature"])
-    timestep = collect(file["hoomd-data"]["Simulation"]["timestep"])
-    close(file)
-    kb = 0.00831446262
-    fig = Plots.plot(timestep, temperature/kb, xlabel="step", ylabel="temperature", ylim=(Sim.TargetTemp*0.95, Sim.TargetTemp*1.05), label="Sim. Temp.")
-    Plots.hline!([Sim.TargetTemp], label="Target Temp.")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.png")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.pdf")
+    try
+        file = h5open("$(Sim.BasePath)pressure.h5", "r")
+        temperature = collect(file["hoomd-data"]["md"]["compute"]["ThermodynamicQuantities"]["kinetic_temperature"])
+        timestep = collect(file["hoomd-data"]["Simulation"]["timestep"])
+        close(file)
+        kb = 0.00831446262
+        fig = Plots.plot(timestep, temperature/kb, xlabel="step", ylabel="temperature", ylim=(Sim.TargetTemp*0.95, Sim.TargetTemp*1.05), label="Sim. Temp.")
+        Plots.hline!([Sim.TargetTemp], label="Target Temp.")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.png")
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_KineticTemperature.pdf")
+    catch e 
+        println(e)
+    end
 end
 
 function plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
@@ -522,6 +541,9 @@ end
 
 
 function get_color(value, clims, scheme)
+    if isnan(value)
+        return RGBA(0.0, 0.0, 0.0, 0.0)
+    end
     norm_val = clamp((value - clims[1]) / (clims[2] - clims[1]), 0.0, 1.0)
     return colorschemes[scheme][norm_val]
 end
@@ -542,7 +564,7 @@ function compute_submatrix(matrix::Matrix{R}, ranges) where {R<:Real}
     return small_matrix, large_matrix
 end
 
-function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}()) where {R<:Real, I<:Integer}
+function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}(), labels=["",""],inPercent=false) where {R<:Real, I<:Integer}
 
     IntraChainMatrix = sum(Sim.IntraChainContactMatrix)./length(Sim.IntraChainContactMatrix)
     
@@ -552,25 +574,34 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
 
     ly = @layout([a{0.9w, 0.03h} b{0.1w, 0.03h}; c{0.95w, 0.95h} d{0.03w, 0.95h}])
 
-    InterChainMatrix = Sim.ContactMatrices
+    InterChainMatrix = Matrix{R}(Sim.ContactMatrices)
     ### plot once with errors and once with normal values
-    for (i, (avg, iserror)) in enumerate(zip([IntraChainMatrix , Sim.ContactMatricesError], ["", "_Error"]))
-        fig=Plots.plot(xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", colorbar=:legend, legend=:outertop,)
+    for (i, (avg, iserror, label_)) in enumerate(zip([IntraChainMatrix , Sim.ContactMatricesError], ["", "_Error"],labels))
+        fig=Plots.plot(xlabel="Amino Acids i ", ylabel="Amino Acids j ", colorbar=:legend, legend=:outertop,)
 
         addon=""
         if length(ranges)>0
             _, InterChainMatrix = compute_submatrix(InterChainMatrix, ranges)
             addon ="_with_coarse"
         end
+        if any(isnan.(InterChainMatrix)) || any(isnan.(avg))
+            println("Skip plot.")
+            continue
+        end
 
         clims_inter = (0,maximum(InterChainMatrix)) # a
         clims_intra = iserror=="_Error" ? clims_inter : extrema(avg) #b
-        toplabel = iserror=="_Error" ? L"ΔP(d_{ij}<1.1~σ~2^{(1/6)})" : L"\ln(<d_{ij}>)"
+        toplabel    = iserror=="_Error" ? (inPercent ? L"ΔP(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad[\%]" :  L"ΔP(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})") : L"\ln(\langle d_{ij}\rangle)"
         color_intra = iserror=="_Error" ? color_inter : :viridis
+
+        rightlabel = inPercent ? L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad[\%]" : L"P((d_{ij}<1.1\cdotσ\cdot2^{(1/6)})"
 
         matrix  = triu(InterChainMatrix)+tril(avg,-1);
         is_triu = triu(trues(size(InterChainMatrix)), 1)
         color_mat = [istriu ? get_color(val, clims_inter, color_inter) : get_color(val, clims_intra, color_intra) for (istriu, val) in zip(is_triu, matrix)]
+
+        clims_inter = inPercent ? clims_inter.*100.0 : clims_inter
+        clims_intra = (inPercent && iserror=="_Error") ? clims_intra.*100.0 : clims_intra
 
         data_inter = collect(range(clims_intra..., 100))
         data_intra = collect(range(clims_inter..., 100))
@@ -579,12 +610,14 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
         NMat = size(matrix,1)
         ticks = vcat([1], collect(0:50:NMat)[2:end])#, [NMat])
 
-        fig = plot(layout=ly, size=(Size,Size), margin=-2.5mm, AspectRatio=true)#, link=:y )
+        fig = plot(layout=ly, size=(Size,Size), margin=-2.5mm, AspectRatio=true, minorticks=10, tick_direction=:out)#, link=:y )
 
-        heatmap!(color_mat,yflip=false,lims=(0.5,NMat+0.5), ticks=ticks, colorbar=true, color = color_inter, clims=clims_intra, subplot=3, xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", AspectRatio=false,yrotation=90.0, fontsize=10)#, yaxis = :flip)
+        heatmap!(color_mat,yflip=false,lims=(0.5,NMat+0.5), ticks=ticks, colorbar=true, color = color_inter, clims=clims_intra, subplot=3, xlabel="Amino Acids i ", ylabel="Amino Acids j ", AspectRatio=false,yrotation=90.0, fontsize=10)#, yaxis = :flip)
         heatmap!(data_inter,[1],  transpose([data_inter;;]),color=color_intra,   colorbar=false, subplot=1, yaxis=nothing, xmirror=true, xlabel=toplabel ,labelfontsize=8)
         heatmap!(subplot=2, framestyle=:none)
-        heatmap!([1], data_intra, [data_intra;;], colorbar=false, clims=clims_inter, color=color_inter, xlabel="",xticks=nothing,   ymirror=true,  yguide=nothing, subplot=4, labelfontsize=8, yrotation=90.0, ylabel=L"P(d_{ij}<1.1~σ~2^{(1/6)})")
+        heatmap!([1], data_intra, [data_intra;;], colorbar=false, clims=clims_inter, color=color_inter, xlabel="",xticks=nothing,   ymirror=true,  yguide=nothing, subplot=4, labelfontsize=8, yrotation=90.0, ylabel=rightlabel)
+
+        Plots.annotate!([-0.075*NMat], [1.1*NMat], [label_])
 
         Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_InterChainContactMatrix$(addon)$(iserror).png")
         Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_InterChainContactMatrix$(addon)$(iserror).pdf")
@@ -593,4 +626,79 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
             return fig
         end
     end
+end
+
+zerotonan(x) = isapprox(x,0,atol=10^-7,rtol=10^-7) ? NaN : x
+
+function getTypeNameDictWithEndingNames(Sim::SimData{R,I}; RenamePhosAA=Dict('#'=>"pS",'&'=> "pT", '@'=>"pY"))::Dict{I,String} where {R<:Real,I<:Integer} 
+    NIds = maximum(keys(Sim.IDToResName))
+    local_IDToResName = copy(Sim.IDToResName)
+    non_real_aa = [id for id in 1:NIds if islowercase(Sim.IDToResName[id][1])]
+    NIds_total = BioData.AaToWeight
+    types =collect(keys(BioData.AaToWeight))
+    for aa in non_real_aa      
+        key = findfirst(x->(BioData.AaToWeight[x]+2≈Sim.IDToMasses[aa] || BioData.AaToWeight[x]+16≈Sim.IDToMasses[aa]) ,types)
+        if !(key ∈ ['#','&','@'])
+            local_IDToResName[aa] = lowercase("$(types[key])")
+        end
+        if key ∈ ['#','&','@']
+            local_IDToResName[aa] = RenamePhosAA[aa]
+        end
+    end
+    return local_IDToResName
+end
+
+function plotMeanEnergyPerID(Sim::SimData{R,I}; inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+    fig =  Plots.plot(xlabel="Amino Acid i", ylabel="Amino Acid j",title=L"\quad\langle E \rangle~\textrm{per~Sequence~Index}~[\textrm{J/mol}]")
+
+    if inter
+        matrix  = (triu(Sim.MeanYukawaEnergy)+tril(Sim.MeanAshbaughHatchEnergy,-1)).*1000.0
+    else
+        matrix  = (triu(Sim.MeanIntraYukawaEnergy)+tril(Sim.MeanIntraAshbaughHatchEnergy,-1)).*1000.0
+    end
+    max = maximum(abs.(matrix); init=0.0)
+    if max==0 return fig end
+    NMat = size(matrix,1)
+    ticks = vcat([1], collect(0:50:NMat)[2:end])
+    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),size=(400,400), ticks=ticks, AspectRatio=true, tick_direction=:out, minorticks=10)
+    return fig
+end
+
+function plotMeanEnergyPerType(Sim::SimData{R,I};inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+    IDToResNames = getTypeNameDictWithEndingNames(Sim)
+
+    NIds = maximum(keys(IDToResNames))
+    ticks= [IDToResNames[id] for id in 1:NIds ]
+
+    fig =  Plots.plot(xlabel="Amino Acid Type",ylabel="Amino Acid Type", title=L"\quad\langle E \rangle~\textrm{per~Amino~Acid~Type}~[\textrm{J/mol}]", ticks=(1:NIds, ticks)) 
+    if inter
+        matrix  = (triu(Sim.MeanYukawaEnergy_perAA)+tril(Sim.MeanAshbaughHatchEnergy_perAA,-1)).*1000
+    else
+        matrix  = (triu(Sim.MeanIntraYukawaEnergy_perAA)+tril(Sim.MeanIntraAshbaughHatchEnergy_perAA,-1)).*1000
+    end
+    max = maximum(abs.(matrix); init=0.0)
+    if max==0 return fig end
+
+    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),AspectRatio=true, size=(400,400),right_margin=1mm,colorbar_title_location=:top,colorbar_tickfontrotation=0, tick_direction=:out)
+    return fig
+end
+
+function plotMeanEnergies(Sim::SimData{R,I}; annotatePlot=true) where {R<:Real,I<:Integer} 
+    figs =[]
+    for (inter,addon) in [(true,""), (false,"_intra")]
+        figa= plotMeanEnergyPerID(Sim; inter=inter)
+        xlims=Plots.xlims(figa)
+        if annotatePlot annotate!(figa,[-xlims[2]/5.0],[xlims[2]],["a)"], subplot=1) end
+
+        figb= plotMeanEnergyPerType(Sim; inter=inter)
+        xlims=Plots.xlims(figb)
+        if annotatePlot annotate!(figb,[-xlims[2]/6.5],[xlims[2]],["b)"], subplot=1) end
+
+        fig  = Plots.plot(figa,figb , size=(800,400), bottom_margin=2mm, left_margin=2mm)
+
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies$(addon).png" )
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies$(addon).pdf" )
+        push!(figs, fig)
+    end
+    return Plots.plot(figs..., layout=(2,1), size=(800,800))
 end

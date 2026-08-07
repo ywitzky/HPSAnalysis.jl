@@ -887,6 +887,11 @@ function AlphaFold_startpos(ProteintoCif::Dict{String,String}, Proteins::Vector{
                 end
             end
         end
+        shift= sum.(collect(extrema(pos,dims=1)))./2.0
+        pos[:,1].-=shift[1]
+        pos[:,2].-=shift[2]
+        pos[:,3].-=shift[3]
+
         PositionDict[protein] = pos
     end
     return PositionDict, LengthDict

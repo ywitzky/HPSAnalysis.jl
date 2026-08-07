@@ -459,6 +459,14 @@ function computeBondsHists(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
+@inline function sqr_distance(Sim::SimData{R,I}, a::Vector{R}, b::Vector{R}) where {R<:Real, I<:Integer}
+    inv = 1.0 ./Sim.BoxLength
+    Δ = a.-b
+    Δ .-= floor.(I, Δ.*inv .+0.5).*Sim.BoxLength
+    return sum(Δ.^2)
+end
+
+distance(Sim::SimData{R,I}, a::Vector{R}, b::Vector{R}) where {R<:Real, I<:Integer} =  sqrt(sqr_distance(Sim, a, b))
 
 #### probably deprecated check sequence analysis and the sequence monte carlo
 function computeSequenceHydropathyDecoration(Sim::SimData{R,I}; SimType="Calvados2", β=-1.0) where {R<:Real, I<:Integer}

@@ -286,3 +286,38 @@ function computeAlphaHelix(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.AlphaHelixProb ./=Float64(Sim.NSteps)
 end
 
+function computeBondLengthsENM(Sim::SimData{R,I}, ENM_Def_Path::String, ProtName::String) where {R<:Real,I<:Integer}
+    ### uses externally defined ENM storage
+    entry= load(ENM_Def_Path)[ProtName]
+    N_Bonds, types, typeid, pairs,type_mapping = entry
+    typed_list = [Vector{Tuple{Int32,Int32}}() for name in types]
+
+    ### compute all pairs of interaction for one bond type
+    if minimum(typeid)==0 typeid .+= 1 end
+    range = Sim.ChainStart[1]:Sim.ChainStop[1]
+    for (i,pair) in enumerate(pairs)
+        if pair[1]∈range && pair[2]∈range
+            push!(typed_list[typeid[i]], pair)
+        end
+    end
+
+    step=1000
+    for (c,inter) in enumerate(typed_list)
+        inter_pairs = sort(inter)
+
+        distances=[]
+        for step in 1:10:Sim.NSteps
+            for start in Sim.ChainStart
+                for pair in inter
+                    i,j= start .+ pair
+                    dist = distance(Sim, [Sim.x[i,step], Sim.y[i,step], Sim.z[i,step]], [Sim.x[j,step], Sim.y[j,step], Sim.z[j,step]])
+                    push!(distances, dist)
+                end
+            end
+        end
+        println("Type $c")
+        println("Mean $(mean(distances)) vs $(type_mapping[types[c]][:r]*10.0)")
+        println("Std  $(std(distances))")
+
+    end
+end

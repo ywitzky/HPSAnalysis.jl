@@ -1,7 +1,7 @@
 import time
 
 import os
-
+import argparse, sys
 import numpy as np
 
 import gsd.hoomd
@@ -55,6 +55,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
 
     if prerun:
         Params["NSteps"] = resizeSteps+8000
+        Params["Create_Start_Config"] = False
 
     if Restart:
         TrajectoryNumber , NStepsOld = CountNumberOfTrajectoryFiles(FolderPath)
@@ -65,7 +66,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         CopyLastFrameToRestartFile(FolderPath+lastTrajectory, RestartPath)
 
         Params["NSteps"] = Params["NSteps"]-NStepsOld if ExtendedSteps==0 else ExtendedSteps-NStepsOld ### Either extend to meet initial goal or extend simulations.
-        Params["NSteps"] = Params["NSteps"] if Params["NSteps"]>0 else 0
+        #Params["NSteps"] = Params["NSteps"] if Params["NSteps"]>0 else 0
 
         print(f"NSteps {Params['NSteps']}")
         #Params["NSteps"] = int(NewGoal)-int(NStepsOld)  if int(NewGoal)-int(NStepsOld) >0 else 0  ### avoid negativ steps
@@ -91,22 +92,17 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
             snapshot.particles.mass = InputMasses.astype(np.float32)
             snapshot.particles.charge = InputCharges.astype(np.float32)
 
+            ### use undocumented feature to use "floppy bodies"
+            snapshot.particles.body = np.genfromtxt(f"{FolderPath}/HOOMD_Setup/Groups.txt") 
+
             B_N = NBeads-NChains
             B_types = ['O-O']
             B_typeid = np.zeros(B_N, dtype=np.int32)
             B_group = InputBonds#.astype(np.uint32)
 
             if Params["SimulationType"]=="Calvados3":
-                ### Harmonic bonds
-                harmonic = hoomd.md.bond.Harmonic()
-
                 ## read the ENM_indice and backbone data
                 B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
-                
-                for typ in B_types: 
-                    harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"])
-
-                forces.append(harmonic)
 
 
             snapshot.bonds.N = B_N
@@ -146,13 +142,24 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         harmonic = hoomd.md.bond.Harmonic()
         harmonic.params['O-O'] = dict(k=8033, r0=bondLength) ###calvados2: k=8033kJ/mol/nm^2 k=1000kJ/nm^2 = 10KJ/AA^2
         forces.append(harmonic)
+    if Params["SimulationType"]=="Calvados3":
+        ### Harmonic bonds
+        harmonic = hoomd.md.bond.Harmonic()
+
+        ## read the ENM_indice and backbone data
+        B_N, B_types, B_typeid, B_group, ENMharmonic = read_ENM_HOOD_indices(f"{FolderPath}/HOOMD_Setup/ENM_indices.txt")
+        
+        for typ in B_types: 
+            harmonic.params[typ] = dict(k=ENMharmonic[typ]["k"], r0=ENMharmonic[typ]["r"])
+
+        forces.append(harmonic)
 
     if Params["UseAngles"]:
         cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'])
         cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond', 'angle', 'dihedral', '1-3', '1-4'] )
     else:
-        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond'])
-        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond'] )
+        cell2 = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=Params["AHCutoff"], exclusions=['bond','body'])
+        cell  = hoomd.md.nlist.Tree(buffer=0.4,default_r_cut=0.0, exclusions=['bond','body'])
 
 
     if Params["UseCharge"]:
@@ -206,7 +213,7 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     write_mode  ='wb'
     if prerun:
         filename = FolderPath+"/prerun_"+Params["Trajectory"]
-        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(Params["NOut"]), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
+        gsd_writer = hoomd.write.GSD(trigger=hoomd.trigger.Periodic(int(Params["NOut"])), filename=filename, filter=hoomd.filter.All(), mode=write_mode,dynamic=['particles/position', 'particles/image', 'configuration/box']) # -> trigger can be set to NSteps for saving only the last frame
         gsd_writer.log = logger
 
         #logger = hoomd.logging.Logger(categories=['scalar', 'string']) #'sequence'
@@ -223,7 +230,6 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         logger.add(sim, quantities=['timestep', 'walltime', 'tps'])
         table = hoomd.write.Table(trigger=hoomd.trigger.Periodic(100000), logger=logger)
         sim.operations.writers.append(table)
-        
 
     hdf5_writer=[]
     if True:
@@ -250,11 +256,11 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
         # dalton /((dalton / nm^3) * nm^2) = nm 
         L = TotalMass / (A*rho) # nm
 
-        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])*1.3
+        Ly_start = np.max(InputPositions[:,1])-np.min(InputPositions[:,1])*1.
         state_box = [Params["Lx"], Ly_start , Params["Lz"], 0, 0, 0]
         goalbox = [Params["Lx"], L , Params["Lz"], 0, 0, 0]
 
-        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=8000+resizeSteps))
+        box_resize = hoomd.update.BoxResize(trigger=hoomd.trigger.Periodic(10), box1=state_box, box2=goalbox, variant=hoomd.variant.Ramp(A=1.0, B=2.0, t_start=8000, t_ramp=resizeSteps))
         sim.operations.updaters.append(box_resize)
 
 
@@ -262,10 +268,10 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     integrator.methods = [nvt]
     integrator.dt = Params["dt"]
 
-
+    ### apply increased friction to thermalized quicker in preruns as in HPS model
     for i in IDToResName.keys():
         name = IDToResName[i]
-        nvt.gamma[name] = IDToMass[i]*10.0**-5
+        nvt.gamma[name] = IDToMass[i]*10.0**-3
         nvt.gamma_r[name] = (0.0, 0.0, 0.0)
         
     sim.operations.integrator=integrator
@@ -277,14 +283,28 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     sim.operations.writers.append(hdf5_writer)
 
     ### pre equilibrate the bonds by dissipating energy from the stretched bonds 
-    if not Restart:
-        for fac in [10000.0, 1000.0, 100.0, 10.0,5.0,2.0, 1.5, 1.0]:
+    if prerun:
+        for fac in [50.0, 10.0,5.0,2.0, 1.5, 1.0]:
             for i in range(10):
+                print(f"fac {fac} i {i}")
                 integrator.dt = Params["dt"]/fac
                 sim.run(100)
                 sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT/fac)
-    sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+    else:
+        if not Restart:
+            ### apply higher friction to thermalize quicker during the 0.1 mu s
+            ### the excess potential energy created by unraveling the 
+            ### proteins that cross the pbc from the prerun
+            integrator.dt = Params["dt"]
+            
+            sim.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=kT)
+            sim.run(10_000_000)
 
+    ### apply friction as in HPS model
+    for i in IDToResName.keys():
+        name = IDToResName[i]
+        nvt.gamma[name] = IDToMass[i]*10.0**-5
+        nvt.gamma_r[name] = (0.0, 0.0, 0.0)
 
     ### optimise cell list buffer
     now = sim.timestep
@@ -306,17 +326,24 @@ def run(FolderPath, Restart=False, ExtendedSteps=0, prerun=False, resizeSteps=10
     print(f"TPS: {sim.tps:0.5g}")
     print(f"WallTime: {sim.walltime:0.5g}")
 
-def preRun(FolderPath, prerunSteps=100_000):
-    run(FolderPath, Restart=False, ExtendedSteps=prerunSteps, prerun=True, resizeSteps=prerunSteps)
+def str2bool(v):
+    v = v.lower()
+    if v in ('yes','true','t','y','1'):  return True
+    if v in ('no','false','f','n','0'):  return False
+    raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def restart(FolderPath, ExtendedSteps=0):
-    run(FolderPath, Restart=True, ExtendedSteps=ExtendedSteps)
+#def run(folder, flag, steps):
+#    print(f'>>> run(folder={folder!r}, flag={flag}, steps={steps})')
+#    # … your actual work …
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('folder')
+    p.add_argument('flag', type=str2bool)
+    p.add_argument('steps', type=int)
+    a = p.parse_args()
+    print(a.folder, a.flag, a.steps)   # echo for debugging
+    run(a.folder, a.flag, a.steps)
 
 if __name__ == '__main__':
-    if len(sys.argv)<2:
-        print("Need folder of input parameters as second argument.")
-    else:
-        print(sys.argv[1])#, sys.argv[2])
-        run(sys.argv[1])#, int(sys.argv[2]))
-
- 
+    sys.exit(main())
