@@ -648,37 +648,57 @@ function getTypeNameDictWithEndingNames(Sim::SimData{R,I}; RenamePhosAA=Dict('#'
     return local_IDToResName
 end
 
-function plotMeanEnergyPerID(Sim::SimData{R,I})::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
-    fig =  Plots.plot(xlabel="amino acid i", ylabel="amino acid j",title=L"\langle E \rangle~per~Protein\quad[J/mol]")
+function plotMeanEnergyPerID(Sim::SimData{R,I}; inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+    fig =  Plots.plot(xlabel="Amino Acid i", ylabel="Amino Acid j",title=L"\quad\langle E \rangle~\textrm{per~Sequence~Index}~[\textrm{J/mol}]")
 
-    matrix  = (triu(Sim.MeanYukawaEnergy)+tril(Sim.MeanAshbaughHatchEnergy,-1)).*1000
+    if inter
+        matrix  = (triu(Sim.MeanYukawaEnergy)+tril(Sim.MeanAshbaughHatchEnergy,-1)).*1000.0
+    else
+        matrix  = (triu(Sim.MeanIntraYukawaEnergy)+tril(Sim.MeanIntraAshbaughHatchEnergy,-1)).*1000.0
+    end
     max = maximum(abs.(matrix); init=0.0)
     if max==0 return fig end
     NMat = size(matrix,1)
     ticks = vcat([1], collect(0:50:NMat)[2:end])
-    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),size=(400,400), ticks=ticks, AspectRatio=true)
+    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),size=(400,400), ticks=ticks, AspectRatio=true, tick_direction=:out, minorticks=10)
     return fig
 end
 
-function plotMeanEnergyPerType(Sim::SimData{R,I})::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+function plotMeanEnergyPerType(Sim::SimData{R,I};inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
     IDToResNames = getTypeNameDictWithEndingNames(Sim)
 
     NIds = maximum(keys(IDToResNames))
     ticks= [IDToResNames[id] for id in 1:NIds ]
 
-    fig =  Plots.plot(title=L"\langle E \rangle~per~Amino~Acid\quad[J/mol]", ticks=(1:NIds, ticks)) 
-    matrix  = (triu(Sim.MeanYukawaEnergy_perAA)+tril(Sim.MeanAshbaughHatchEnergy_perAA,-1)).*1000
+    fig =  Plots.plot(xlabel="Amino Acid Type",ylabel="Amino Acid Type", title=L"\quad\langle E \rangle~\textrm{per~Amino~Acid~Type}~[\textrm{J/mol}]", ticks=(1:NIds, ticks)) 
+    if inter
+        matrix  = (triu(Sim.MeanYukawaEnergy_perAA)+tril(Sim.MeanAshbaughHatchEnergy_perAA,-1)).*1000
+    else
+        matrix  = (triu(Sim.MeanIntraYukawaEnergy_perAA)+tril(Sim.MeanIntraAshbaughHatchEnergy_perAA,-1)).*1000
+    end
     max = maximum(abs.(matrix); init=0.0)
     if max==0 return fig end
 
-    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),AspectRatio=true, size=(400,400),right_margin=1mm,colorbar_title_location=:right,colorbar_tickfontrotation=0)
+    Plots.heatmap!(zerotonan.(matrix),c=:vik,clims=(-max,max),AspectRatio=true, size=(400,400),right_margin=1mm,colorbar_title_location=:top,colorbar_tickfontrotation=0, tick_direction=:out)
     return fig
 end
 
-function plotMeanEnergies(Sim::SimData{R,I}) where {R<:Real,I<:Integer} 
-    fig  = Plots.plot(plotMeanEnergyPerID(Sim),plotMeanEnergyPerType(Sim) , size=(800,400), bottom_margin=2mm, left_margin=2mm)
+function plotMeanEnergies(Sim::SimData{R,I}; annotatePlot=true) where {R<:Real,I<:Integer} 
+    figs =[]
+    for (inter,addon) in [(true,""), (false,"_intra")]
+        figa= plotMeanEnergyPerID(Sim; inter=inter)
+        xlims=Plots.xlims(figa)
+        if annotatePlot annotate!(figa,[-xlims[2]/5.0],[xlims[2]],["a)"], subplot=1) end
 
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies.png" )
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies.pdf" )
-    return fig
+        figb= plotMeanEnergyPerType(Sim; inter=inter)
+        xlims=Plots.xlims(figb)
+        if annotatePlot annotate!(figb,[-xlims[2]/6.5],[xlims[2]],["b)"], subplot=1) end
+
+        fig  = Plots.plot(figa,figb , size=(800,400), bottom_margin=2mm, left_margin=2mm)
+
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies$(addon).png" )
+        Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_MeanEnergies$(addon).pdf" )
+        push!(figs, fig)
+    end
+    return Plots.plot(figs..., layout=(2,1), size=(800,800))
 end
