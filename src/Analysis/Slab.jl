@@ -1,4 +1,4 @@
-using Base.Iterators, HDF5, LsqFit, LaTeXStrings,Integrals
+using Base.Iterators, HDF5, LsqFit, LaTeXStrings,Integrals, Statistics 
 
 function getSlabCoordinate(Sim::SimData{R,I};Unwrapped=true) where {R<:Real, I<:Integer}
     if Sim.SlabAxis==1
@@ -471,14 +471,16 @@ function computeSurfaceTension(Sim::HPSAnalysis.SimData{R,I},Ranges::Vector{<:Ab
         normal_p = all_axis[Sim.SlabAxis]
         tangential_p = sum(deleteat!(all_axis,Sim.SlabAxis))./2.0
         
-        γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
-        Sim.SurfaceTension = mean(R.(γ))
         n_measure = floor(I, length(normal_p)/NSub)
         if n_measure==0
+            Sim.SurfaceTension =R(0)
             Sim.SurfaceTensionError=R(0)
         else
+            γ = Sim.BoxLength[Sim.SlabAxis]/2.0 .*(normal_p.-tangential_p)
+            Sim.SurfaceTension = mean(R.(γ)) 
             y_mean_sub = [mean(sub) for sub in Iterators.partition(γ, n_measure)][1:end-1] ### last partition is not full...
-            Sim.SurfaceTensionError = sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
+            Sim.SurfaceTensionError = Statistics.std(y_mean_sub, mean=Sim.SurfaceTension)
+            #sqrt(sum((y_mean_sub.-Sim.SurfaceTension).^2)/NSub)
         end
     else
         Sim.SurfaceTension =0.0
@@ -507,14 +509,14 @@ Compute surface tension correction terms (AH and YK) from simulation data.
 # Notes
 Internally calls `computeSurfaceTensionCorrection(...)` with derived parameters from `Sim`.
 """
-function computeSurfaceTensionCorrection(Sim::SimData{R,I},Δρ::R2, W::R2, λ_eff::R2,charge_frac::R2) where {R<:Real,I<:Integer, R2<:Real}
+function computeSurfaceTensionCorrection(Sim::SimData{R,I},Δρ::R2, W::R2, λ_eff::R2,charge_frac::R2,Δf::R2) where {R<:Real,I<:Integer, R2<:Real}
     yu_pref, κ, rcut_yu, rcut_ah = read_FF_Interaction_Parameters(Sim)
 
     m_monomer = sum(Sim.ChainMasses)./Sim.NAtoms
 
-    Δγ_AH, Δγ_YK = computeSurfaceTensionCorrection(R(Δρ), R(W), κ,m_monomer,R(λ_eff), yu_pref, R(charge_frac); r_c_AH=rcut_ah,r_c_DH=rcut_yu)
+    Δγ_AH, Δγ_YK, Δγ_ExQ  = computeSurfaceTensionCorrection(R(Δρ), R(W), κ,m_monomer,R(λ_eff), yu_pref, R(charge_frac), R(Δf); r_c_AH=rcut_ah,r_c_DH=rcut_yu)
 
-    return Δγ_AH,Δγ_YK
+    return Δγ_AH,Δγ_YK, Δγ_ExQ
 end
 
 """
@@ -541,7 +543,7 @@ Compute surface tension corrections (AH and YK) using integral formulations.
 - Integrals are evaluated in reduced coordinates.
 - AH term uses Lennard-Jones-like kernel; YK term uses Yukawa-like kernel.
 """
-function computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_eff::R, yk_prefactor::R, charge_frac::R; r_c_AH=R(20.0), r_c_DH=R(40), ϵ_AH=R(0.8368)) where {R<:Real}
+function computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_eff::R, yk_prefactor::R, charge_frac::R, Δf::R; r_c_AH=R(20.0), r_c_DH=R(40), ϵ_AH=R(0.8368)) where {R<:Real}
     ### integrals in reduced coordinates
     Δγ_AH((s,r),(W   )) = (r^-3 -2*r^-9)        *(3*s^3-s)*coth(s*r/W)
     Δγ_DH((s,r),(W,D))  = r^2*(D+r)/D*exp(-r/D) *(3*s^3-s)*coth(s*r/W)
@@ -555,14 +557,16 @@ function computeSurfaceTensionCorrection(Δρ::R, W::R, κ::R, m_monomer::R, λ_
     prob = IntegralProblem(Δγ_DH, ([0,r_c_DH/l], [1,Inf]) ,(W/l,1.0/κ/l))
     integral_DH =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
 
+    l = 1.0 # Angstroem
+    prob = IntegralProblem(Δγ_DH, ([0,σ/l], [1,Inf]) ,(W/l,1.0/κ/l))
+    integral_ExQ =solve(prob, HCubatureJL(), reltol = 1e-8, abstol = 1e-8)
+
     conv_to_number_density = 1.0/(m_monomer*1.6605) ### converts to number density per Å^3
     Δn = Δρ * conv_to_number_density
-    #println("density $(Δρ),  number density: $(Δn)")
 
-    Δγ_AH = Δn^2 * 12.0*π* λ_eff*ϵ_AH*σ^4*integral_AH[1]*1000.0
-    Δγ_YK = Δn^2 *charge_frac^2*yk_prefactor*π/2.0*l^3 *integral_DH[1]*1000.0
-    #println("$(Δγ_AH) 10^-3 kJ/mol/A^2")
-    #println("$(Δγ_YK) 10^-3 kJ/mol/A^2")
-
-    return Δγ_AH,Δγ_YK
+    Δγ_AH  = Δn^2 * 12.0*π* λ_eff*ϵ_AH*σ^4*integral_AH[1]*1000.0
+    Δγ_YK  = Δn^2 *charge_frac^2*yk_prefactor*π/2.0*l^3 *integral_DH[1]*1000.0
+    Δγ_ExQ = Δn^2 *Δf           *yk_prefactor*π/2.0*l^3 *integral_ExQ[1]*1000.0
+    
+    return Δγ_AH,Δγ_YK,Δγ_ExQ
 end
