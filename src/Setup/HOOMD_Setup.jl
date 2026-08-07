@@ -150,7 +150,7 @@ function WriteParams(filename, SimName, Temp, NSteps, NOut, Timestep, Box, Seed;
     write(io, "Alt_GSD_Start: $(Alt_GSD_Start)\n")
     write(io, "Create_Start_Config: $(Create_Start_Config)\n")
     write(io, "epsilon_r: $(ϵ_r)\n")
-    write(io, "yk_prefactor: $(138.9315360433804/ϵ_r)\n") ### e^2/(4*pi*epsilon_r) in units of KJ/mol
+    write(io, "yk_prefactor: $(138.9315360433804/ϵ_r)\n") ### e^2/(4*pi*epsilon_r) in units of KJ/mol*nm
     #write(io, "yk_D: $(D)\n")
     write(io, "kappa: $(κ)\n")
     write(io, "Device: $(Device)\n")
@@ -212,17 +212,24 @@ function writeHOOMD(BasePath, Sequences,pos,image,OneToCharge,AaToId,OneToMass,O
 
         offset = 0
         DomainRanges = []
-        @warn "Need to update Domain definitions for groups incase different proteins are simulated."
-        for Seq in Sequences
-            append!(DomainRanges, [(start+offset):(stop+offset) for (start, stop) in deepcopy(domain)])
-            offset += length(Seq)
-        end
         ### use unofficial feature "floppy boddies" to group ENMs and turn off their interactions
         groups = fill(-1, NAtoms)
-        for (i, range) in enumerate(DomainRanges)
-            groups[range] .= -i-1
-        end 
+        # @TODO clean up the following part
+        @warn "Need to update Domain definitions for groups incase different proteins are simulated. Code assumes just one protein within the dictionary of folded proteins."
+        if !isnothing(ENM)
+            @assert length(keys(domain)) == 1
+        
+            name = first(keys(domain)) ### wrongsly assumes that the only entry is the right proteins
+            for Seq in Sequences
+                append!(DomainRanges, [(start+offset):(stop+offset) for (start, stop) in deepcopy(domain[name])])
+                offset += length(Seq)
+            end
+         ### @TODO add a proper check for Calvados2
+            for (i, range) in enumerate(DomainRanges)
+                groups[range] .= -i-1
+            end 
+        end
         WriteGroups("$(BasePath)/HOOMD_Setup/Groups.txt" ,groups)
 
-        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,BoxLength, Float32.(pos), AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, groups)    
+        writeGSDStartFile("$BasePath$StartFileName.gsd", NAtoms, NBonds, NAngles, NDihedrals,Float32.(BoxLength), Float32.(pos), AaToId,Sequences,image, InputMasses, InputCharges, dihedral_short_map, dihedral_list, OneToSigma, AlphaAddition, SimulationType, ENM, groups)    
 end
