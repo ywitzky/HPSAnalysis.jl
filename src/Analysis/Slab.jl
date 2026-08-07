@@ -383,20 +383,24 @@ function computeBinderCumulantsSubBoxes(Sim::HPSAnalysis.SimData{R,I}, indices_d
             ### recenter histogram according to Cluster COMs
             pos = getRecenteredPositions(SlabCoord, atom ,j, step, AxisCOM, Len, Len_inv)
 
-            if abs(pos)< dense_cutoff[step]
+            if abs(pos)< dense_cutoff
                 ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
                 ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
-                DenseCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                if ind1 ∈ 1:12 && ind2 ∈ 1:12 ### catch exceptions where position is exactly a boundary
+                    DenseCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                end
             end
 
-            if abs(pos)> dilute_cutoff[step]
+            if abs(pos)> dilute_cutoff
                 ind1 = getVoxelIndex(Axis1[atom,step], d1, 6)
                 ind2 = getVoxelIndex(Axis2[atom,step], d2, 6)
-                DiluteCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                if ind1 ∈ 1:12 && ind2 ∈ 1:12 ### catch exceptions where position is exactly a boundary
+                    DiluteCumulantBoxes[ind1, ind2, j] += Sim.Masses[atom]
+                end 
             end
         end
-        DenseCumulantBoxes[:,:,j] /= dense_cutoff[step]*2 
-        DiluteCumulantBoxes[:,:,j] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff[step]*2 )
+        DenseCumulantBoxes[:,:,j] /= dense_cutoff*2 
+        DiluteCumulantBoxes[:,:,j] /= (Sim.BoxLength[Sim.SlabAxis]-dilute_cutoff*2 )
     end
     Sim.SlabDenseCumulantBoxes  = DenseCumulantBoxes .*conversion
     Sim.SlabDiluteCumulantBoxes = DiluteCumulantBoxes.*conversion
