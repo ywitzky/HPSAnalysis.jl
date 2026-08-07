@@ -2,9 +2,8 @@
 #module GSD
 #include("./Unify.jl")
 
-include("./Plot/Comp_Plots.jl")
 
-using Plots, Printf, Measures, LinearAlgebra, ColorSchemes, LaTeXStrings
+
 #
 
 #=

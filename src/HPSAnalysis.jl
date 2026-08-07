@@ -16,5 +16,4 @@ include("./Setup.jl")
  
 include("./IO.jl")
 include("./Analysis.jl")
-include("./Plot.jl")
 end # module HPSAnalysis
