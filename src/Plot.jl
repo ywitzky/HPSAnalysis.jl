@@ -564,7 +564,7 @@ function compute_submatrix(matrix::Matrix{R}, ranges) where {R<:Real}
     return small_matrix, large_matrix
 end
 
-function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}()) where {R<:Real, I<:Integer}
+function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}(), labels=["",""],inPercent=false) where {R<:Real, I<:Integer}
 
     IntraChainMatrix = sum(Sim.IntraChainContactMatrix)./length(Sim.IntraChainContactMatrix)
     
@@ -574,10 +574,10 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
 
     ly = @layout([a{0.9w, 0.03h} b{0.1w, 0.03h}; c{0.95w, 0.95h} d{0.03w, 0.95h}])
 
-    InterChainMatrix = Sim.ContactMatrices
+    InterChainMatrix = Matrix{R}(Sim.ContactMatrices)
     ### plot once with errors and once with normal values
-    for (i, (avg, iserror)) in enumerate(zip([IntraChainMatrix , Sim.ContactMatricesError], ["", "_Error"]))
-        fig=Plots.plot(xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", colorbar=:legend, legend=:outertop,)
+    for (i, (avg, iserror, label_)) in enumerate(zip([IntraChainMatrix , Sim.ContactMatricesError], ["", "_Error"],labels))
+        fig=Plots.plot(xlabel="Amino Acids i ", ylabel="Amino Acids j ", colorbar=:legend, legend=:outertop,)
 
         addon=""
         if length(ranges)>0
@@ -591,12 +591,17 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
 
         clims_inter = (0,maximum(InterChainMatrix)) # a
         clims_intra = iserror=="_Error" ? clims_inter : extrema(avg) #b
-        toplabel    = iserror=="_Error" ? L"ΔP(d_{ij}<1.1~σ~2^{(1/6)})" : L"\ln(<d_{ij}>)"
+        toplabel    = iserror=="_Error" ? (inPercent ? L"ΔP(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad[\%]" :  L"ΔP(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})") : L"\ln(\langle d_{ij}\rangle)"
         color_intra = iserror=="_Error" ? color_inter : :viridis
+
+        rightlabel = inPercent ? L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad[\%]" : L"P((d_{ij}<1.1\cdotσ\cdot2^{(1/6)})"
 
         matrix  = triu(InterChainMatrix)+tril(avg,-1);
         is_triu = triu(trues(size(InterChainMatrix)), 1)
         color_mat = [istriu ? get_color(val, clims_inter, color_inter) : get_color(val, clims_intra, color_intra) for (istriu, val) in zip(is_triu, matrix)]
+
+        clims_inter = inPercent ? clims_inter.*100.0 : clims_inter
+        clims_intra = (inPercent && iserror=="_Error") ? clims_intra.*100.0 : clims_intra
 
         data_inter = collect(range(clims_intra..., 100))
         data_intra = collect(range(clims_inter..., 100))
@@ -605,12 +610,14 @@ function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{
         NMat = size(matrix,1)
         ticks = vcat([1], collect(0:50:NMat)[2:end])#, [NMat])
 
-        fig = plot(layout=ly, size=(Size,Size), margin=-2.5mm, AspectRatio=true)#, link=:y )
+        fig = plot(layout=ly, size=(Size,Size), margin=-2.5mm, AspectRatio=true, minorticks=10, tick_direction=:out)#, link=:y )
 
-        heatmap!(color_mat,yflip=false,lims=(0.5,NMat+0.5), ticks=ticks, colorbar=true, color = color_inter, clims=clims_intra, subplot=3, xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]", AspectRatio=false,yrotation=90.0, fontsize=10)#, yaxis = :flip)
+        heatmap!(color_mat,yflip=false,lims=(0.5,NMat+0.5), ticks=ticks, colorbar=true, color = color_inter, clims=clims_intra, subplot=3, xlabel="Amino Acids i ", ylabel="Amino Acids j ", AspectRatio=false,yrotation=90.0, fontsize=10)#, yaxis = :flip)
         heatmap!(data_inter,[1],  transpose([data_inter;;]),color=color_intra,   colorbar=false, subplot=1, yaxis=nothing, xmirror=true, xlabel=toplabel ,labelfontsize=8)
         heatmap!(subplot=2, framestyle=:none)
-        heatmap!([1], data_intra, [data_intra;;], colorbar=false, clims=clims_inter, color=color_inter, xlabel="",xticks=nothing,   ymirror=true,  yguide=nothing, subplot=4, labelfontsize=8, yrotation=90.0, ylabel=L"P(d_{ij}<1.1~σ~2^{(1/6)})")
+        heatmap!([1], data_intra, [data_intra;;], colorbar=false, clims=clims_inter, color=color_inter, xlabel="",xticks=nothing,   ymirror=true,  yguide=nothing, subplot=4, labelfontsize=8, yrotation=90.0, ylabel=rightlabel)
+
+        Plots.annotate!([-0.075*NMat], [1.1*NMat], [label_])
 
         Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_InterChainContactMatrix$(addon)$(iserror).png")
         Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_InterChainContactMatrix$(addon)$(iserror).pdf")
