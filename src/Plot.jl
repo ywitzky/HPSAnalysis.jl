@@ -359,23 +359,38 @@ end
 
 Plots the average slab histogram of the frames in range Sim.NSteps-Windowlength:Sim.NSteps. Result is empty if the Windowlength is larger then the step size at which histgrams here computed.
 """
-function plotAvgSlabDensity(Sim::SimData{R,I}; IndexDict=Dict(1=>"all"), Windowlength=100) where {R<:Real, I<:Integer}
+function plotAvgSlabDensity(Sim::HPSAnalysis.SimData{R,I};size=(400, 400), IndexDict=Dict(1=>"all"), Windowlength=100, title=nothing, normalize=false,xlims=nothing, filename=nothing) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
+
+    filename = isnothing(filename) ?  Sim.SimulationName : filename
 
     xaxis = axes(Sim.SlabHistogramSeries)[1]
     ### newer iterations dont measure at every frame. Detect which frames actually contain data
     NMeasurements= sum(Sim.SlabHistogramSeries[1,Sim.NSteps-Windowlength+1:Sim.NSteps,1].!=0.0)
     AvgHist = sum(Sim.SlabHistogramSeries[xaxis,Sim.NSteps-Windowlength:Sim.NSteps,:], dims=2)./(NMeasurements)
 
-    fig = Plots.plot(dpi=300, ylabel= "avg. density"* "  [kg/L]" , xlabel= "z-Axis [Å]" ) 
-    for (index, label) in IndexDict
-        Plots.plot!(xaxis, AvgHist[:,1,index],  label=label, title=Sim.SimulationName) # color=:black,
+    if isnothing(title)
+        split_ =  split(Sim.SimulationName[3:end],"_")
+        title= "$(split_[1]) @ $(split_[2])"
     end
 
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.png")
-    Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_AvgSlabHist_$(Windowlength)_LastFrames.pdf")
+    ylabel_ = normalize ?  L"\langle \rho(z)\rangle/\langle \rho(z=0)\rangle" : L"\langle \rho(z)\rangle\quad[\textrm{kg/L}]"
+    fig = Plots.plot(dpi=300, size=size, ylabel= ylabel_ , xlabel= L"z\quad[\textrm{Å}]", minorticks=10, gridalpha=1.0) 
+    for (index, label) in IndexDict
+        mean_ = normalize ? mean(AvgHist[-10:10,1,index]) : 1
+        Plots.plot!(xaxis,AvgHist[:,1,index]./mean_,  label=label, title= title, legendtitlefontsize=9, c= index==1 ? :black : index, legend= normalize ? :bottom : :best, legend_column= normalize ?  2 : 1) # color=:black,
+    end
+
+    addon= normalize ?  "_normed" : ""
+    if !isnothing(xlims)
+        Plots.plot!(xlims=xlims,xticks=xlims[1]:100:xlims[2])
+        addon *= "_lims"
+    end
+
+    Plots.savefig(fig, Sim.PlotPath*filename*"_AvgSlabHist_$(Windowlength)$(addon)_LastFrames.png")
+    Plots.savefig(fig, Sim.PlotPath*filename*"_AvgSlabHist_$(Windowlength)$(addon)_LastFrames.pdf")
     return fig
 end
 
