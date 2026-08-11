@@ -1,4 +1,5 @@
-using LaTeXStrings, Plots
+
+export plotRGAutocorrComp
 
 function plotBondAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R <: Real , I<: Integer}
     BondAnglePlot = Plots.plot(xlabel="Bond Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Bond angle histogram")
@@ -34,7 +35,7 @@ function plotDihedralAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path:
     for Sim in Sims
         DihedralAnglePlot= Plots.plot!(axes(Sim.TorsionHist,2), Sim.TorsionHist[end,:]*100,  label=Sim.SimulationName)
     end
-    #Plots.plot!(( x)*180.0/π, (P+P2)*100/2.0, label="Probability")
+
     Plots.savefig(DihedralAnglePlot, Path*"Comp_DihedralAngleHist.png")
     Plots.savefig(DihedralAnglePlot, Path*"Comp_DihedralAngleHist.pdf")
     return DihedralAnglePlot
@@ -262,3 +263,4 @@ function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, fil
 
     return fig
 end
+ext = Base.get_extension(HPSAnalysis, :HPSAnalysisPlots)

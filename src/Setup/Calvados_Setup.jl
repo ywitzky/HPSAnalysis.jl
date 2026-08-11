@@ -74,6 +74,7 @@ function CalvadosSetup(Sequences, AtomTypes, pH, AaToId, SimulationType)
     ResToLongAtomType = Dict()
     NewSequences= deepcopy(Sequences)
     cnt = 96 ### use lower case ascii letters as modified residue types
+    ### @TODO FIX THIS, works only on first chain
     for (id,Sequence) in enumerate(Sequences)
         if( ~((Sequence[1], true) in  keys(ResToLongAtomType)))
             ResToLongAtomType[(Sequence[1], true)] = Char(cnt+=1) 

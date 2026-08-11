@@ -188,30 +188,30 @@ isinbounds(x,y,z, bounds)=(bounds[1][1] ≤ x ≤ bounds[1][2]) && (bounds[2][1]
     # -----------------------------------------------------------------
     L = 100.0
     Sim = HPSAnalysis.SimData()
-    Sim.NAtoms      = 9
+    Sim.NAtoms      = 12
     Sim.NChains     = 3
     Sim.NSteps      = 3                                 # three frames
-    Sim.ChainStart  = [1,4,7]
-    Sim.ChainStop   = [3,6,9]
-    Sim.ChainLength = [3,3,3]
-    Sim.x           = zeros(9, 3)
-    Sim.y           = zeros(9, 3)
-    Sim.z           = zeros(9, 3)
+    Sim.ChainStart  = [1,5,9]
+    Sim.ChainStop   = [4,8,12]
+    Sim.ChainLength = [4,4,4]
+    Sim.x           = zeros(12, 3)
+    Sim.y           = zeros(12, 3)
+    Sim.z           = zeros(12, 3)
     Sim.BoxLength   = [L, L, L]
-    Sim.Charges     = zeros(9)
-    Sim.IDs         = [1,2,3, 1,2,3, 1,2,3]            # three types, repeated per chain
-    Sim.IDToResName = Dict(i=>string('A'+i-1) for i in 1:3)
-    Sim.IDToSigmas  = [5,6,7]
-    Sim.IDToLambdas = collect(LinRange(0.2,1.0,3))
-    Sim.Masses      = ones(9)
-    Sim.ChainMasses = [3,3,3]
+    Sim.Charges     = zeros(12)
+    Sim.IDs         = [1,2,3,4, 1,2,3,4, 1,2,3,4]            # three types, repeated per chain
+    Sim.IDToResName = Dict(i=>string('A'+i-1) for i in 1:4)
+    Sim.IDToSigmas  = [5,6,7,8]
+    Sim.IDToLambdas = collect(LinRange(0.2,1.0,4))
+    Sim.Masses      = ones(12)
+    Sim.ChainMasses = [4,4,4]
     Sim.EquilibrationTime = 1
     Sim.RGMeasureStep     = 1
 
     # -----------------------------------------------------------------
     #   Charge pattern (same for all steps)
     # -----------------------------------------------------------------
-    id_to_charge = [ +1.0, 0.0, -1.0 ]           # A = +1, B = 0, C = –1
+    id_to_charge = [ +1.0, 0.0, -1.0, 0.5 ]           # A = +1, B = 0, C = –1
     Sim.Charges = [ id_to_charge[id] for id in Sim.IDs ]
 
     # -----------------------------------------------------------------
@@ -219,19 +219,20 @@ isinbounds(x,y,z, bounds)=(bounds[1][1] ≤ x ≤ bounds[1][2]) && (bounds[2][1]
     # -----------------------------------------------------------------
     for step in 1:3
         # chain 1 – will stay *inside* the bound in every step
-        Sim.x[1:3, step] = [30, 40, 50] .+ 0.0
-        Sim.y[1:3, step] .= 50
-        Sim.z[1:3, step] .= 50
+        Sim.x[1:4, step] = [30, 34, 38, 42
+        ] .+ 0.0
+        Sim.y[1:4, step] .= 50
+        Sim.z[1:4, step] .= 50
 
         # chain 2 – moves partially outside the bound in step 2
-        Sim.x[4:6, step] = [30, 40, 50] .+ (step == 2 ? -35 : 0)
-        Sim.y[4:6, step] .= 50
-        Sim.z[4:6, step] .= 50
+        Sim.x[5:8, step] = [30, 40, 50, 60] .+ (step == 2 ? -35 : 0)
+        Sim.y[5:8, step] .= 50
+        Sim.z[5:8, step] .= 50
 
         # chain 3 – moves partially outside the bound in step 3
-        Sim.x[7:9, step] = [30, 40, 50] .+ (step == 3 ? +35 : 0)
-        Sim.y[7:9, step] .= 50
-        Sim.z[7:9, step] .= 50
+        Sim.x[9:12, step] = [30, 40, 50, 60] .+ (step == 3 ? +35 : 0)
+        Sim.y[9:12, step] .= 50
+        Sim.z[9:12, step] .= 50
     end
 
     # centre box (so that the minimum‑image convention works)
@@ -248,7 +249,7 @@ isinbounds(x,y,z, bounds)=(bounds[1][1] ≤ x ≤ bounds[1][2]) && (bounds[2][1]
     # -----------------------------------------------------------------
     #   indices 1‑3 → -1 (active)
     #   indices 4‑9 → 0  (inactive)
-    _test_body_vec[] = vcat(fill(-1,3), fill(0,6))
+    _test_body_vec[] = vcat(fill(-1,4), fill(0,8))
 
     # -----------------------------------------------------------------
     #   Bounding‑box that *excludes* chain 2 in step 2 and chain 3 in step 3.
@@ -306,7 +307,7 @@ isinbounds(x,y,z, bounds)=(bounds[1][1] ≤ x ≤ bounds[1][2]) && (bounds[2][1]
             for (i_rel,i) in enumerate(Sim.ChainStart[chain]:Sim.ChainStop[chain])
                 if _test_body_vec[][i]!=-1 continue end
                 for (j_rel,j) in enumerate(Sim.ChainStart[chain]:Sim.ChainStop[chain])
-                    if i_rel >= j_rel  continue end
+                    if !(j_rel > i_rel+1)   continue end
                     if _test_body_vec[][j]!=-1 continue end
 
                     # distance with minimum‑image convention

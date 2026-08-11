@@ -261,7 +261,11 @@ function computeInertiaTensor(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
-function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100; Range::Union{Nothing,Vector{Vector{I2}}}=nothing) where {R<:Real, I<:Integer, I2<:Integer}
+function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100)  where {R<:Real, I<:Integer}
+    computePolymerCharacteristics(Sim, Start, [Start:Sim.RGMeasureStep:Sim.NSteps for _ in 1:Sim.NChains])
+end
+
+function computePolymerCharacteristics(Sim::SimData{R,I}, Start, Range::Vector{Vector{I2}}) where {R<:Real, I<:Integer, I2<:Integer}
     λ = Sim.InertiaTensorEigVals
     Sim.ShapeAsymmetry =  1.0 .-3.0.*(λ[1,:,:].*λ[2,:,:].+λ[1,:,:].*λ[3,:,:].+λ[2,:,:].*λ[3,:,:])./(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]).^2 ### arash + janka
     Sim.ParallelInertiaTensor = @. (λ[1,:,:]+λ[2,:,:])/2.0
@@ -269,8 +273,8 @@ function computePolymerCharacteristics(Sim::SimData{R,I}, Start=100; Range::Unio
     Sim.Asphericity = @. (λ[3,:,:]-0.5*(λ[1,:,:]+λ[2,:,:]))/(λ[1,:,:]+λ[2,:,:]+λ[3,:,:]) ### wikipedia + own norm
     Sim.Acylindricity = @. (λ[2,:,:] - λ[1,:,:])/(λ[1,:,:].+λ[2,:,:].+λ[3,:,:]) ### https://journals.aps.org/pre/pdf/10.1103/PhysRevE.106.064606
 
-    Range = isnothing(Range) ? [Start:Sim.RGMeasureStep:Sim.NSteps for _ in 1:Sim.NChains] :  Range
-    NDataPoints = convert(eltype(Sim.x), (Sim.NSteps-Start+1)÷Sim.RGMeasureStep)
+    #Range = isnothing(Range) ? [Start:Sim.RGMeasureStep:Sim.NSteps for _ in 1:Sim.NChains] :  Range
+    NDataPoints = convert(R, (Sim.NSteps-Start+1)÷Sim.RGMeasureStep)
     Sim.MeanShapeAsymmetry = [sum(Sim.ShapeAsymmetry[i,Range[i]])./NDataPoints for i in 1:Sim.NChains]
     Sim.MeanAspectRatio    = [sum(Sim.AspectRatio[   i,Range[i]])./NDataPoints for i in 1:Sim.NChains]
     Sim.MeanAsphericity    = [sum(Sim.Asphericity[   i,Range[i]])./NDataPoints for i in 1:Sim.NChains] 
