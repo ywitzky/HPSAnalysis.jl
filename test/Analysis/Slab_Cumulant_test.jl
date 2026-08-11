@@ -104,17 +104,17 @@ conv_fac=1.66053906660 ### conversion from u/AA^3 to kg/L which is done in the f
         Sim.z_uw = deepcopy(Sim.z)
         Sim.Masses = ones(Float32, Sim.NAtoms)
 
-        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, [5], [5])
+        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, 5, 5)
 
         @test all(conv_fac*1.0*ones(Float32, 12, 12,1) .≈ dilute)
         @test all(conv_fac*5.0*ones(Float32, 12, 12,1) .≈ dense)
 
-        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, [4], [4])
+        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, 4, 4)
 
         @test all(isapprox.(conv_fac*20.0/12.0*ones(Float32, 12, 12,1), dilute; atol=10^-6))
         @test all(conv_fac*5.0*ones(Float32, 12, 12,1) .≈ dense)
 
-        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, [6], [6])
+        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, 6, 6)
 
         @test all(conv_fac*1.0*ones(Float32, 12, 12,1) .≈ dilute)
         @test all(isapprox.(conv_fac*52.0/12.0*ones(Float32, 12, 12,1), dense; atol=10^-6))
@@ -151,7 +151,7 @@ conv_fac=1.66053906660 ### conversion from u/AA^3 to kg/L which is done in the f
         Sim.z_uw = deepcopy(Sim.z)
         Sim.Masses = ones(Float32, Sim.NAtoms)
 
-        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, [5], [5])
+        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, 5, 5)
 
         @test all(conv_fac*1.0*ones(Float32, 12, 12,1) .≈ dilute)
         @test all(conv_fac*10.5*ones(Float32, 12, 12,1) .≈ dense)
@@ -187,7 +187,7 @@ conv_fac=1.66053906660 ### conversion from u/AA^3 to kg/L which is done in the f
         Sim.z_uw = deepcopy(Sim.z)
         Sim.Masses = ones(Float32, Sim.NAtoms)
 
-        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, [5], [5])
+        dense, dilute = HPSAnalysis.computeBinderCumulantsSubBoxes(Sim, 5, 5)
 
         const_dilute = conv_fac*1.0*ones(Float32, 12, 12,1)
         const_dense = conv_fac*5.0*ones(Float32, 12, 12,1)
