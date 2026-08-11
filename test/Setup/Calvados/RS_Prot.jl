@@ -110,7 +110,7 @@ for (protID, protein) in enumerate(ToCreate)
         pos = readPositionFromCif(ProteinToCif["RS31"])
         local ENM = HPSAnalysis.Setup.BuildENMModel(Data, FoldedDomains, Proteins, Sequences, ProteinToJSON)
 
-        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 1, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=FoldedDomains[protein],Device="CPU",WriteOutFreq=100, ENM)
+        HPSAnalysis.Setup.writeStartConfiguration(Path, "/$(protein)_slab","/$(SimulName)_Start_slab", Info, Sequences, BoxSize , 1, HOOMD=true ; SimulationType="Calvados3" , Temperature=temp,  InitStyle="Pos", Pos=pos , pH=pH,domain=Dict(protein=>FoldedDomains[protein]),Device="CPU",WriteOutFreq=100, ENM)
 
         ### test if it crashes
         if PythonTests

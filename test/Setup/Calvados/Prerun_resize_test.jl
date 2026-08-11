@@ -39,18 +39,24 @@ close(io)
 TestDict = Dict("test"=> "$(BasePath)test.cif")
 PosDict, LenDict = HPSAnalysis.AlphaFold_startpos(TestDict, ["test"],["abc"])
 
+pos = Float32.([-23.073 27.290  -30.037; -24.013 27.248  -26.348;-21.064 25.649  -24.585 ])
+shift =  ((maximum(pos, dims=1)+minimum(pos, dims=1))/2.0)[1:3]
+pos[:,1] .-= shift[1]
+pos[:,2] .-= shift[2]
+pos[:,3] .-= shift[3]
+
 @test LenDict == Dict{String, Int32}("test"=>Int32(3))
-@test PosDict == Dict{String,Matrix{Float32}}("test"=> Float32.([-23.073 27.290  -30.037; -24.013 27.248  -26.348;-21.064 25.649  -24.585 ]))
+@test collect(keys(PosDict)) == ["test"]
+@test all(isapprox.(PosDict["test"], pos, rtol=10^-3))
 
 (min_vals, max_vals) = HPSAnalysis.getLargestBoundingbox(PosDict)
-@test all(isapprox.(min_vals , [-24.013, 25.649, -30.037], rtol=10^-3) )
-@test all(isapprox.(max_vals , [-21.064, 27.290, -24.585], rtol=10^-3))
+@test isapprox(min_vals , [-24.013, 25.649, -30.037].-shift, rtol=10^-3)
+@test isapprox(max_vals , [-21.064, 27.290, -24.585].-shift, rtol=10^-3)
 
 ### potentially test CreateStartConfiguration 
 
 
 if PythonTests
-
     Proteins = ["tia1", "ubq2", "ubq3", "ubq4", "gal3"]
     DomainDict = Dict("tia1" => [(6, 82),(95, 172),(190, 275)], "ubq2" => [(11, 82),(87, 158)], "ubq3" => [(1, 72),(77, 148),(153, 224)], "ubq4" => [(1, 72),(77, 148),(153, 224),(229, 300)], "gal3" => [(117, 250)])
 
