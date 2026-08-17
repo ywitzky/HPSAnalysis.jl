@@ -1,9 +1,4 @@
 
-#module GSD
-#include("./Unify.jl")
-
-
-
 #
 
 #=
@@ -25,7 +20,7 @@ function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 end
 =#
 
-function plotREEVecAutocorr(Sim::HPSAnalysis.SimData{R,I}, conf=0.1) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotREEVecAutocorr(Sim::HPSAnalysis.SimData{R,I}, conf=0.1) where {R<:Real, I<:Integer}
     x = (collect(R, axes(Sim.REEVecSeries,1)).-convert(R,1.0)) * convert(R,conf)
 
     Plots.plot(xlabel="Lag time [ns]", ylabel="AutoCorr [steps]")
@@ -58,7 +53,7 @@ end
     Plots.savefig(Sim.PlotPath*Sim.SimulationName*"_RG_Autocorr.pdf")
 end=#
 
-function plotChargeBondTime(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotChargeBondTime(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Sim.CellResolution=20.
     Sim.ChargeAnalysisCutoff=20.
     if length(Sim.ChargeContactTimeHist)==0
@@ -91,7 +86,7 @@ function plotChargeBondTime(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 	return ChargeBondTime
 end
 
-function plotChargeBonds(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotChargeBonds(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     if length(Sim.ChargeChainContactMatrix)==0
         SetFieldsFromData(Sim, ["ChargeChainContactMatrix", "MaxChainLength", "ChargeResidueContactMatrix"])
     #    computeChargeCorrelations(Sim)
@@ -110,7 +105,7 @@ function plotChargeBonds(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return ChargeMatrix
 end
 
-function plotMSDofChains(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotMSDofChains(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Plots.gr()
     MSD_Plot=Plots.plot()
     MSD_Diff=Plots.plot()
@@ -211,7 +206,7 @@ function plotMSDofChains(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return MSD_Master
 end
 
-function plotBondHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotBondHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
 
     #max_val = maximum(axes(Sim.BondHist),1)
     BondPlot= Plots.plot(axes(Sim.BondHist,1)/100, Sim.BondHist*100, xlabel="Bond distance r [AA]", ylabel="P(r) [%]", label="", xlim=(3,4.5))
@@ -231,7 +226,7 @@ Plot of the befor computed histogram of dihedral angles.
 **Create**:
 * A histogram of dihedral angles.
 """
-function plotDihedralAngleHist(Sim)
+function HPSAnalysis.plotDihedralAngleHist(Sim)
     kα1 = 11.4
     kα2 = 0.15
     θα1 = 0.90
@@ -285,7 +280,7 @@ Plot of the histogram of bond angles.
 **Create**:
 * A histogram of bond angles.
 """
-function plotBondAngleHist(Sim)
+function HPSAnalysis.plotBondAngleHist(Sim)
     BondAnglePlot= Plots.plot(axes(Sim.BondAngleHist,1)*180.0/size(Sim.BondAngleHist,1), Sim.BondAngleHist[:]*100, xlabel="Bond Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Bond angle histogram", label="")
 
     Plots.savefig(BondAnglePlot, Sim.PlotPath*Sim.SimulationName*"_BondAngleHist.png")
@@ -293,7 +288,7 @@ function plotBondAngleHist(Sim)
     return BondAnglePlot
 end
 
-function plotRGHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotRGHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Plots.plot()
     RG_Hist = Plots.histogram([(Sim.RGSeries...)...], normalize=:pdf, xlabel="RG [AA]", ylabel="P(RG)", label="") #,, bins=b_range color=:gray)
     Plots.savefig(RG_Hist, Sim.PlotPath*Sim.SimulationName*"_RGHist.png")
@@ -301,7 +296,7 @@ function plotRGHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return RG_Hist
 end
 
-function plotRGSeries(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotRGSeries(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Hist= Plots.plot()
     axis = axes(Sim.RGSeries[1,:])
     for chain in 1:Sim.NChains
@@ -313,7 +308,7 @@ function plotRGSeries(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return RG_Hist
 end
 
-function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
     axis = 0:length(Sim.RGAutocorr[1,:])-1
     avg = sum(Sim.RGAutocorr, dims=1)[1,:]./Sim.NChains
@@ -329,7 +324,7 @@ function plotRGAutocorr(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return RG_Auto
 end
 
-function plotREEHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotREEHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Plots.plot()
     REE_Hist = Plots.histogram([(Sim.REESeries...)...], normalize=:pdf, xlabel="REE [AA]", ylabel="P(REE)", label="") #,, bins=b_range color=:gray)
     Plots.savefig(REE_Hist, Sim.PlotPath*Sim.SimulationName*"_REEHist.png")
@@ -337,7 +332,7 @@ function plotREEHist(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     return REE_Hist
 end
 
-function animateDensityGif(Sim::SimData{R,I}, NBins=100) where {R<:Real, I<:Integer}
+function HPSAnalysis.animateDensityGif(Sim::SimData{R,I}, NBins=100) where {R<:Real, I<:Integer}
 
     conversion = 1.66053906660/(Sim.BoxLength[1]*Sim.BoxLength[2]/Float32(NBins)^2*Sim.BoxLength[3])
     weights= Sim.Masses*conversion
@@ -358,7 +353,7 @@ end
 
 Plots the average slab histogram of the frames in range Sim.NSteps-Windowlength:Sim.NSteps. Result is empty if the Windowlength is larger then the step size at which histgrams here computed.
 """
-function plotAvgSlabDensity(Sim::HPSAnalysis.SimData{R,I};size=(400, 400), IndexDict=Dict(1=>"all"), Windowlength=100, title=nothing, normalize=false,xlims=nothing, filename=nothing) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotAvgSlabDensity(Sim::HPSAnalysis.SimData{R,I};size=(400, 400), IndexDict=Dict(1=>"all"), Windowlength=100, title=nothing, normalize=false,xlims=nothing, filename=nothing) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
@@ -407,7 +402,7 @@ Plots the average slab histogram in range n\*Windowlength:(n+1)\*Windowlength st
 **Create**:
 * A histogram of the average density.
 """
-function plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100, dilute_pos=0, dense_pos=0) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength=100, dilute_pos=0, dense_pos=0) where {R<:Real, I<:Integer}
     if Windowlength > Sim.NSteps
         Windowlength=Sim.NSteps
     end
@@ -474,7 +469,7 @@ Plots the logarithmic density histogram computed by [`computeDensityHistogram`](
 **Create**:
 * A time averaged histogram of the average density per subcube of the simulation box.
 """
-function plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     res = 80
     x=10.0.^((collect(axes(Sim.DensityHist,1)).-(6*res))./res)#./NRes
 
@@ -493,7 +488,7 @@ Plots the square intra chain distance |r_i-r_j| on logarithmic scales as compute
 **Arguments**:
 - `Sim::SimData{R,I}`: A simulation data structure containing the Simulation information.
 """
-function plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     fig = Plots.plot( xlim=(1, maximum(length.(Sim.IntraChainScalingSlidingWindow))), ylim=(1, maximum(maximum.(Sim.IntraChainScalingSlidingWindow))*1.2),  xlabel="i []", ylabel="|r_i-r_j|^2 [AA]", xscale=:log10, yscale=:log10, minorticks=true)
     
     for (S, Sequence) in enumerate(Sim.IntraChainScalingNaiv)
@@ -510,7 +505,7 @@ function plotIntraChainScaling(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     Plots.savefig(fig, Sim.PlotPath*Sim.SimulationName*"_IntraChainScaling.pdf")
 end
 
-function plotHOOMDTemperature(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotHOOMDTemperature(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     try
         file = h5open("$(Sim.BasePath)pressure.h5", "r")
         temperature = collect(file["hoomd-data"]["md"]["compute"]["ThermodynamicQuantities"]["kinetic_temperature"])
@@ -526,7 +521,7 @@ function plotHOOMDTemperature(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     end
 end
 
-function plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
     N = ceil(Int32, sqrt(Sim.NChains))
     fig=Plots.plot(layout=(N,N), xlabel="Amino Acids i [-]", ylabel="Amino Acids j [-]")
 
@@ -563,7 +558,7 @@ function compute_submatrix(matrix::Matrix{R}, ranges) where {R<:Real}
     return small_matrix, large_matrix
 end
 
-function plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}(), labels=["",""],inPercent=false) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}(), labels=["",""],inPercent=false) where {R<:Real, I<:Integer}
 
     IntraChainMatrix = sum(Sim.IntraChainContactMatrix)./length(Sim.IntraChainContactMatrix)
     
@@ -647,7 +642,7 @@ function getTypeNameDictWithEndingNames(Sim::SimData{R,I}; RenamePhosAA=Dict('#'
     return local_IDToResName
 end
 
-function plotMeanEnergyPerID(Sim::SimData{R,I}; inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+function HPSAnalysis.plotMeanEnergyPerID(Sim::SimData{R,I}; inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
     fig =  Plots.plot(xlabel="Amino Acid i", ylabel="Amino Acid j",title=L"\quad\langle E \rangle~\textrm{per~Sequence~Index}~[\textrm{J/mol}]")
 
     if inter
@@ -663,7 +658,7 @@ function plotMeanEnergyPerID(Sim::SimData{R,I}; inter=true)::Plots.Plot{Plots.GR
     return fig
 end
 
-function plotMeanEnergyPerType(Sim::SimData{R,I};inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
+function HPSAnalysis.plotMeanEnergyPerType(Sim::SimData{R,I};inter=true)::Plots.Plot{Plots.GRBackend} where {R<:Real,I<:Integer} 
     IDToResNames = getTypeNameDictWithEndingNames(Sim)
 
     NIds = maximum(keys(IDToResNames))
@@ -682,7 +677,7 @@ function plotMeanEnergyPerType(Sim::SimData{R,I};inter=true)::Plots.Plot{Plots.G
     return fig
 end
 
-function plotMeanEnergies(Sim::SimData{R,I}; annotatePlot=true) where {R<:Real,I<:Integer} 
+function HPSAnalysis.plotMeanEnergies(Sim::SimData{R,I}; annotatePlot=true) where {R<:Real,I<:Integer} 
     figs =[]
     for (inter,addon) in [(true,""), (false,"_intra")]
         figa= plotMeanEnergyPerID(Sim; inter=inter)

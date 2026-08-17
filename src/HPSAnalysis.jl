@@ -16,4 +16,8 @@ include("./Setup.jl")
  
 include("./IO.jl")
 include("./Analysis.jl")
+
+### load empty functions to be extended in HPSAnalysisPlots
+include("../ext/Plot/EmptyFuncs.jl")
+
 end # module HPSAnalysis

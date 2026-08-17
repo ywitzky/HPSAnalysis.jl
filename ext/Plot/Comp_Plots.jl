@@ -1,7 +1,7 @@
 
 export plotRGAutocorrComp
 
-function plotBondAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R <: Real , I<: Integer}
+function HPSAnalysis.plotBondAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R <: Real , I<: Integer}
     BondAnglePlot = Plots.plot(xlabel="Bond Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Bond angle histogram")
     for Sim in Sims
         Plots.plot!(axes(Sim.BondAngleHist,1)*180.0/size(Sim.BondAngleHist,1), Sim.BondAngleHist[:]*100, label=Sim.SimulationName)
@@ -11,7 +11,7 @@ function plotBondAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::Str
     return BondAnglePlot
 end
 
-function plotRGAutocorrComp(Sims::Vector{HPSAnalysis.SimData{R,I}},  Path::String) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotRGAutocorrComp(Sims::Vector{HPSAnalysis.SimData{R,I}},  Path::String) where {R<:Real, I<:Integer}
     RG_Auto= Plots.plot(xlabel="lag time [τ]", ylabel="autocorr []", xlims=(0,500),ylims=(-0.5, 1.0))
     for Sim in Sims
         axis = axes(Sim.RGAutocorr[1,:])
@@ -30,7 +30,7 @@ function plotRGAutocorrComp(Sims::Vector{HPSAnalysis.SimData{R,I}},  Path::Strin
     return RG_Auto
 end
 
-function plotDihedralAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R<:Real, I<:Integer}
+function HPSAnalysis.plotDihedralAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path::String) where {R<:Real, I<:Integer}
     DihedralAnglePlot= Plots.plot(xlabel="Diehedral Angle Ψ [Degree]", ylabel="P(Ψ) [%]", title="Dihedral angle histogram", label="",legend_position=:topleft)
     for Sim in Sims
         DihedralAnglePlot= Plots.plot!(axes(Sim.TorsionHist,2), Sim.TorsionHist[end,:]*100,  label=Sim.SimulationName)
@@ -41,7 +41,7 @@ function plotDihedralAngleHistComp(Sims::Vector{HPSAnalysis.SimData{R,I}}, Path:
     return DihedralAnglePlot
 end
 
-function computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.SimData{R,I}},ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),color_inter=:thermal,color_intra=:hawaii, xspace::Int64=50) where {R<:Real, I<:Integer,I2<:Integer}
+function HPSAnalysis.computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.SimData{R,I}},ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),color_inter=:thermal,color_intra=:hawaii, xspace::Int64=50) where {R<:Real, I<:Integer,I2<:Integer}
    # Prepare the contact matrices (unchanged from the original code)
     inter_CMs = [Sim.ContactMatrices for Sim in Sims]
     addon = ""
@@ -82,7 +82,7 @@ function computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.SimData{R,I}},
 
 end
 
-function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
+function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
 
     nSims = length(Sims) # how many simulations we have
 
@@ -96,7 +96,7 @@ function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::Stri
     ]
     nGrid=ncols*nrows
 
-    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace)
+    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace)
 
     # Figure and colour‑bars
     fig = plot(layout = comb_layout,margins = -3mm, left_margin = 0mm, right_margin = 0mm,size = Size, top_margin=0mm, bottom_margin=0mm, minorticks=10)
@@ -161,10 +161,10 @@ function plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::Stri
 end
 
 
-function plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true) where {R<:Real, I<:Integer,I2<:Integer}
+function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true) where {R<:Real, I<:Integer,I2<:Integer}
     @assert length(Sims)>=2 "Number of Simulations needs to be atleast 2"
 
-     inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = computeContactMatrixColorMatrix(Sims,Vector{Vector{UnitRange{Int32}}}(),color_inter,color_intra, xspace)
+     inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,Vector{Vector{UnitRange{Int32}}}(),color_inter,color_intra, xspace)
     grid = Plots.grid(1,3)
 
     comb_layout = @layout [

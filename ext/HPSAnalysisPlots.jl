@@ -1,7 +1,7 @@
 module HPSAnalysisPlots
 using HPSAnalysis
 using HPSAnalysis: SimData
-using Plots, Printf, Measures, LinearAlgebra, ColorSchemes, LaTeXStrings
+using Plots, Printf, Measures, LinearAlgebra, ColorSchemes, LaTeXStrings, Statistics
 
 include("./Plot/Comp_Plots.jl")
 include("./Plot/Plot.jl")
