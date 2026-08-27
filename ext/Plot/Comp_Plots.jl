@@ -41,14 +41,22 @@ function HPSAnalysis.plotDihedralAngleHistComp(Sims::Vector{HPSAnalysis.SimData{
     return DihedralAnglePlot
 end
 
-function HPSAnalysis.computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.SimData{R,I}},ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),color_inter=:thermal,color_intra=:hawaii, xspace::Int64=50) where {R<:Real, I<:Integer,I2<:Integer}
+function HPSAnalysis.computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.SimData{R,I}},ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),color_inter=:thermal,color_intra=:hawaii, xspace::Int64=50, amino_acids_volume::Vector{<:Vector{<:Real}}=Vector{Float64}[]) where {R<:Real, I<:Integer,I2<:Integer}
+   
    # Prepare the contact matrices (unchanged from the original code)
     inter_CMs = [Sim.ContactMatrices for Sim in Sims]
     addon = ""
 
+    @assert all(map(x->all(0 .<= x .<=1.0 ),  amino_acids_volume)) "'amino_acids_volume' needs to be in range (0,1]."
+    if length(amino_acids_volume) == length(Sims) && all(map(x->!(isempty(x)), amino_acids_volume)) 
+        addon *= length(ranges) ==  length(Sims) ? "_VolumeWeight" : ""
+    else
+        amino_acids_volume = [Vector{Float32}([]) for _ in enumerate(inter_CMs)]
+    end
+
     if length(ranges) > 0
         for (i, CM) in enumerate(inter_CMs)
-            _, inter_CMs[i] = compute_submatrix(CM, ranges[i])
+            _, inter_CMs[i] = compute_submatrix(CM, ranges[i], amino_acids_volume[i])
             addon = "_with_coarse"
         end
     end
@@ -140,7 +148,7 @@ function usePercentage!(inPercent, clims, data)
     return label,clims, data
 end
 
-function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
+function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false, amino_acids_volume::Vector{<:Vector{<:Real}}=Vector{Float64}[]) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
 
     nSims = length(Sims)
     grid,  ncols,nrows = determineGrid(Grid, nSims)  # Determine the grid that will hold the heat‑maps
@@ -150,7 +158,7 @@ function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}
     ]
     nGrid=ncols*nrows
 
-    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace)
+    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace,amino_acids_volume)
 
     # Figure and colour‑bars
     fig = plot(layout = comb_layout,margins = -3mm, left_margin = 0mm, right_margin = 0mm,size = Size, top_margin=0mm, bottom_margin=0mm, minorticks=10)
@@ -178,7 +186,7 @@ function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}
     return fig
 end
 
-function HPSAnalysis.plotContactMatrixCompTopBottomBars(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=0mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
+function HPSAnalysis.plotContactMatrixCompTopBottomBars(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=0mm, tspace=0mm,lspace=0mm,inPercent=false, amino_acids_volume::Vector{<:Vector{<:Real}}=Vector{Float64}[]) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
 
     nSims = length(Sims)
     grid, ncols,nrows  = determineGrid(Grid, nSims)  # Determine the grid that will hold the heat‑maps
@@ -190,7 +198,7 @@ function HPSAnalysis.plotContactMatrixCompTopBottomBars(Sims::Vector{HPSAnalysis
     ]
     nGrid=ncols*nrows
 
-    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace)
+    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace,amino_acids_volume)
 
     # Figure and colour‑bars
     fig = plot(layout = comb_layout, left_margin = 0mm, right_margin=0.5mm, size = Size, top_margin=0mm, bottom_margin=0mm, minorticks=10)

@@ -542,15 +542,23 @@ function get_color(value, clims, scheme)
     return colorschemes[scheme][norm_val]
 end
 
-function compute_submatrix(matrix::Matrix{R}, ranges) where {R<:Real}
+function compute_submatrix(matrix::Matrix{R}, ranges, volume::Vector{<:Real}=Float64[]) where {R<:Real}
     N = size(matrix, 1)
     N_sub = length(ranges)
     small_matrix = zeros(R, (N_sub,N_sub))
     large_matrix = zeros(R, (N,N))
 
+    weighted = !isempty(volume)
+    weighted && @assert length(volume) == N "'volume' needs one entry per row/column of 'matrix'."
+
     for (i,range_i) in enumerate(ranges)
         for (j, range_j) in enumerate(ranges)
-            mean_val = mean(matrix[range_i, range_j])
+            if weighted
+                w = volume[range_i] * transpose(volume[range_j])
+                mean_val = sum(matrix[range_i, range_j] .* w) / sum(w)
+            else
+                mean_val = mean(matrix[range_i, range_j])
+            end
             large_matrix[range_i,range_j] .= mean_val
             small_matrix[i,j] = mean_val
         end
