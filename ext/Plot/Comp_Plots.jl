@@ -82,14 +82,68 @@ function HPSAnalysis.computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.Si
 
 end
 
-function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
+# blanks out any grid subplots left over when nSims < ncols*nrows
+function fillEmptyGridCells!(fig,subplot_range, ncols::Integer, nrows::Integer)
+    for i in subplot_range
+        row = ((i - 1) ÷ ncols) + 1
+        col = ((i - 1) % ncols) + 1
+        xlbl = (row == nrows) ? "Amino Acids i " : ""
+        ylbl = (col == 1)     ? "Amino Acids j " : ""
+        plot!(fig,subplot=i, xlabel = xlbl, ylabel = ylbl, framestyle = :none)
+    end
+end
 
-    nSims = length(Sims) # how many simulations we have
+# optional red boxes marking Points[i] on top of heat‑map subplot j, for j in subplot_range
+function overlayPoints!(fig,Points::Vector{Vector{R2}}, NMats, subplot_range, ::Type{IntType}) where {R2<:Real, IntType<:Integer}
+    length(Points) == 0 && return
+    for (i, j) in enumerate(subplot_range)
+        len = NMats[i]
+        if length(Points[i]) > 0
+            for point in Points[i]
+                plot!(fig,[point,point],[floor(IntType,len*0.975), len], label="", c=:red, subplot=j, linewidth=2.0)
+                plot!(fig,[floor(IntType,len*0.975), len],[point,point], label="", c=:red, subplot=j, linewidth=2.0)
+            end
+        end
+    end
+end
 
-    # Determine the grid that will hold the heat‑maps
+# one heat‑map subplot per simulation, starting at subplot index offset+1
+function plotHeatmapGrid!(fig, Color_Mats, Lims, Ticks, NMats, Labels::Vector{String}, ncols::Integer, nrows::Integer, LabelSize, bspace, lspace; offset::Integer=1, xlbl::AbstractString="Amino Acids i ", ylbl::AbstractString="Amino Acids j ")
+    for i in 1:length(Color_Mats)
+        subplot_idx = offset + i
+
+        row = ((i - 1) ÷ ncols) + 1
+        col = ((i - 1) % ncols) + 1
+
+        xlbl_ = (row == nrows) ? xlbl : ""
+        ylbl_ = (col == 1)     ? ylbl : ""
+        bs = (row == nrows) ? bspace  : 0mm
+        ls = (col ==1) ? lspace : 0mm
+
+        heatmap!(fig, Color_Mats[i],yflip = false,lims = Lims[i],ticks = Ticks[i],subplot = subplot_idx, xlabel = xlbl_, ylabel = ylbl_, AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,bottom_margin=bs,left_margin=ls)
+
+        # label in the upper‑right corner of each panel
+        annotate!(fig, [NMats[i] / 2.0],[NMats[i] * 0.95],text(get(Labels, i, ""), :black, :center, LabelSize), subplot = subplot_idx)
+    end
+end
+
+function determineGrid(Grid, nSims)
     ncols = isnothing(Grid) ? ceil(Int, sqrt(nSims)) : Grid[1]
     nrows = isnothing(Grid) ? ceil(Int, nSims/ncols) : Grid[2] 
-    grid = Plots.grid(nrows,ncols)
+    return Plots.grid(nrows,ncols), ncols,nrows
+end
+
+function usePercentage!(inPercent, clims, data)
+    label = inPercent ?  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad [\%]" :  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})" 
+    clims = inPercent ? clims.*100.0 : clims
+    data .*= inPercent ? 100.0 : 1.0
+    return label,clims, data
+end
+
+function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=-7mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
+
+    nSims = length(Sims)
+    grid,  ncols,nrows = determineGrid(Grid, nSims)  # Determine the grid that will hold the heat‑maps
     comb_layout = @layout [
         a{0.975w}  b{0.025w};
         [grid]    c{0.975h,0.025w}
@@ -107,56 +161,57 @@ function HPSAnalysis.plotContactMatrixComp(Sims::Vector{HPSAnalysis.SimData{R,I}
     # empty placeholder (keeps the left bar thin)
     plot!(subplot = 2, framestyle = :none, bottom_margin=topsepspace, left_margin=rightsepspace,right_margin=2mm)
 
-    ylabel_ = inPercent ?  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad [\%]" :  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})" 
-    # inter‑chain colour bar (right)
-    clims_inter = inPercent ? clims_inter.*100.0 : clims_inter
-    data_inter .*= inPercent ? 100.0 : 1.0
+    ylabel_,clims_inter, data_inter = usePercentage!(inPercent, clims_inter, data_inter)
+
     heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = nGrid + 3,yrotation = 90.0,xmirror = true,ylabel = ylabel_,xlabel = nothing,yticks = true,tick_direction = :out,right_margin = 2.5mm,labelfontsize = LabelSize, left_margin=rightsepspace,yminorticks=10)
 
     # Plot the heat‑maps - one subplot per simulation
-    for i in 1:nSims
-        subplot_idx = 2 + i                      # 3,4,5,… (first heat‑map is 3)
+    plotHeatmapGrid!(fig, Color_Mats, Lims, Ticks, NMats, Labels, ncols, nrows, LabelSize, bspace, lspace; offset=2)
 
-        # Decide whether we need axis‑labels for this cell
-        row = ((i - 1) ÷ ncols) + 1
-        col = ((i - 1) % ncols) + 1
-
-        xlbl = (row == nrows) ? "Amino Acids i " : ""
-        ylbl = (col == 1)     ? "Amino Acids j " : ""
-        bs = (row == nrows) ? bspace  : 0mm
-        ls = (col ==1) ? lspace : 0mm
-
-        heatmap!(Color_Mats[i],yflip = false,lims = Lims[i],ticks = Ticks[i],subplot = subplot_idx, xlabel = xlbl, ylabel = ylbl, AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,bottom_margin=bs,left_margin=ls)
-
-        # label in the upper‑right corner of each panel
-        annotate!([NMats[i] / 2.0],[NMats[i] * 0.95],text(get(Labels, i, ""), :black, :center, LabelSize), subplot = subplot_idx)
-    end
-
-    for i in 3+nSims:2+nGrid
-        row = ((i - 1) ÷ ncols) + 1
-        col = ((i - 1) % ncols) + 1
-        xlbl = (row == nrows) ? "Amino Acids i " : ""
-        ylbl = (col == 1)     ? "Amino Acids j " : ""
-        plot!(subplot=i, xlabel = xlbl,framestyle = :none,)
-    end
+    fillEmptyGridCells!(fig, 3+nSims:2+nGrid, ncols, nrows)
 
     # (Optional) plot point‑sets on top of each heat‑map
-    if length(Points) > 0
-        cnt = nSims + 4
-        for (i, j) in enumerate(3:(nSims + 2))   # `j` is the heat‑map subplot index
-            len = NMats[i]
-            if length(Points) > 0 && length(Points[i]) > 0
-                # Create twin axes that share the limits of the heat‑map
-                for point in Points[i]
-                    plot!([point,point],[floor(I,len*0.975), len], label="", c=:red, subplot=j, linewidth=2.0)
-                    plot!([floor(I,len*0.975), len],[point,point], label="", c=:red, subplot=j, linewidth=2.0)
-                end
-            end
-        end
-    end
+    overlayPoints!(fig, Points, NMats, 3:(nSims+2), I)
 
     Plots.savefig(fig, Path * "Comp_ContactMatrix$(addon).png")
     Plots.savefig(fig, Path * "Comp_ContactMatrix$(addon).pdf")
+    return fig
+end
+
+function HPSAnalysis.plotContactMatrixCompTopBottomBars(Sims::Vector{HPSAnalysis.SimData{R,I}},Path::String,Labels::Vector{String};Size=(600,600),color_inter=:thermal,color_intra=:hawaii,LabelSize= 10,Points::Vector{Vector{R2}}=Vector{Vector{Int32}}(),xspace::Int64=50,ranges::Vector{Vector{UnitRange{I2}}}=Vector{Vector{UnitRange{Int32}}}(),Grid=nothing,topsepspace=-7mm, bspace=0mm,rightsepspace=0mm, tspace=0mm,lspace=0mm,inPercent=false) where {R<:Real, I<:Integer,I2<:Integer, R2<:Real}
+
+    nSims = length(Sims)
+    grid, ncols,nrows  = determineGrid(Grid, nSims)  # Determine the grid that will hold the heat‑maps
+    # colour‑bars stacked above and below the grid instead of beside it
+    comb_layout = @layout [
+        a{0.05h};
+        [grid];
+        c{0.05h}
+    ]
+    nGrid=ncols*nrows
+
+    inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,ranges,color_inter,color_intra, xspace)
+
+    # Figure and colour‑bars
+    fig = plot(layout = comb_layout, left_margin = 0mm, right_margin=0.5mm, size = Size, top_margin=0mm, bottom_margin=0mm, minorticks=10)
+
+    # intra‑chain colour bar (top)
+    heatmap!(data_intra, [1],transpose([data_intra;;]),color = color_intra,colorbar = false,subplot = 1,yaxis = nothing,xmirror = true,xlabel = L"\ln(\langle d_{ij}\rangle/\AA)",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=topsepspace, clims=clims_intra,top_margin=tspace,xlims=clims_intra)
+
+    xlabel_,clims_inter, data_inter = usePercentage!(inPercent, clims_inter, data_inter)
+
+    heatmap!(data_inter,[1], transpose([data_inter;;]),colorbar = false, clims = clims_inter,color = color_inter, xlabel = xlabel_,tick_direction = :out,labelfontsize = LabelSize, left_margin=rightsepspace,xminorticks=10,subplot = nGrid + 2, bottom_margin=3mm,yaxis = nothing, top_margin=topsepspace,xlims=clims_inter) 
+
+    # Plot the heat‑maps - one subplot per simulation
+    plotHeatmapGrid!(fig, Color_Mats, Lims, Ticks, NMats, Labels, ncols, nrows, LabelSize, bspace, lspace; offset=1, xlbl="", ylbl="")
+
+    fillEmptyGridCells!(fig,2+nSims:1+nGrid, ncols, nrows)
+
+    # (Optional) plot point‑sets on top of each heat‑map
+    overlayPoints!(fig,Points, NMats, 2:(nSims+1), I)
+
+    Plots.savefig(fig, Path * "Comp_ContactMatrixWide$(addon).png")
+    Plots.savefig(fig, Path * "Comp_ContactMatrixWide$(addon).pdf")
     return fig
 end
 

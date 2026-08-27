@@ -30,4 +30,5 @@ function plotBondAngleHistComp end
 function plotDihedralAngleHistComp end
 function computeContactMatrixColorMatrix end
 function plotContactMatrixComp end
+function plotContactMatrixCompTopBottomBars end
 function plotContactMatrixDifference end
