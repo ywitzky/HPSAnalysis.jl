@@ -82,7 +82,7 @@ function HPSAnalysis.computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.Si
         push!(Color_Mats, colour_mat)
         NMat = size(matrix, 1)
         push!(NMats, NMat)
-        push!(Lims, (0.5, NMat - 0.5))
+        push!(Lims, (0.5, NMat + 0.5))
         push!(Ticks, vcat([1], collect(0:xspace:NMat)[2:end]))
     end
 
@@ -224,7 +224,7 @@ function HPSAnalysis.plotContactMatrixCompTopBottomBars(Sims::Vector{HPSAnalysis
 end
 
 
-function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true) where {R<:Real, I<:Integer,I2<:Integer}
+function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true, inPercent=false) where {R<:Real, I<:Integer,I2<:Integer}
     @assert length(Sims)>=2 "Number of Simulations needs to be atleast 2"
 
      inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,Vector{Vector{UnitRange{Int32}}}(),color_inter,color_intra, xspace)
@@ -241,15 +241,17 @@ function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimDat
 
     heatmap!(data_intra, [1],transpose([data_intra;;]),color = color_intra,colorbar = false,subplot = 1,yaxis = nothing,xmirror = true,xlabel = L"\ln(<d_{ij}>)",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=bspace, clims=clims_intra, top_margin=tspace)
 
+    label,clims_inter, data_inter = usePercentage!(inPercent, clims_inter, data_inter)
 
-    heatmap!(data_inter, [1],transpose([data_inter;;]),color = color_inter,colorbar = false,subplot = 2,yaxis = nothing,xmirror = true,xlabel = L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=bspace, clims = clims_inter, top_margin=tspace)
+    heatmap!(data_inter, [1],transpose([data_inter;;]),color = color_inter,colorbar = false,subplot = 2,yaxis = nothing,xmirror = true,xlabel =label,ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=bspace, clims = clims_inter, top_margin=tspace)
 
     xlbl = "Amino Acids i "
     ylbl = "Amino Acids j "
 
-    Plots.heatmap!(Color_Mats[1], subplot=3,yflip = false,lims = Lims[1],ticks = Ticks[1], xlabel = xlbl, ylabel = ylbl, AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,left_margin=4mm)
+    Plots.heatmap!(Color_Mats[1], subplot=3,yflip = false,lims = Lims[1],ticks = Ticks[1], xlabel = xlbl, ylabel = ylbl, AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,left_margin=4mm, minorticks=10)
 
-    Plots.heatmap!(Color_Mats[2], subplot=4, yflip = false,lims = Lims[2],ticks = Ticks[2], xlabel = xlbl, ylabel = "", AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top)
+    #Ticks[2]
+    Plots.heatmap!(Color_Mats[2], subplot=4, yflip = false,lims = Lims[2],ticks = Ticks[2], xlabel = xlbl, ylabel = "", AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top, minorticks=10)
 
     # label in the upper‑right corner of each panel
     annotate!([NMats[1] / 2.0],[NMats[1] * 0.95],text(get(Labels, 1, ""), :black, :center, LabelSize), subplot = 3)
@@ -299,20 +301,22 @@ function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimDat
     sep_space=-3mm
     heatmap!(data_intra, [1],transpose([data_intra;;]),color = color_intra,colorbar = false, subplot = 1,yaxis = nothing,xmirror = true,xlabel = L"\Delta\ln(<d_{ij}>)",ticks = true,tick_direction = :out, labelfontsize = LabelSize, xminorticks=10, bottom_margin=bspace, clims=clims_intra, top_margin=tspace,left_margin=sep_space,right_margin=rr_space)
 
-    Plots.heatmap!(colour_mat, subplot=3, yflip = false, ticks=ticks, xlabel = xlbl, ylabel = "", AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,lims=lims, left_margin=sep_space,right_margin=rr_space)
-
-
+    Plots.heatmap!(colour_mat, subplot=3, yflip = false, ticks=ticks, xlabel = xlbl, ylabel = "", AspectRatio = true, yrotation = 90.0,tick_direction = :out,colorbar=false, guidefontsize=LabelSize,ytickfontvalign=:top,lims=lims, left_margin=sep_space,right_margin=rr_space, minorticks=10)
 
     # empty placeholder (keeps the right bar thin)
     plot!(subplot = 2, framestyle = :none, bottom_margin=bspace, left_margin=lspace,right_margin=rspace, top_margin=tspace)
 
 
-    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = 4,yrotation = 90.0,xmirror = true,ylabel = L"\Delta P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})",xlabel = nothing,tick_direction = :out,labelfontsize = LabelSize, left_margin=lspace,yminorticks=10,right_margin=rspace,)
+    label,clims_inter, data_inter = usePercentage!(inPercent, clims_inter, data_inter)
 
-    for (i,range) in zip([3,4],ranges)
-        low  = first(range)
-        high =  last(range)
-        plot!(fig1,[low, low,high, high,low], [low, high, high, low,low], linewidth=3, linecolor=:red, label="", linestyle=:solid, subplot=i)
+    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = 4,yrotation = 90.0,xmirror = true,ylabel = label ,xlabel = nothing,tick_direction = :out,labelfontsize = LabelSize, left_margin=lspace,yminorticks=10,right_margin=rspace,)
+
+    if any(NMats .!= last.(ranges)) ### dont plot squares if equally long proteins are compared.
+        for (i,range) in zip([3,4],ranges)
+            low  = first(range)
+            high =  last(range)
+            plot!(fig1,[low, low,high, high,low], [low, high, high, low,low], linewidth=3, linecolor=:red, label="", linestyle=:solid, subplot=i)
+        end
     end
 
     ### COMBINE PLOTS
@@ -326,4 +330,5 @@ function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimDat
 
     return fig
 end
-ext = Base.get_extension(HPSAnalysis, :HPSAnalysisPlots)
+
+#ext = Base.get_extension(HPSAnalysis, :HPSAnalysisPlots)
