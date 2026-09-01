@@ -141,10 +141,11 @@ function determineGrid(Grid, nSims)
     return Plots.grid(nrows,ncols), ncols,nrows
 end
 
-function usePercentage!(inPercent, clims, data)
-    label = inPercent ?  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})\quad [\%]" :  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})" 
-    clims = inPercent ? clims.*100.0 : clims
-    data .*= inPercent ? 100.0 : 1.0
+function usePercentage!(inPercent, clims, data; inPermille=false)
+    fac,sign = inPermille ? (1000.0,"‰") : (100.0, "\\%")
+    label = inPercent ?  latexstring("P(d_{ij}<1.1\\cdotσ\\cdot2^{(1/6)})\\quad ["*sign*"]") :  L"P(d_{ij}<1.1\cdotσ\cdot2^{(1/6)})" 
+    clims = inPercent ? clims.*fac : clims
+    data .*= inPercent ? fac : 1.0
     return label,clims, data
 end
 
@@ -224,10 +225,10 @@ function HPSAnalysis.plotContactMatrixCompTopBottomBars(Sims::Vector{HPSAnalysis
 end
 
 
-function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{I2}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true, inPercent=false) where {R<:Real, I<:Integer,I2<:Integer}
+function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimData{R,I}}, filename::String;color_inter=:thermal,color_intra=:hawaii,ranges::Vector{UnitRange{I2}}=Vector{UnitRange{Int32}}(),xspace::Int64=50,Size=(1050,400), LabelSize=10, bspace=-3mm,lspace=-6mm, rspace=-3mm, tspace=7mm, Labels::Vector{String}=["",""],CheckSequence=true, inPercent=false,CoarseRanges::Vector{Vector{UnitRange{I3}}}=Vector{Vector{UnitRange{Int32}}}()) where {R<:Real, I<:Integer,I2<:Integer,I3<:Integer}
     @assert length(Sims)>=2 "Number of Simulations needs to be atleast 2"
 
-     inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,Vector{Vector{UnitRange{Int32}}}(),color_inter,color_intra, xspace)
+     inter_CMs , intra_CMs, clims_inter, clims_intra, data_inter, data_intra, Color_Mats, NMats, Lims, Ticks,addon = HPSAnalysis.computeContactMatrixColorMatrix(Sims,CoarseRanges,color_inter,color_intra, xspace)
     grid = Plots.grid(1,3)
 
     comb_layout = @layout [
@@ -286,10 +287,10 @@ function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimDat
     cmax =maximum(maximum(abs.(intra_diff)))
     clims_intra = (-cmax, cmax)
 
-    color_inter = :romaO
+    color_inter = :redgreensplit #:romaO
     color_intra = :tarn
 
-    colour_mat = [istriu_ ? get_color(val, clims_inter, color_inter) : get_color(val, clims_intra, color_intra) for (istriu_, val) in zip(is_triu, matrix) ]
+    colour_mat = [istriu_ ? get_color(-val, clims_inter, color_inter) : get_color(val, clims_intra, color_intra) for (istriu_, val) in zip(is_triu, matrix) ]
     
     ticks = vcat([1], collect(0:xspace:size(inter_diff)[1])[2:end])
     lims= (1,size(inter_diff)[1])
@@ -307,9 +308,9 @@ function HPSAnalysis.plotContactMatrixDifference(Sims::Vector{HPSAnalysis.SimDat
     plot!(subplot = 2, framestyle = :none, bottom_margin=bspace, left_margin=lspace,right_margin=rspace, top_margin=tspace)
 
 
-    label,clims_inter, data_inter = usePercentage!(inPercent, clims_inter, data_inter)
+    label,clims_inter, data_inter = usePercentage!(inPercent, clims_inter, data_inter; inPermille=true)
 
-    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = color_inter,xticks = nothing,ymirror = true,yguide = nothing,subplot = 4,yrotation = 90.0,xmirror = true,ylabel = label ,xlabel = nothing,tick_direction = :out,labelfontsize = LabelSize, left_margin=lspace,yminorticks=10,right_margin=rspace,)
+    heatmap!([1], data_inter, [data_inter;;],colorbar = false, clims = clims_inter,color = cgrad(color_inter, rev=true),xticks = nothing,ymirror = true,yguide = nothing,subplot = 4,yrotation = 90.0,xmirror = true,ylabel = label ,xlabel = nothing,tick_direction = :out,labelfontsize = LabelSize, left_margin=lspace,yminorticks=10,right_margin=rspace,)
 
     if any(NMats .!= last.(ranges)) ### dont plot squares if equally long proteins are compared.
         for (i,range) in zip([3,4],ranges)
