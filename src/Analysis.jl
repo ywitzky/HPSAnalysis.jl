@@ -43,14 +43,10 @@ function isNotInSameChain(Sim::SimData, i::I,j::I) where{I<:Integer}
 end
 
 function FitSeries(Sim::SimData, Series::Vector{Float64},Func, Init::Vector{Float64}, SaveAs; xlabel="", ylabel="", label="")
-    FitPlot = Plots.plot()
     axis= collect(Float64, axes(Series)[1])
     Fit=LsqFit.curve_fit(Func , axis, Series, Init)
     if Fit.converged
-        Plots.plot!(axis, Func(axis, Fit.param), xlabel=xlabel, ylabel=ylabel, label=label)
-        Plots.plot!(axis, Series, label="data")
-        Plots.savefig(FitPlot, Sim.PlotPath*Sim.SimulationName*"_$SaveAs.png")
-        Plots.savefig(FitPlot, Sim.PlotPath*Sim.SimulationName*"_$SaveAs.pdf")
+        plotFitSeries(axis, Series, Func, Fit, Sim.PlotPath*Sim.SimulationName*"_$SaveAs"; xlabel=xlabel, ylabel=ylabel, label=label)
         return Fit.param
     else
         printstyled("Fit did not converge!"; color=:red)

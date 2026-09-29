@@ -14,6 +14,10 @@ function animateDensityGif end
 function plotAvgSlabDensity end
 function plotAvgSlabDensityEvolution end
 function plotDensityHistogram end
+function plotSurfaceWidthFit end
+function plotFitSeries end
+function plotSwapSteps end
+function plotHREMDMSDofChains end
 function plotIntraChainScaling end
 function plotHOOMDTemperature end
 function plotIntraChainContactMatrix end
@@ -32,3 +36,4 @@ function computeContactMatrixColorMatrix end
 function plotContactMatrixComp end
 function plotContactMatrixCompTopBottomBars end
 function plotContactMatrixDifference end
+function plotContactMatrixDifferenceGroups end

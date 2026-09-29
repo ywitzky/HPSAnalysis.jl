@@ -458,6 +458,100 @@ function HPSAnalysis.plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength
     return fig
 end
 
+function HPSAnalysis.plotSurfaceWidthFit(xvals, yvals, model, SaveAs; size=(400,300))
+    fig = Plots.plot(xvals,yvals, size=size,label="sim. data", xlabel=L"|z-z_\textrm{drop.}|\quad[\AA]", ylabel=L"\rho(z)\quad[\textrm{kg/L}]", minorticks=10,gridalpha=1.0)
+    Plots.plot!(xvals,HPSAnalysis.tanh_profile(xvals, model.param),label="tanh. fit", xlim=(0,2*model.param[4]))
+
+    Plots.savefig(fig, SaveAs*".png")
+    Plots.savefig(fig, SaveAs*".pdf")
+
+    return fig
+end
+
+function HPSAnalysis.plotFitSeries(axis, Series, Func, Fit, SaveAs; xlabel="", ylabel="", label="")
+    FitPlot = Plots.plot()
+    Plots.plot!(axis, Func(axis, Fit.param), xlabel=xlabel, ylabel=ylabel, label=label)
+    Plots.plot!(axis, Series, label="data")
+    Plots.savefig(FitPlot, SaveAs*".png")
+    Plots.savefig(FitPlot, SaveAs*".pdf")
+    return FitPlot
+end
+
+function HPSAnalysis.plotSwapSteps(ChargeFile::String)
+    Steps, Charges, ID, Restarts = HPSAnalysis.readChargeAssignments(ChargeFile)
+
+    fig = Plots.plot(xlabel="Steps", ylabel="q_i"*" at Sim i")
+    for i in axes(ID,1) Plots.plot!(Steps[1:end-1],  Charges[i,1:end-1], label="") end
+    Plots.vline!(Restarts, c=:black, label="")
+    return fig
+end
+
+function HPSAnalysis.plotHREMDMSDofChains(Data::HPSAnalysis.HREMD_Data{R,I}) where {R<:Real, I<:Integer}
+    Plots.gr()
+    MSD_Plot= Plots.plot()
+    MSD_Diff= Plots.plot(title="X-Y-Z")
+    MSD_all = Plots.plot()
+
+    Diff_all = Plots.plot( title="X-Y-Z")
+
+
+    #MinLength = minimum(Sim.BoxLength)/2. ### visualisation of a improper behaviour of the Analysis after certain diffusion values
+    #MaxDeviation = MinLength^2
+    MSD_XY = Plots.plot()
+    MSD_XZ = Plots.plot()
+    MSD_YZ = Plots.plot()
+
+    Diff_XY = Plots.plot(title="X")
+    Diff_XZ = Plots.plot(title="Y")
+    Diff_YZ = Plots.plot(title="Z")
+    for Sim in Data.ReplicaData
+
+        avg = sum(Sim.MSD, dims=1)[1,:,:]/Sim.NChains
+        MaxVal = maximum(avg)
+        ylims = [1, MaxVal]
+
+        Plots.plot!(MSD_all, axes(avg,1), avg[:,1]+avg[:,2]+avg[:,3], color=:black, label="", ylim=ylims.*3)
+
+    #  Plots.hline!([MaxDeviation], label="", linewidth=1; color=:red)
+        Plots.plot!(MSD_XY, axes(avg,1), avg[:,1], color=:black, title="X" , label="", ylim=ylims) #+avg[:,2], title="X-Y"
+
+        #Plots.hline!([MaxDeviation], label="", linewidth=1; color=:red)
+        Plots.plot!(MSD_XZ, axes(avg,1), avg[:,2], color=:black, title="Y" , label="", ylim=ylims)
+
+
+        #Plots.hline!([MaxDeviation], label="", linewidth=1; color=:red)
+        Plots.plot!(MSD_YZ, axes(avg,1), avg[:,3], color=:black, title="Z" , label="" , ylim=ylims)
+
+
+        steps = length(axes(avg,1))
+        diff_avg  = avg[2:steps,:]-avg[1:steps-1,:]
+        #max_step=Int32(min(500., Float32(length(axes(avg,1)))))
+        #lims = [minimum(diff_avg[1:max_step,:])*0.95, maximum(diff_avg[1:max_step,:])*1.05]
+        lims = [0,5.0]
+
+        Plots.plot!(Diff_all, 1:steps-1, diff_avg[:,1]+diff_avg[:,2]+diff_avg[:,3], color=:black, label="" , ylims= lims)
+        Plots.plot!(Diff_XY, 1:steps-1, diff_avg[:,1], color=:black, label="" , ylims= lims)
+        Plots.plot!(Diff_XZ, 1:steps-1, diff_avg[:,2], color=:black, label="" , ylims= lims)
+        Plots.plot!(Diff_YZ, 1:steps-1, diff_avg[:,3], color=:black, label="" ,  ylims= lims)
+
+
+    end
+    Sim = Data.ReplicaData[1]
+
+    Plots.annotate!(Diff_all,(-0.2, 1.3), Plots.text("$(Sim.SimulationName)")) ### hacky way to get plot title that isnt set for subplots
+
+    MSD_Plot = Plots.plot(MSD_all, MSD_XY,MSD_XZ,MSD_YZ, layout=4, plot_title="MSD") # xscale=:log, yscale=:log,
+    MSD_Diff = Plots.plot(Diff_all, Diff_XY, Diff_XZ, Diff_YZ, layout=4, plot_title="d/dt MSD")
+    Plots.vline!([50, 100,150,200], label="restarts")
+    MSD_Master = Plots.plot(MSD_Plot , MSD_Diff, layout=2, size=(1600, 600),)
+
+
+    Plots.savefig(MSD_Master, Sim.PlotPath*"HREMD_MSD_Chains.png")
+    Plots.savefig(MSD_Master, Sim.PlotPath*"HREMD_MSD_Chains.pdf")
+
+    return MSD_Master
+end
+
 
 @doc raw"""
     plotDensityHistogram(Sim::SimData{R,I}) where {R<:Real, I<:Integer}
@@ -534,12 +628,33 @@ function HPSAnalysis.plotIntraChainContactMatrix(Sim::SimData{R,I}) where {R<:Re
 end
 
 
-function get_color(value, clims, scheme)
+function get_color(value, clims, scheme; zero_centered::Bool=false)
     if isnan(value)
         return RGBA(0.0, 0.0, 0.0, 0.0)
     end
-    norm_val = clamp((value - clims[1]) / (clims[2] - clims[1]), 0.0, 1.0)
+    if zero_centered
+        lo, hi = clims
+        norm_val = value >= 0 ? 0.5 + 0.5*clamp(hi > 0 ? value/hi : 0.0, 0.0, 1.0) :
+                                 0.5 - 0.5*clamp(lo < 0 ? value/lo : 0.0, 0.0, 1.0)
+    else
+        norm_val = clamp((value - clims[1]) / (clims[2] - clims[1]), 0.0, 1.0)
+    end
     return colorschemes[scheme][norm_val]
+end
+
+# a colour gradient whose neutral/middle colour is pinned at value 0, even for asymmetric
+# clims, so Plots' own linear clims normalization (heatmap `color=`/`clims=`) puts the
+# scheme's neutral colour exactly at the 0 tick instead of at the midpoint of clims.
+# Finely resamples the whole scheme through the same piecewise remap get_color(zero_centered=true)
+# uses, rather than interpolating between just the 3 anchor colours (which would skip any
+# intermediate hues the scheme has between its ends and its middle).
+function zero_centered_cgrad(clims, scheme; nstops::Integer=101)
+    lo, hi = clims
+    pos0 = clamp((0.0 - lo) / (hi - lo), 0.0, 1.0)
+    orig_pos(p) = p <= pos0 ? (pos0 > 0 ? 0.5*p/pos0 : 0.5) :
+                              0.5 + 0.5*(p - pos0)/(pos0 < 1 ? 1 - pos0 : 1)
+    ps = range(0.0, 1.0, length=nstops)
+    return cgrad([colorschemes[scheme][orig_pos(p)] for p in ps], ps)
 end
 
 function compute_submatrix(matrix::Matrix{R}, ranges, volume::Vector{<:Real}=Float64[]) where {R<:Real}

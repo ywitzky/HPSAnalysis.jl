@@ -257,14 +257,11 @@ function determineSurfaceWidth(Sim::HPSAnalysis.SimData{R,I}; Windowlength=300, 
 
     xvals = collect(xaxis[1:1000])
     yvals = collect(density[1:1000])
-    fig = Plots.plot(xvals,yvals, size=size,label="sim. data", xlabel=L"|z-z_\textrm{drop.}|\quad[\AA]", ylabel=L"\rho(z)\quad[\textrm{kg/L}]", minorticks=10,gridalpha=1.0)
 
     W0 = xvals[findfirst(x->x<0.2,yvals)] ### rough guess where the center of the tanh is
     model = curve_fit(tanh_profile, xvals, yvals, [0.5, 0.0,30.0, W0])
-    Plots.plot!(xvals,tanh_profile(xvals, model.param),label="tanh. fit", xlim=(0,2*model.param[4]))
 
-    Plots.savefig(fig, Sim.PlotPath*"SurfaceWidthFit.png" )
-    Plots.savefig(fig, Sim.PlotPath*"SurfaceWidthFit.pdf" )
+    plotSurfaceWidthFit(xvals, yvals, model, Sim.PlotPath*"SurfaceWidthFit"; size=size)
 
     return model.param[3]
 end
