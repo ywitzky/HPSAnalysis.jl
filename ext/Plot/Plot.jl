@@ -418,7 +418,7 @@ function HPSAnalysis.plotAvgSlabDensityEvolution(Sim::SimData{R,I}; Windowlength
         stop = start + Windowlength-1
         ### newer iterations dont measure at every frame. Detect which frames actually contain data
         NMeasurements= sum(Sim.SlabHistogramSeries[0,start:stop,1].!=0.0)
-        AvgHist[:,:,i] .= OffsetArrays.no_offset_view((reduce(+, Sim.SlabHistogramSeries[xaxis,start:stop,:], dims=2)./(NMeasurements)))[:,1,:] ### convert offsetarray back so that we can assign it to AvgHist
+        AvgHist[:,:,i] .= inter_vals.no_offset_view((reduce(+, Sim.SlabHistogramSeries[xaxis,start:stop,:], dims=2)./(NMeasurements)))[:,1,:] ### convert offsetarray back so that we can assign it to AvgHist
     end
     start = (tmp-1)*Windowlength+1
     stop=Sim.NSteps
@@ -657,11 +657,13 @@ function zero_centered_cgrad(clims, scheme; nstops::Integer=101)
     return cgrad([colorschemes[scheme][orig_pos(p)] for p in ps], ps)
 end
 
-function compute_submatrix(matrix::Matrix{R}, ranges, volume::Vector{<:Real}=Float64[]) where {R<:Real}
+function HPSAnalysis.compute_submatrix(matrix::Matrix{R},matrix_err::Matrix{R}, ranges, volume::Vector{<:Real}=Float64[]) where {R<:Real}
     N = size(matrix, 1)
     N_sub = length(ranges)
     small_matrix = zeros(R, (N_sub,N_sub))
     large_matrix = zeros(R, (N,N))
+    small_matrix_err = zeros(R, (N_sub,N_sub))
+    large_matrix_err = zeros(R, (N,N))
 
     weighted = !isempty(volume)
     weighted && @assert length(volume) == N "'volume' needs one entry per row/column of 'matrix'."
@@ -670,15 +672,19 @@ function compute_submatrix(matrix::Matrix{R}, ranges, volume::Vector{<:Real}=Flo
         for (j, range_j) in enumerate(ranges)
             if weighted
                 w = volume[range_i] * transpose(volume[range_j])
-                mean_val = sum(matrix[range_i, range_j] .* w) / sum(w)
+                mean_val = sum(matrix[    range_i, range_j] .* w) / sum(w)
+                err_val  = 0.0 # sum(matrix_err[range_i, range_j] .* w) / sum(w)
             else
-                mean_val = mean(matrix[range_i, range_j])
+                mean_val = mean(matrix[   range_i, range_j])
+                err_val = sqrt(sum(matrix_err[range_i, range_j].^2))/length(matrix_err[range_i, range_j])
             end
-            large_matrix[range_i,range_j] .= mean_val
-            small_matrix[i,j] = mean_val
+            large_matrix[    range_i,range_j] .= mean_val
+            large_matrix_err[range_i,range_j] .= err_val
+            small_matrix[    i,j] = mean_val
+            small_matrix_err[i,j] = err_val
         end
     end
-    return small_matrix, large_matrix
+    return small_matrix, large_matrix, small_matrix_err, large_matrix_err
 end
 
 function HPSAnalysis.plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ranges=Vector{UnitRange{<:Integer}}(), labels=["",""],inPercent=false) where {R<:Real, I<:Integer}
@@ -692,13 +698,15 @@ function HPSAnalysis.plotInterChainContactMatrix(Sim::SimData{R,I}; Size=500, ra
     ly = @layout([a{0.9w, 0.03h} b{0.1w, 0.03h}; c{0.95w, 0.95h} d{0.03w, 0.95h}])
 
     InterChainMatrix = Matrix{R}(Sim.ContactMatrices)
+    InterChainMatrixError = Matrix{R}(Sim.ContactMatricesError)
+
     ### plot once with errors and once with normal values
     for (i, (avg, iserror, label_)) in enumerate(zip([IntraChainMatrix , Sim.ContactMatricesError], ["", "_Error"],labels))
         fig=Plots.plot(xlabel="Amino Acids i ", ylabel="Amino Acids j ", colorbar=:legend, legend=:outertop,)
 
         addon=""
         if length(ranges)>0
-            _, InterChainMatrix = compute_submatrix(InterChainMatrix, ranges)
+            _, InterChainMatrix,_,_ = HPSAnalysis.compute_submatrix(InterChainMatrix,InterChainMatrixError, ranges)
             addon ="_with_coarse"
         end
         if any(isnan.(InterChainMatrix)) || any(isnan.(avg))

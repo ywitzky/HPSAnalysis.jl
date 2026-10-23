@@ -55,8 +55,8 @@ function HPSAnalysis.computeContactMatrixColorMatrix(Sims::Vector{HPSAnalysis.Si
     end
 
     if length(ranges) > 0
-        for (i, CM) in enumerate(inter_CMs)
-            _, inter_CMs[i] = compute_submatrix(CM, ranges[i], amino_acids_volume[i])
+        for (i, (CM, Sim)) in enumerate(zip(inter_CMs, Sims))
+            _, inter_CMs[i],_,_ = HPSAnalysis.compute_submatrix(CM, Matrix{eltype(CM)}(Sim.ContactMatricesError), ranges[i], amino_acids_volume[i])
             addon = "_with_coarse"
         end
     end
